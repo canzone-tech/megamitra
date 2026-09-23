@@ -4,6 +4,7 @@ import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
 import { BinaryPolicyModule } from './binary-policy/binary-policy.module';
 import { BinarySettlementModule } from './binary-settlement/binary-settlement.module';
+import { BinaryUnitModule } from './binary-unit/binary-unit.module';
 import { BinaryVolumeModule } from './binary-volume/binary-volume.module';
 import { CaptchaModule } from './captcha/captcha.module';
 import { envValidationSchema } from './config/env.validation';
@@ -36,6 +37,7 @@ import { UsersModule } from './users/users.module';
     GenealogyModule,
     BinaryPolicyModule,
     BinaryVolumeModule,
+    BinaryUnitModule,
     BinarySettlementModule,
     LedgerModule,
     HealthModule,
