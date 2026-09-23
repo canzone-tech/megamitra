@@ -52,6 +52,23 @@ enum AuditAction {
   UNBLOCK
 }
 
+enum PolicyLifecycle {
+  DRAFT
+  PUBLISHED
+  RETIRED
+}
+
+enum BinaryPlacementSide {
+  LEFT
+  RIGHT
+}
+
+enum BinaryVolumeEventType {
+  CREDIT
+  ADJUSTMENT
+  REVERSAL
+}
+
 model User {
   id                  String     @id @default(uuid()) @db.Char(36)
   username            String     @unique @db.VarChar(100)
@@ -77,6 +94,14 @@ model User {
   securityConfigUpdates     SystemSecurityConfig[]     @relation("SecurityConfigUpdater")
   authConfigUpdates         SystemAuthConfig[]         @relation("AuthConfigUpdater")
   registrationConfigUpdates SystemRegistrationConfig[] @relation("RegistrationConfigUpdater")
+  sponsorRelationship       SponsorRelationship?       @relation("SponsorMember")
+  sponsoredMembers          SponsorRelationship[]      @relation("SponsorOwner")
+  binaryPlacement           BinaryPlacement?           @relation("PlacementMember")
+  binaryChildren            BinaryPlacement[]          @relation("PlacementParent")
+  binaryAncestorLinks       BinaryAncestry[]           @relation("BinaryAncestor")
+  binaryDescendantLinks     BinaryAncestry[]           @relation("BinaryDescendant")
+  binaryVolumeEvents        BinaryVolumeEvent[]        @relation("VolumeSourceMember")
+  binaryVolumeCredits       BinaryUplineVolumeCredit[] @relation("VolumeCreditAncestor")
 
   @@index([email])
   @@index([phone])
@@ -201,7 +226,7 @@ model SystemAuthConfig {
   loginWithMobile              Boolean  @default(true)
   captchaOnLoginEnabled        Boolean  @default(false)
   captchaOnRegistrationEnabled Boolean  @default(false)
-  captchaTtlSeconds            Int      @default(300)
+  captchaTtlSeconds             Int      @default(300)
   accessTokenTtlSeconds         Int      @default(900)
   refreshTokenTtlSeconds        Int      @default(2592000)
   updatedByUserId               String?  @db.Char(36)
@@ -255,4 +280,137 @@ model SystemSequence {
   updatedAt DateTime @updatedAt @db.DateTime(3)
 
   @@map("system_sequences")
+}
+
+model SponsorRelationship {
+  id              String   @id @default(uuid()) @db.Char(36)
+  memberUserId    String   @unique @db.Char(36)
+  sponsorUserId   String   @db.Char(36)
+  createdByUserId String?  @db.Char(36)
+  createdAt       DateTime @default(now()) @db.DateTime(3)
+  member          User     @relation("SponsorMember", fields: [memberUserId], references: [id], onDelete: Restrict)
+  sponsor         User     @relation("SponsorOwner", fields: [sponsorUserId], references: [id], onDelete: Restrict)
+
+  @@index([sponsorUserId])
+  @@map("sponsor_relationships")
+}
+
+model BinaryPlacement {
+  id              String              @id @default(uuid()) @db.Char(36)
+  memberUserId    String              @unique @db.Char(36)
+  parentUserId    String              @db.Char(36)
+  side            BinaryPlacementSide
+  createdByUserId String?             @db.Char(36)
+  createdAt       DateTime            @default(now()) @db.DateTime(3)
+  member          User                @relation("PlacementMember", fields: [memberUserId], references: [id], onDelete: Restrict)
+  parent          User                @relation("PlacementParent", fields: [parentUserId], references: [id], onDelete: Restrict)
+
+  @@unique([parentUserId, side])
+  @@index([parentUserId])
+  @@map("binary_placements")
+}
+
+model BinaryAncestry {
+  ancestorUserId   String              @db.Char(36)
+  descendantUserId String              @db.Char(36)
+  depth            Int
+  firstLegSide     BinaryPlacementSide
+  createdAt        DateTime            @default(now()) @db.DateTime(3)
+  ancestor         User                @relation("BinaryAncestor", fields: [ancestorUserId], references: [id], onDelete: Restrict)
+  descendant       User                @relation("BinaryDescendant", fields: [descendantUserId], references: [id], onDelete: Restrict)
+
+  @@id([ancestorUserId, descendantUserId])
+  @@index([ancestorUserId, depth])
+  @@index([descendantUserId, depth])
+  @@map("binary_ancestry")
+}
+
+model BinaryPlan {
+  id              String              @id @default(uuid()) @db.Char(36)
+  code            String              @unique @db.VarChar(50)
+  name            String              @db.VarChar(120)
+  description     String?             @db.VarChar(500)
+  createdByUserId String?             @db.Char(36)
+  createdAt       DateTime            @default(now()) @db.DateTime(3)
+  updatedAt       DateTime            @updatedAt @db.DateTime(3)
+  versions        BinaryPlanVersion[]
+
+  @@map("binary_plans")
+}
+
+model BinaryPlanVersion {
+  id                     String                     @id @default(uuid()) @db.Char(36)
+  planId                 String                     @db.Char(36)
+  version                Int
+  lifecycle              PolicyLifecycle            @default(DRAFT)
+  effectiveFrom          DateTime                   @db.DateTime(3)
+  effectiveTo            DateTime?                  @db.DateTime(3)
+  qualifyingUnit         Decimal                    @db.Decimal(18, 4)
+  leftVolumePerPair      Decimal                    @db.Decimal(18, 4)
+  rightVolumePerPair     Decimal                    @db.Decimal(18, 4)
+  pairPayoutAmount       Decimal                    @db.Decimal(18, 2)
+  dailyPairCap           Int?
+  monthlyPairCap         Int?
+  carryForwardEnabled    Boolean
+  carryForwardExpiryDays Int?
+  qualificationRules     Json?
+  settlementRules        Json?
+  createdByUserId        String?                    @db.Char(36)
+  publishedByUserId      String?                    @db.Char(36)
+  retiredByUserId        String?                    @db.Char(36)
+  publishedAt            DateTime?                  @db.DateTime(3)
+  retiredAt              DateTime?                  @db.DateTime(3)
+  createdAt              DateTime                   @default(now()) @db.DateTime(3)
+  updatedAt              DateTime                   @updatedAt @db.DateTime(3)
+  plan                   BinaryPlan                 @relation(fields: [planId], references: [id], onDelete: Restrict)
+  volumeEvents           BinaryVolumeEvent[]
+  uplineCredits          BinaryUplineVolumeCredit[]
+
+  @@unique([planId, version])
+  @@index([planId, lifecycle])
+  @@index([lifecycle, effectiveFrom, effectiveTo])
+  @@map("binary_plan_versions")
+}
+
+model BinaryVolumeEvent {
+  id                 String                @id @default(uuid()) @db.Char(36)
+  sourceKey          String                @unique @db.VarChar(191)
+  sourceMemberUserId String                @db.Char(36)
+  planVersionId      String                @db.Char(36)
+  eventType          BinaryVolumeEventType
+  volume             Decimal               @db.Decimal(18, 4)
+  reversalOfEventId  String?               @unique @db.Char(36)
+  occurredAt         DateTime              @db.DateTime(3)
+  metadata           Json?
+  createdByUserId    String?               @db.Char(36)
+  createdAt          DateTime              @default(now()) @db.DateTime(3)
+  sourceMember       User                  @relation("VolumeSourceMember", fields: [sourceMemberUserId], references: [id], onDelete: Restrict)
+  planVersion        BinaryPlanVersion     @relation(fields: [planVersionId], references: [id], onDelete: Restrict)
+  reversalOf         BinaryVolumeEvent?    @relation("VolumeReversal", fields: [reversalOfEventId], references: [id], onDelete: Restrict)
+  reversedBy         BinaryVolumeEvent?    @relation("VolumeReversal")
+  uplineCredits      BinaryUplineVolumeCredit[]
+
+  @@index([sourceMemberUserId, occurredAt])
+  @@index([planVersionId, occurredAt])
+  @@index([eventType, occurredAt])
+  @@map("binary_volume_events")
+}
+
+model BinaryUplineVolumeCredit {
+  id            String              @id @default(uuid()) @db.Char(36)
+  volumeEventId String              @db.Char(36)
+  ancestorUserId String             @db.Char(36)
+  planVersionId String              @db.Char(36)
+  side          BinaryPlacementSide
+  depth         Int
+  volume        Decimal             @db.Decimal(18, 4)
+  createdAt     DateTime            @default(now()) @db.DateTime(3)
+  volumeEvent   BinaryVolumeEvent   @relation(fields: [volumeEventId], references: [id], onDelete: Restrict)
+  ancestor      User                @relation("VolumeCreditAncestor", fields: [ancestorUserId], references: [id], onDelete: Restrict)
+  planVersion   BinaryPlanVersion   @relation(fields: [planVersionId], references: [id], onDelete: Restrict)
+
+  @@unique([volumeEventId, ancestorUserId])
+  @@index([ancestorUserId, side, createdAt])
+  @@index([planVersionId, createdAt])
+  @@map("binary_upline_volume_credits")
 }
