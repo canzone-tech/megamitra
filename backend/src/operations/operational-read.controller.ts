@@ -1,11 +1,13 @@
-import { Controller, Get, Query } from '@nestjs/common';
+import { Controller, Get, Query, UseInterceptors } from '@nestjs/common';
 import type { AuthUser } from '../auth/auth-user';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { Permissions } from '../rbac/permissions.decorator';
+import { OperationalJsonSafeInterceptor } from './operational-json-safe.interceptor';
 import { OperationalListQueryDto } from './operational-read.dto';
 import { OperationalReadService } from './operational-read.service';
 
 @Controller('member')
+@UseInterceptors(OperationalJsonSafeInterceptor)
 export class MemberOperationalReadController {
   constructor(private readonly reads: OperationalReadService) {}
 
@@ -42,6 +44,7 @@ export class MemberOperationalReadController {
 
 @Controller('admin/operations')
 @Permissions('operations.read')
+@UseInterceptors(OperationalJsonSafeInterceptor)
 export class AdminOperationalReadController {
   constructor(private readonly reads: OperationalReadService) {}
 
