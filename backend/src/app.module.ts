@@ -1,10 +1,15 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-
+import { AuditModule } from './audit/audit.module';
+import { AuthModule } from './auth/auth.module';
+import { CaptchaModule } from './captcha/captcha.module';
 import { envValidationSchema } from './config/env.validation';
 import { PrismaModule } from './database/prisma.module';
 import { HealthModule } from './health/health.module';
+import { PlatformConfigModule } from './platform-config/platform-config.module';
+import { RbacModule } from './rbac/rbac.module';
 import { RedisModule } from './redis/redis.module';
+import { UsersModule } from './users/users.module';
 
 @Module({
   imports: [
@@ -13,13 +18,16 @@ import { RedisModule } from './redis/redis.module';
       cache: true,
       expandVariables: false,
       validationSchema: envValidationSchema,
-      validationOptions: {
-        abortEarly: false,
-      },
+      validationOptions: { abortEarly: false },
     }),
-
     PrismaModule,
     RedisModule,
+    AuditModule,
+    CaptchaModule,
+    AuthModule,
+    RbacModule,
+    UsersModule,
+    PlatformConfigModule,
     HealthModule,
   ],
 })

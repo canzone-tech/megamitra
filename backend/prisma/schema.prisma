@@ -15,6 +15,23 @@ enum UserStatus {
   BLOCKED
 }
 
+enum UserIdentifierType {
+  EMAIL
+  MOBILE
+}
+
+enum PasswordCreationMode {
+  AUTO
+  MANUAL
+  AUTO_OR_MANUAL
+}
+
+enum UsernameCreationMode {
+  AUTO
+  MANUAL
+  AUTO_OR_MANUAL
+}
+
 enum RoleStatus {
   ACTIVE
   INACTIVE
@@ -36,25 +53,30 @@ enum AuditAction {
 }
 
 model User {
-  id           String     @id @default(uuid()) @db.Char(36)
-  username     String     @unique @db.VarChar(100)
-  email        String?    @db.VarChar(191)
-  phone        String?    @db.VarChar(30)
-  passwordHash String     @db.VarChar(255)
-  firstName    String?    @db.VarChar(100)
-  lastName     String?    @db.VarChar(100)
-  status       UserStatus @default(PENDING)
+  id                  String     @id @default(uuid()) @db.Char(36)
+  username            String     @unique @db.VarChar(100)
+  email               String?    @db.VarChar(191)
+  phone               String?    @db.VarChar(30)
+  passwordHash        String     @db.VarChar(255)
+  firstName           String?    @db.VarChar(100)
+  lastName            String?    @db.VarChar(100)
+  status              UserStatus @default(PENDING)
+  emailVerifiedAt     DateTime?  @db.DateTime(3)
+  phoneVerifiedAt     DateTime?  @db.DateTime(3)
+  lastLoginAt         DateTime?  @db.DateTime(3)
+  mustChangePassword  Boolean    @default(false)
+  failedLoginAttempts Int        @default(0)
+  lockedUntil         DateTime?  @db.DateTime(3)
+  createdAt           DateTime   @default(now()) @db.DateTime(3)
+  updatedAt           DateTime   @updatedAt @db.DateTime(3)
 
-  emailVerifiedAt DateTime? @db.DateTime(3)
-  phoneVerifiedAt DateTime? @db.DateTime(3)
-  lastLoginAt     DateTime? @db.DateTime(3)
-
-  createdAt DateTime @default(now()) @db.DateTime(3)
-  updatedAt DateTime @updatedAt @db.DateTime(3)
-
-  roles     UserRole[]
-  auditLogs AuditLog[]    @relation("AuditActor")
-  sessions  AuthSession[]
+  roles                     UserRole[]
+  auditLogs                 AuditLog[]                 @relation("AuditActor")
+  sessions                  AuthSession[]
+  identifierClaims          UserIdentifierClaim[]
+  securityConfigUpdates     SystemSecurityConfig[]     @relation("SecurityConfigUpdater")
+  authConfigUpdates         SystemAuthConfig[]         @relation("AuthConfigUpdater")
+  registrationConfigUpdates SystemRegistrationConfig[] @relation("RegistrationConfigUpdater")
 
   @@index([email])
   @@index([phone])
@@ -68,10 +90,8 @@ model Role {
   name        String     @unique @db.VarChar(100)
   description String?    @db.VarChar(255)
   status      RoleStatus @default(ACTIVE)
-
-  createdAt DateTime @default(now()) @db.DateTime(3)
-  updatedAt DateTime @updatedAt @db.DateTime(3)
-
+  createdAt   DateTime   @default(now()) @db.DateTime(3)
+  updatedAt   DateTime   @updatedAt @db.DateTime(3)
   users       UserRole[]
   permissions RolePermission[]
 
@@ -80,26 +100,22 @@ model Role {
 }
 
 model Permission {
-  id          String  @id @default(uuid()) @db.Char(36)
-  code        String  @unique @db.VarChar(150)
-  description String? @db.VarChar(255)
-
-  createdAt DateTime @default(now()) @db.DateTime(3)
-  updatedAt DateTime @updatedAt @db.DateTime(3)
-
-  roles RolePermission[]
+  id          String   @id @default(uuid()) @db.Char(36)
+  code        String   @unique @db.VarChar(150)
+  description String?  @db.VarChar(255)
+  createdAt   DateTime @default(now()) @db.DateTime(3)
+  updatedAt   DateTime @updatedAt @db.DateTime(3)
+  roles       RolePermission[]
 
   @@map("permissions")
 }
 
 model UserRole {
-  userId String @db.Char(36)
-  roleId String @db.Char(36)
-
+  userId     String   @db.Char(36)
+  roleId     String   @db.Char(36)
   assignedAt DateTime @default(now()) @db.DateTime(3)
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role Role @relation(fields: [roleId], references: [id], onDelete: Restrict)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role       Role     @relation(fields: [roleId], references: [id], onDelete: Restrict)
 
   @@id([userId, roleId])
   @@index([roleId])
@@ -107,11 +123,10 @@ model UserRole {
 }
 
 model RolePermission {
-  roleId       String @db.Char(36)
-  permissionId String @db.Char(36)
-
-  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  roleId       String     @db.Char(36)
+  permissionId String     @db.Char(36)
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
 
   @@id([roleId, permissionId])
   @@index([permissionId])
@@ -128,10 +143,8 @@ model AuditLog {
   metadata    Json?
   ipAddress   String?     @db.VarChar(45)
   userAgent   String?     @db.VarChar(1000)
-
-  createdAt DateTime @default(now()) @db.DateTime(3)
-
-  actorUser User? @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  createdAt   DateTime    @default(now()) @db.DateTime(3)
+  actorUser   User?       @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
 
   @@index([actorUserId])
   @@index([entityType, entityId])
@@ -148,13 +161,88 @@ model AuthSession {
   revokedAt          DateTime? @db.DateTime(3)
   revocationReason   String?   @db.VarChar(100)
   rotatedToSessionId String?   @db.Char(36)
-
-  createdAt DateTime @default(now()) @db.DateTime(3)
-  updatedAt DateTime @updatedAt @db.DateTime(3)
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt          DateTime  @default(now()) @db.DateTime(3)
+  updatedAt          DateTime  @updatedAt @db.DateTime(3)
+  user               User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, revokedAt])
   @@index([expiresAt])
   @@map("auth_sessions")
+}
+
+model SystemSecurityConfig {
+  id                            Int      @id @default(1)
+  idleTimeoutMinutes            Int      @default(30)
+  absoluteSessionTimeoutMinutes Int      @default(1440)
+  maxActiveSessions             Int      @default(5)
+  maxFailedLoginAttempts        Int      @default(5)
+  lockoutMinutes                Int      @default(15)
+  refreshTokenRotationEnabled   Boolean  @default(true)
+  updatedByUserId               String?  @db.Char(36)
+  createdAt                     DateTime @default(now()) @db.DateTime(3)
+  updatedAt                     DateTime @updatedAt @db.DateTime(3)
+  updatedByUser                 User?    @relation("SecurityConfigUpdater", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([updatedByUserId])
+  @@map("system_security_config")
+}
+
+model SystemAuthConfig {
+  id                           Int      @id @default(1)
+  loginWithUsername            Boolean  @default(true)
+  loginWithEmail               Boolean  @default(true)
+  loginWithMobile              Boolean  @default(true)
+  captchaOnLoginEnabled        Boolean  @default(false)
+  captchaOnRegistrationEnabled Boolean  @default(false)
+  captchaTtlSeconds             Int      @default(300)
+  accessTokenTtlSeconds         Int      @default(900)
+  refreshTokenTtlSeconds        Int      @default(2592000)
+  updatedByUserId               String?  @db.Char(36)
+  createdAt                     DateTime @default(now()) @db.DateTime(3)
+  updatedAt                     DateTime @updatedAt @db.DateTime(3)
+  updatedByUser                 User?    @relation("AuthConfigUpdater", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([updatedByUserId])
+  @@map("system_auth_config")
+}
+
+model SystemRegistrationConfig {
+  id                                Int                  @id @default(1)
+  publicRegistrationEnabled         Boolean              @default(true)
+  emailRequired                     Boolean              @default(true)
+  mobileRequired                    Boolean              @default(false)
+  passwordMode                      PasswordCreationMode @default(MANUAL)
+  usernameMode                      UsernameCreationMode @default(AUTO_OR_MANUAL)
+  usernamePrefixEnabled             Boolean              @default(false)
+  usernamePrefix                    String?              @db.VarChar(20)
+  allowMultipleAccountsPerEmail     Boolean              @default(false)
+  allowMultipleAccountsPerMobile    Boolean              @default(false)
+  updatedByUserId                   String?              @db.Char(36)
+  createdAt                         DateTime             @default(now()) @db.DateTime(3)
+  updatedAt                         DateTime             @updatedAt @db.DateTime(3)
+  updatedByUser                     User?                @relation("RegistrationConfigUpdater", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+
+  @@index([updatedByUserId])
+  @@map("system_registration_config")
+}
+
+model UserIdentifierClaim {
+  id              String             @id @default(uuid()) @db.Char(36)
+  userId          String             @db.Char(36)
+  type            UserIdentifierType
+  normalizedValue String             @db.VarChar(191)
+  createdAt       DateTime           @default(now()) @db.DateTime(3)
+  user            User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([type, normalizedValue])
+  @@index([userId, type])
+  @@map("user_identifier_claims")
+}
+
+model SystemSequence {
+  key       String   @id @db.VarChar(100)
+  nextValue BigInt
+  updatedAt DateTime @updatedAt @db.DateTime(3)
+
+  @@map("system_sequences")
 }

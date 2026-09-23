@@ -6,14 +6,17 @@
   "license": "UNLICENSED",
   "scripts": {
     "build": "nest build",
+    "format": "prettier --write \"src/**/*.ts\" \"scripts/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main",
-    "lint": "eslint \"{src,test,scripts}/**/*.ts\"",
+    "lint": "eslint \"{src,scripts}/**/*.ts\"",
+    "lint:fix": "npm run lint -- --fix",
     "prisma:generate": "prisma generate",
     "prisma:validate": "prisma validate",
     "test": "jest",
-    "test:watch": "jest --watch"
+    "test:watch": "jest --watch",
+    "super-admin:bootstrap": "ts-node scripts/bootstrap-super-admin.ts"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
@@ -55,6 +58,14 @@
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.20.0"
+  },
+  "jest": {
+    "moduleFileExtensions": ["js", "json", "ts"],
+    "rootDir": "src",
+    "testRegex": ".*\\.spec\\.ts$",
+    "transform": {"^.+\\.(t|j)s$": "ts-jest"},
+    "testEnvironment": "node",
+    "moduleNameMapper": {"^(\\.{1,2}/.*)\\.js$": "$1"}
   },
   "overrides": {
     "deepmerge-ts": "8.0.0",
