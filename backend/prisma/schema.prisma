@@ -69,6 +69,27 @@ enum BinaryVolumeEventType {
   REVERSAL
 }
 
+enum BinaryCapOverflowMode {
+  CARRY
+  FLUSH
+}
+
+enum LedgerAccountKind {
+  USER_WALLET
+  COMMISSION_EXPENSE
+}
+
+enum LedgerEntryDirection {
+  DEBIT
+  CREDIT
+}
+
+enum LedgerTransactionType {
+  BINARY_PAIR_COMMISSION
+  ADJUSTMENT
+  REVERSAL
+}
+
 model User {
   id                  String     @id @default(uuid()) @db.Char(36)
   username            String     @unique @db.VarChar(100)
@@ -102,6 +123,8 @@ model User {
   binaryDescendantLinks     BinaryAncestry[]           @relation("BinaryDescendant")
   binaryVolumeEvents        BinaryVolumeEvent[]        @relation("VolumeSourceMember")
   binaryVolumeCredits       BinaryUplineVolumeCredit[] @relation("VolumeCreditAncestor")
+  binarySettlements         BinaryPairSettlement[]     @relation("SettlementMember")
+  ledgerAccounts            LedgerAccount[]            @relation("LedgerAccountOwner")
 
   @@index([email])
   @@index([phone])
@@ -349,6 +372,9 @@ model BinaryPlanVersion {
   leftVolumePerPair      Decimal                    @db.Decimal(18, 4)
   rightVolumePerPair     Decimal                    @db.Decimal(18, 4)
   pairPayoutAmount       Decimal                    @db.Decimal(18, 2)
+  currencyCode           String?                    @db.VarChar(3)
+  settlementTimezone     String?                    @db.VarChar(100)
+  capOverflowMode        BinaryCapOverflowMode?
   dailyPairCap           Int?
   monthlyPairCap         Int?
   carryForwardEnabled    Boolean
@@ -365,6 +391,7 @@ model BinaryPlanVersion {
   plan                   BinaryPlan                 @relation(fields: [planId], references: [id], onDelete: Restrict)
   volumeEvents           BinaryVolumeEvent[]
   uplineCredits          BinaryUplineVolumeCredit[]
+  settlements            BinaryPairSettlement[]
 
   @@unique([planId, version])
   @@index([planId, lifecycle])
@@ -397,20 +424,100 @@ model BinaryVolumeEvent {
 }
 
 model BinaryUplineVolumeCredit {
-  id            String              @id @default(uuid()) @db.Char(36)
-  volumeEventId String              @db.Char(36)
-  ancestorUserId String             @db.Char(36)
-  planVersionId String              @db.Char(36)
-  side          BinaryPlacementSide
-  depth         Int
-  volume        Decimal             @db.Decimal(18, 4)
-  createdAt     DateTime            @default(now()) @db.DateTime(3)
-  volumeEvent   BinaryVolumeEvent   @relation(fields: [volumeEventId], references: [id], onDelete: Restrict)
-  ancestor      User                @relation("VolumeCreditAncestor", fields: [ancestorUserId], references: [id], onDelete: Restrict)
-  planVersion   BinaryPlanVersion   @relation(fields: [planVersionId], references: [id], onDelete: Restrict)
+  id             String              @id @default(uuid()) @db.Char(36)
+  volumeEventId  String              @db.Char(36)
+  ancestorUserId String              @db.Char(36)
+  planVersionId  String              @db.Char(36)
+  side           BinaryPlacementSide
+  depth          Int
+  volume         Decimal             @db.Decimal(18, 4)
+  createdAt      DateTime            @default(now()) @db.DateTime(3)
+  volumeEvent    BinaryVolumeEvent   @relation(fields: [volumeEventId], references: [id], onDelete: Restrict)
+  ancestor       User                @relation("VolumeCreditAncestor", fields: [ancestorUserId], references: [id], onDelete: Restrict)
+  planVersion    BinaryPlanVersion   @relation(fields: [planVersionId], references: [id], onDelete: Restrict)
 
   @@unique([volumeEventId, ancestorUserId])
   @@index([ancestorUserId, side, createdAt])
   @@index([planVersionId, createdAt])
   @@map("binary_upline_volume_credits")
+}
+
+model BinaryPairSettlement {
+  id                      String            @id @default(uuid()) @db.Char(36)
+  sourceKey               String            @unique @db.VarChar(191)
+  memberUserId            String            @db.Char(36)
+  planVersionId           String            @db.Char(36)
+  settledAt               DateTime          @db.DateTime(3)
+  settlementLocalDate     String            @db.Char(10)
+  settlementLocalMonth    String            @db.Char(7)
+  leftAvailableBefore     Decimal           @db.Decimal(18, 4)
+  rightAvailableBefore    Decimal           @db.Decimal(18, 4)
+  pairCountCalculated     Int
+  pairCountPayable        Int
+  capLimitedPairs         Int
+  leftVolumeConsumed      Decimal           @db.Decimal(18, 4)
+  rightVolumeConsumed     Decimal           @db.Decimal(18, 4)
+  leftCarryAfter          Decimal           @db.Decimal(18, 4)
+  rightCarryAfter         Decimal           @db.Decimal(18, 4)
+  payoutAmount            Decimal           @db.Decimal(18, 2)
+  currencyCode            String            @db.VarChar(3)
+  ledgerTransactionId     String?           @unique @db.Char(36)
+  createdByUserId         String?           @db.Char(36)
+  createdAt               DateTime          @default(now()) @db.DateTime(3)
+  member                  User              @relation("SettlementMember", fields: [memberUserId], references: [id], onDelete: Restrict)
+  planVersion             BinaryPlanVersion @relation(fields: [planVersionId], references: [id], onDelete: Restrict)
+  ledgerTransaction       LedgerTransaction? @relation(fields: [ledgerTransactionId], references: [id], onDelete: Restrict)
+
+  @@index([memberUserId, planVersionId, settledAt])
+  @@index([memberUserId, planVersionId, settlementLocalDate])
+  @@index([memberUserId, planVersionId, settlementLocalMonth])
+  @@map("binary_pair_settlements")
+}
+
+model LedgerAccount {
+  id           String            @id @default(uuid()) @db.Char(36)
+  code         String            @unique @db.VarChar(120)
+  name         String            @db.VarChar(150)
+  kind         LedgerAccountKind
+  ownerUserId  String?           @db.Char(36)
+  currencyCode String            @db.VarChar(3)
+  createdAt    DateTime          @default(now()) @db.DateTime(3)
+  ownerUser    User?             @relation("LedgerAccountOwner", fields: [ownerUserId], references: [id], onDelete: Restrict)
+  entries      LedgerEntry[]
+
+  @@index([ownerUserId, kind, currencyCode])
+  @@index([kind, currencyCode])
+  @@map("ledger_accounts")
+}
+
+model LedgerTransaction {
+  id               String                @id @default(uuid()) @db.Char(36)
+  sourceKey        String                @unique @db.VarChar(191)
+  type             LedgerTransactionType
+  description      String?               @db.VarChar(500)
+  occurredAt       DateTime              @db.DateTime(3)
+  createdByUserId  String?               @db.Char(36)
+  createdAt        DateTime              @default(now()) @db.DateTime(3)
+  entries          LedgerEntry[]
+  binarySettlement BinaryPairSettlement?
+
+  @@index([type, occurredAt])
+  @@index([createdAt])
+  @@map("ledger_transactions")
+}
+
+model LedgerEntry {
+  id            String               @id @default(uuid()) @db.Char(36)
+  transactionId String               @db.Char(36)
+  accountId     String               @db.Char(36)
+  direction     LedgerEntryDirection
+  amount        Decimal              @db.Decimal(18, 2)
+  currencyCode  String               @db.VarChar(3)
+  createdAt     DateTime             @default(now()) @db.DateTime(3)
+  transaction   LedgerTransaction    @relation(fields: [transactionId], references: [id], onDelete: Restrict)
+  account       LedgerAccount        @relation(fields: [accountId], references: [id], onDelete: Restrict)
+
+  @@index([transactionId])
+  @@index([accountId, createdAt])
+  @@map("ledger_entries")
 }
