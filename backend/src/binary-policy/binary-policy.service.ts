@@ -7,7 +7,11 @@ import {
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../database/prisma.service';
 import type { Prisma } from '../generated/prisma/client';
-import { AuditAction, PolicyLifecycle } from '../generated/prisma/enums';
+import {
+  AuditAction,
+  BinaryCapOverflowMode,
+  PolicyLifecycle,
+} from '../generated/prisma/enums';
 import type {
   CreateBinaryPlanDto,
   CreateBinaryPlanVersionDto,
@@ -76,6 +80,9 @@ export class BinaryPolicyService {
             leftVolumePerPair: dto.leftVolumePerPair,
             rightVolumePerPair: dto.rightVolumePerPair,
             pairPayoutAmount: dto.pairPayoutAmount,
+            currencyCode: dto.currencyCode.trim().toUpperCase(),
+            settlementTimezone: dto.settlementTimezone.trim(),
+            capOverflowMode: dto.capOverflowMode,
             dailyPairCap: dto.dailyPairCap,
             monthlyPairCap: dto.monthlyPairCap,
             carryForwardEnabled: dto.carryForwardEnabled,
@@ -117,6 +124,9 @@ export class BinaryPolicyService {
       leftVolumePerPair: dto.leftVolumePerPair ?? current.leftVolumePerPair.toString(),
       rightVolumePerPair: dto.rightVolumePerPair ?? current.rightVolumePerPair.toString(),
       pairPayoutAmount: dto.pairPayoutAmount ?? current.pairPayoutAmount.toString(),
+      currencyCode: dto.currencyCode ?? current.currencyCode ?? '',
+      settlementTimezone: dto.settlementTimezone ?? current.settlementTimezone ?? '',
+      capOverflowMode: dto.capOverflowMode ?? current.capOverflowMode ?? undefined,
     };
     this.validateVersionInput(merged);
 
@@ -129,10 +139,15 @@ export class BinaryPolicyService {
         ...(dto.leftVolumePerPair ? { leftVolumePerPair: dto.leftVolumePerPair } : {}),
         ...(dto.rightVolumePerPair ? { rightVolumePerPair: dto.rightVolumePerPair } : {}),
         ...(dto.pairPayoutAmount ? { pairPayoutAmount: dto.pairPayoutAmount } : {}),
+        ...(dto.currencyCode ? { currencyCode: dto.currencyCode.trim().toUpperCase() } : {}),
+        ...(dto.settlementTimezone ? { settlementTimezone: dto.settlementTimezone.trim() } : {}),
+        ...(dto.capOverflowMode ? { capOverflowMode: dto.capOverflowMode } : {}),
         ...(dto.dailyPairCap !== undefined ? { dailyPairCap: dto.dailyPairCap } : {}),
         ...(dto.monthlyPairCap !== undefined ? { monthlyPairCap: dto.monthlyPairCap } : {}),
         ...(dto.carryForwardEnabled !== undefined ? { carryForwardEnabled: dto.carryForwardEnabled } : {}),
-        ...(dto.carryForwardExpiryDays !== undefined ? { carryForwardExpiryDays: dto.carryForwardExpiryDays } : {}),
+        ...(dto.carryForwardExpiryDays !== undefined
+          ? { carryForwardExpiryDays: dto.carryForwardExpiryDays }
+          : {}),
         ...(dto.qualificationRules !== undefined
           ? { qualificationRules: dto.qualificationRules as Prisma.InputJsonValue }
           : {}),
@@ -158,6 +173,7 @@ export class BinaryPolicyService {
       if (current.lifecycle !== PolicyLifecycle.DRAFT) {
         throw new ConflictException('Only draft policy versions can be published');
       }
+      this.assertSettlementFields(current);
       const published = await tx.binaryPlanVersion.findFirst({
         where: { planId: current.planId, lifecycle: PolicyLifecycle.PUBLISHED },
       });
@@ -239,6 +255,9 @@ export class BinaryPolicyService {
     leftVolumePerPair: string;
     rightVolumePerPair: string;
     pairPayoutAmount: string;
+    currencyCode: string;
+    settlementTimezone: string;
+    capOverflowMode?: BinaryCapOverflowMode;
   }): void {
     const effectiveFrom = new Date(input.effectiveFrom);
     const effectiveTo = input.effectiveTo ? new Date(input.effectiveTo) : null;
@@ -256,6 +275,34 @@ export class BinaryPolicyService {
     }
     if (!Number.isFinite(Number(input.pairPayoutAmount)) || Number(input.pairPayoutAmount) < 0) {
       throw new BadRequestException('pairPayoutAmount cannot be negative');
+    }
+    if (!/^[A-Za-z]{3}$/.test(input.currencyCode)) {
+      throw new BadRequestException('currencyCode must be a three-letter code');
+    }
+    this.validateTimezone(input.settlementTimezone);
+    if (!input.capOverflowMode) {
+      throw new BadRequestException('capOverflowMode must be explicitly configured');
+    }
+  }
+
+  private assertSettlementFields(input: {
+    currencyCode: string | null;
+    settlementTimezone: string | null;
+    capOverflowMode: BinaryCapOverflowMode | null;
+  }): void {
+    if (!input.currencyCode || !input.settlementTimezone || !input.capOverflowMode) {
+      throw new ConflictException(
+        'Currency, settlement timezone and cap overflow mode must be configured before publishing',
+      );
+    }
+    this.validateTimezone(input.settlementTimezone);
+  }
+
+  private validateTimezone(timeZone: string): void {
+    try {
+      new Intl.DateTimeFormat('en-US', { timeZone }).format(new Date());
+    } catch {
+      throw new BadRequestException('settlementTimezone must be a valid IANA timezone');
     }
   }
 }
