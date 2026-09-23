@@ -49,8 +49,11 @@ npm test -- --runInBand
 echo "==> Integration tests"
 npm run test:integration
 
-echo "==> Build"
+echo "==> Build backend"
 npm run build
+
+echo "==> Verify Next.js admin and public/member apps"
+bash "${ROOT_DIR}/scripts/verify-frontends.sh"
 
 PORT_VALUE="$(grep -E '^PORT=' .env | tail -n1 | cut -d= -f2- || true)"
 PORT_VALUE="${PORT_VALUE:-3100}"
