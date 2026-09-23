@@ -9,11 +9,11 @@ MEMBER_LOG=""
 
 cleanup_smoke() {
   if [[ -n "${ADMIN_PID}" ]] && kill -0 "${ADMIN_PID}" 2>/dev/null; then
-    kill "${ADMIN_PID}" 2>/dev/null || true
+    kill -- -"${ADMIN_PID}" 2>/dev/null || true
     wait "${ADMIN_PID}" 2>/dev/null || true
   fi
   if [[ -n "${MEMBER_PID}" ]] && kill -0 "${MEMBER_PID}" 2>/dev/null; then
-    kill "${MEMBER_PID}" 2>/dev/null || true
+    kill -- -"${MEMBER_PID}" 2>/dev/null || true
     wait "${MEMBER_PID}" 2>/dev/null || true
   fi
   [[ -z "${ADMIN_LOG}" ]] || rm -f "${ADMIN_LOG}"
@@ -82,9 +82,9 @@ smoke_frontends() {
   MEMBER_LOG="$(mktemp -t megamitra-member.XXXXXX.log)"
   trap cleanup_smoke EXIT INT TERM
 
-  npm --prefix "${ROOT_DIR}/admin" run start >"${ADMIN_LOG}" 2>&1 &
+  setsid npm --prefix "${ROOT_DIR}/admin" run start >"${ADMIN_LOG}" 2>&1 &
   ADMIN_PID=$!
-  npm --prefix "${ROOT_DIR}/frontend" run start >"${MEMBER_LOG}" 2>&1 &
+  setsid npm --prefix "${ROOT_DIR}/frontend" run start >"${MEMBER_LOG}" 2>&1 &
   MEMBER_PID=$!
 
   wait_for_url "http://127.0.0.1:3101/login" "${ADMIN_PID}" "${ADMIN_LOG}"
