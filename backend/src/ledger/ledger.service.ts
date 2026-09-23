@@ -16,6 +16,7 @@ export class LedgerService {
           include: { account: true },
         },
         binarySettlement: true,
+        referralRewardEvent: true,
       },
     });
     if (!transaction) throw new NotFoundException('Ledger transaction not found');
