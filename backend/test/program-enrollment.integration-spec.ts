@@ -238,9 +238,21 @@ describe('MegaMitra program enrollment and payment integration', () => {
     expect(payment1.body.idempotent).toBe(false);
     const payment1Id = String(payment1.body.payment.id);
     paymentIds.push(payment1Id);
-    expect(payment1.body.payment.allocations).toHaveLength(2);
-    expect(payment1.body.payment.allocations[0].allocationType).toBe('REGISTRATION_FEE');
-    expect(payment1.body.payment.allocations[1].allocationType).toBe('INSTALLMENT');
+    const payment1Allocations = payment1.body.payment.allocations as Array<{
+      allocationType: string;
+      amount: string | number;
+    }>;
+    expect(payment1Allocations).toHaveLength(2);
+    const registrationAllocation = payment1Allocations.find(
+      (allocation) => allocation.allocationType === 'REGISTRATION_FEE',
+    );
+    const installmentAllocation = payment1Allocations.find(
+      (allocation) => allocation.allocationType === 'INSTALLMENT',
+    );
+    expect(registrationAllocation).toBeDefined();
+    expect(installmentAllocation).toBeDefined();
+    expect(String(registrationAllocation?.amount)).toBe('100');
+    expect(String(installmentAllocation?.amount)).toBe('250');
 
     const duplicatePayment = await request(
       `/admin/program-payments/attempts/${attempt1Id}/confirm`,
