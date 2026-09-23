@@ -3,6 +3,14 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
+verify_token_copy() {
+  local target="$1"
+  if ! cmp -s "${ROOT_DIR}/packages/design-tokens/tokens.css" "${target}"; then
+    echo "ERROR: MegaMitra design token copy drifted from canonical tokens.css: ${target}"
+    exit 1
+  fi
+}
+
 verify_app() {
   local name="$1"
   local dir="$2"
@@ -26,6 +34,10 @@ if grep -RniE "${FORBIDDEN_REGEX}" "${ROOT_DIR}/admin" "${ROOT_DIR}/frontend" "$
   echo "ERROR: foreign project branding found in frontend foundation"
   exit 1
 fi
+
+echo "==> Verifying shared MegaMitra design token contract"
+verify_token_copy "${ROOT_DIR}/admin/app/tokens.css"
+verify_token_copy "${ROOT_DIR}/frontend/app/tokens.css"
 
 verify_app "MegaMitra admin" "${ROOT_DIR}/admin"
 verify_app "MegaMitra public/member web" "${ROOT_DIR}/frontend"
