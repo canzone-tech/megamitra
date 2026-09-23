@@ -92,6 +92,9 @@ describe('MegaMitra binary business-domain integration', () => {
       await prisma.binaryUplineVolumeCredit.deleteMany({
         where: { volumeEventId: { in: eventIds } },
       });
+      await prisma.binaryVolumeEvent.deleteMany({
+        where: { id: { in: eventIds }, reversalOfEventId: { not: null } },
+      });
       await prisma.binaryVolumeEvent.deleteMany({ where: { id: { in: eventIds } } });
       await prisma.binaryAncestry.deleteMany({
         where: {
@@ -271,7 +274,12 @@ describe('MegaMitra binary business-domain integration', () => {
     expect(volume.status).toBe(201);
     const volumeEvent = volume.body.event as {
       id: string;
-      uplineCredits: Array<{ ancestorUserId: string; depth: number; side: BinaryPlacementSide; volume: string }>;
+      uplineCredits: Array<{
+        ancestorUserId: string;
+        depth: number;
+        side: BinaryPlacementSide;
+        volume: string;
+      }>;
     };
     eventIds.push(volumeEvent.id);
     expect(volumeEvent.uplineCredits).toHaveLength(2);
@@ -308,7 +316,10 @@ describe('MegaMitra binary business-domain integration', () => {
       authenticated({ method: 'POST', body: JSON.stringify({ sourceKey: `${sourceKey}-reversal` }) }),
     );
     expect(reversal.status).toBe(201);
-    const reversalEvent = reversal.body.event as { id: string; uplineCredits: Array<{ volume: string }> };
+    const reversalEvent = reversal.body.event as {
+      id: string;
+      uplineCredits: Array<{ volume: string }>;
+    };
     eventIds.push(reversalEvent.id);
     expect(reversalEvent.uplineCredits).toHaveLength(2);
     expect(Number(reversalEvent.uplineCredits[0].volume)).toBeLessThan(0);
