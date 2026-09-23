@@ -71,7 +71,7 @@ export class CreateProgramEventPolicyDto {
 
   @IsOptional()
   @IsObject()
-  eligibilityRules?: Record<string, unknown>;
+  eligibilityRules?: Record<string, unknown> | null;
 }
 
 export class UpdateProgramEventPolicyDto {
@@ -83,7 +83,7 @@ export class UpdateProgramEventPolicyDto {
   @IsOptional() @IsUUID() referralPolicyVersionId?: string;
   @IsOptional() @IsIn(REFERRAL_BASIS_MODES) referralBasisMode?: ReferralBasisMode;
   @IsOptional() @IsBoolean() drawEligibilityHookEnabled?: boolean;
-  @IsOptional() @IsObject() eligibilityRules?: Record<string, unknown>;
+  @IsOptional() @IsObject() eligibilityRules?: Record<string, unknown> | null;
 }
 
 export class ProcessProgramBusinessEventDto {
