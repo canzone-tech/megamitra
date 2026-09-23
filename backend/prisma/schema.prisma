@@ -1,0 +1,140 @@
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "cjs"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+enum UserStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  BLOCKED
+}
+
+enum RoleStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  PASSWORD_CHANGE
+  ROLE_CHANGE
+  PERMISSION_CHANGE
+  SUSPEND
+  ACTIVATE
+  BLOCK
+  UNBLOCK
+}
+
+model User {
+  id           String     @id @default(uuid()) @db.Char(36)
+  username     String     @unique @db.VarChar(100)
+  email        String?    @db.VarChar(191)
+  phone        String?    @db.VarChar(30)
+  passwordHash String     @db.VarChar(255)
+  firstName    String?    @db.VarChar(100)
+  lastName     String?    @db.VarChar(100)
+  status       UserStatus @default(PENDING)
+
+  emailVerifiedAt DateTime? @db.DateTime(3)
+  phoneVerifiedAt DateTime? @db.DateTime(3)
+  lastLoginAt     DateTime? @db.DateTime(3)
+
+  createdAt DateTime @default(now()) @db.DateTime(3)
+  updatedAt DateTime @updatedAt @db.DateTime(3)
+
+  roles     UserRole[]
+  auditLogs AuditLog[] @relation("AuditActor")
+
+  @@index([email])
+  @@index([phone])
+  @@index([status])
+  @@index([createdAt])
+  @@map("users")
+}
+
+model Role {
+  id          String     @id @default(uuid()) @db.Char(36)
+  name        String     @unique @db.VarChar(100)
+  description String?    @db.VarChar(255)
+  status      RoleStatus @default(ACTIVE)
+
+  createdAt DateTime @default(now()) @db.DateTime(3)
+  updatedAt DateTime @updatedAt @db.DateTime(3)
+
+  users       UserRole[]
+  permissions RolePermission[]
+
+  @@index([status])
+  @@map("roles")
+}
+
+model Permission {
+  id          String  @id @default(uuid()) @db.Char(36)
+  code        String  @unique @db.VarChar(150)
+  description String? @db.VarChar(255)
+
+  createdAt DateTime @default(now()) @db.DateTime(3)
+  updatedAt DateTime @updatedAt @db.DateTime(3)
+
+  roles RolePermission[]
+
+  @@map("permissions")
+}
+
+model UserRole {
+  userId String @db.Char(36)
+  roleId String @db.Char(36)
+
+  assignedAt DateTime @default(now()) @db.DateTime(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role Role @relation(fields: [roleId], references: [id], onDelete: Restrict)
+
+  @@id([userId, roleId])
+  @@index([roleId])
+  @@map("user_roles")
+}
+
+model RolePermission {
+  roleId       String @db.Char(36)
+  permissionId String @db.Char(36)
+
+  role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  permission Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+
+  @@id([roleId, permissionId])
+  @@index([permissionId])
+  @@map("role_permissions")
+}
+
+model AuditLog {
+  id          String      @id @default(uuid()) @db.Char(36)
+  actorUserId String?     @db.Char(36)
+  action      AuditAction
+  entityType  String      @db.VarChar(100)
+  entityId    String?     @db.VarChar(100)
+  description String?     @db.VarChar(500)
+  metadata    Json?
+  ipAddress   String?     @db.VarChar(45)
+  userAgent   String?     @db.VarChar(1000)
+
+  createdAt DateTime @default(now()) @db.DateTime(3)
+
+  actorUser User? @relation("AuditActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([actorUserId])
+  @@index([entityType, entityId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
