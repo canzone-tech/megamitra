@@ -1,5 +1,6 @@
 import {
   IsBoolean,
+  IsEnum,
   IsISO8601,
   IsInt,
   IsNumberString,
@@ -7,9 +8,11 @@ import {
   IsOptional,
   IsString,
   Length,
+  Matches,
   MaxLength,
   Min,
 } from 'class-validator';
+import { BinaryCapOverflowMode } from '../generated/prisma/enums';
 
 export class CreateBinaryPlanDto {
   @IsString()
@@ -46,6 +49,17 @@ export class CreateBinaryPlanVersionDto {
   @IsNumberString()
   pairPayoutAmount!: string;
 
+  @IsString()
+  @Matches(/^[A-Za-z]{3}$/)
+  currencyCode!: string;
+
+  @IsString()
+  @Length(1, 100)
+  settlementTimezone!: string;
+
+  @IsEnum(BinaryCapOverflowMode)
+  capOverflowMode!: BinaryCapOverflowMode;
+
   @IsOptional()
   @IsInt()
   @Min(0)
@@ -80,6 +94,9 @@ export class UpdateBinaryPlanVersionDto {
   @IsOptional() @IsNumberString() leftVolumePerPair?: string;
   @IsOptional() @IsNumberString() rightVolumePerPair?: string;
   @IsOptional() @IsNumberString() pairPayoutAmount?: string;
+  @IsOptional() @IsString() @Matches(/^[A-Za-z]{3}$/) currencyCode?: string;
+  @IsOptional() @IsString() @Length(1, 100) settlementTimezone?: string;
+  @IsOptional() @IsEnum(BinaryCapOverflowMode) capOverflowMode?: BinaryCapOverflowMode;
   @IsOptional() @IsInt() @Min(0) dailyPairCap?: number;
   @IsOptional() @IsInt() @Min(0) monthlyPairCap?: number;
   @IsOptional() @IsBoolean() carryForwardEnabled?: boolean;
