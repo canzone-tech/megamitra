@@ -16,7 +16,8 @@
     "prisma:validate": "prisma validate",
     "test": "jest",
     "test:watch": "jest --watch",
-    "super-admin:bootstrap": "ts-node scripts/bootstrap-super-admin.ts"
+    "super-admin:bootstrap": "ts-node scripts/bootstrap-super-admin.ts",
+    "verify:local": "bash scripts/verify-local.sh"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
