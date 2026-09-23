@@ -53,7 +53,8 @@ model User {
   updatedAt DateTime @updatedAt @db.DateTime(3)
 
   roles     UserRole[]
-  auditLogs AuditLog[] @relation("AuditActor")
+  auditLogs AuditLog[]    @relation("AuditActor")
+  sessions  AuthSession[]
 
   @@index([email])
   @@index([phone])
@@ -137,4 +138,23 @@ model AuditLog {
   @@index([action])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+model AuthSession {
+  id                 String    @id @db.Char(36)
+  userId             String    @db.Char(36)
+  refreshTokenHash   String    @unique @db.Char(64)
+  expiresAt          DateTime  @db.DateTime(3)
+  revokedAt          DateTime? @db.DateTime(3)
+  revocationReason   String?   @db.VarChar(100)
+  rotatedToSessionId String?   @db.Char(36)
+
+  createdAt DateTime @default(now()) @db.DateTime(3)
+  updatedAt DateTime @updatedAt @db.DateTime(3)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
+  @@map("auth_sessions")
 }
