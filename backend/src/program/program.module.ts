@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { BinaryUnitModule } from '../binary-unit/binary-unit.module';
+import { ReferralRewardModule } from '../referral-reward/referral-reward.module';
 import {
   ProgramEnrollmentController,
   ProgramPaymentController,
@@ -11,9 +12,10 @@ import { ProgramOrchestrationController } from './program-orchestration.controll
 import { ProgramOrchestrationService } from './program-orchestration.service';
 import { ProgramPaymentService } from './program-payment.service';
 import { ProgramPolicyService } from './program-policy.service';
+import { ProgramReferralRewardConsumerService } from './program-referral-reward-consumer.service';
 
 @Module({
-  imports: [BinaryUnitModule],
+  imports: [BinaryUnitModule, ReferralRewardModule],
   controllers: [
     ProgramPolicyController,
     ProgramEnrollmentController,
@@ -26,6 +28,7 @@ import { ProgramPolicyService } from './program-policy.service';
     ProgramEnrollmentService,
     ProgramPaymentService,
     ProgramOrchestrationService,
+    ProgramReferralRewardConsumerService,
   ],
   exports: [
     ProgramEligibilityService,
@@ -33,6 +36,7 @@ import { ProgramPolicyService } from './program-policy.service';
     ProgramEnrollmentService,
     ProgramPaymentService,
     ProgramOrchestrationService,
+    ProgramReferralRewardConsumerService,
   ],
 })
 export class ProgramModule {}
