@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../database/prisma.service';
-import type { Prisma } from '../generated/prisma/client';
+import { Prisma } from '../generated/prisma/client';
 import {
   AuditAction,
   PolicyLifecycle,
@@ -319,7 +319,7 @@ export class ReferralRewardPolicyService {
     if (
       minimumRewardAmount !== null &&
       maximumRewardAmount !== null &&
-      Number(maximumRewardAmount) < Number(minimumRewardAmount)
+      new Prisma.Decimal(maximumRewardAmount).lessThan(minimumRewardAmount)
     ) {
       throw new BadRequestException(
         'maximumRewardAmount must be greater than or equal to minimumRewardAmount',
@@ -337,17 +337,24 @@ export class ReferralRewardPolicyService {
   }
 
   private positiveAmount(raw: string | undefined, field: string, scale = 2): string {
-    if (raw === undefined || !Number.isFinite(Number(raw)) || Number(raw) <= 0) {
+    try {
+      if (raw === undefined) throw new Error('missing');
+      const value = new Prisma.Decimal(raw);
+      if (!value.isFinite() || value.lessThanOrEqualTo(0)) throw new Error('invalid');
+      return value.toFixed(scale);
+    } catch {
       throw new BadRequestException(`${field} must be greater than zero`);
     }
-    return Number(raw).toFixed(scale);
   }
 
   private optionalNonNegativeAmount(raw: string | undefined, field: string): string | null {
     if (raw === undefined) return null;
-    if (!Number.isFinite(Number(raw)) || Number(raw) < 0) {
+    try {
+      const value = new Prisma.Decimal(raw);
+      if (!value.isFinite() || value.isNegative()) throw new Error('invalid');
+      return value.toFixed(2);
+    } catch {
       throw new BadRequestException(`${field} must be zero or greater`);
     }
-    return Number(raw).toFixed(2);
   }
 }
