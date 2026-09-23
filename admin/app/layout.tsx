@@ -1,0 +1,16 @@
+import type { Metadata } from 'next';
+import '@megamitra/design-tokens/tokens.css';
+import './globals.css';
+
+export const metadata: Metadata = {
+  title: 'MegaMitra Admin',
+  description: 'MegaMitra operations and policy administration',
+};
+
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  return (
+    <html lang="en">
+      <body>{children}</body>
+    </html>
+  );
+}
