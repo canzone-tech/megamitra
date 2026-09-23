@@ -37,7 +37,14 @@ export class BinarySettlementService {
     }
 
     const settlement = await this.prisma.$transaction(async (tx) => {
-      await tx.$queryRaw(Prisma.sql`SELECT id FROM users WHERE id = ${dto.memberUserId} FOR UPDATE`);
+      await tx.systemSequence.upsert({
+        where: { key: `binary-settlement:${dto.memberUserId}:${dto.planVersionId}` },
+        update: { nextValue: { increment: 1 } },
+        create: {
+          key: `binary-settlement:${dto.memberUserId}:${dto.planVersionId}`,
+          nextValue: 1n,
+        },
+      });
 
       const raced = await tx.binaryPairSettlement.findUnique({
         where: { sourceKey: dto.sourceKey },
@@ -84,8 +91,22 @@ export class BinarySettlementService {
 
       const local = this.localPeriod(settledAt, version.settlementTimezone);
       const [leftAvailable, rightAvailable, previous, dailyUsed, monthlyUsed] = await Promise.all([
-        this.availableVolume(tx, dto.memberUserId, dto.planVersionId, BinaryPlacementSide.LEFT, settledAt, version.carryForwardExpiryDays),
-        this.availableVolume(tx, dto.memberUserId, dto.planVersionId, BinaryPlacementSide.RIGHT, settledAt, version.carryForwardExpiryDays),
+        this.availableVolume(
+          tx,
+          dto.memberUserId,
+          dto.planVersionId,
+          BinaryPlacementSide.LEFT,
+          settledAt,
+          version.carryForwardExpiryDays,
+        ),
+        this.availableVolume(
+          tx,
+          dto.memberUserId,
+          dto.planVersionId,
+          BinaryPlacementSide.RIGHT,
+          settledAt,
+          version.carryForwardExpiryDays,
+        ),
         tx.binaryPairSettlement.aggregate({
           where: {
             memberUserId: dto.memberUserId,
@@ -288,7 +309,7 @@ export class BinarySettlementService {
     side: BinaryPlacementSide,
     settledAt: Date,
     expiryDays: number | null,
-  ): Promise<{ all: Prisma.Decimal; eligible: Prisma.Decimal } > {
+  ): Promise<{ all: Prisma.Decimal; eligible: Prisma.Decimal }> {
     const baseWhere = {
       ancestorUserId: memberUserId,
       planVersionId,
@@ -340,7 +361,7 @@ export class BinarySettlementService {
     } catch {
       throw new BadRequestException('Plan settlement timezone is invalid');
     }
-    const read = (type: Intl.DateTimeFormatPartTypes) =>
+    const read = (type: 'year' | 'month' | 'day') =>
       parts.find((part) => part.type === type)?.value ?? '';
     const year = read('year');
     const month = read('month');
