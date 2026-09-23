@@ -53,8 +53,8 @@ type PlanVersionRow = {
 
 type DecimalTotalRow = { total: string | number | bigint | null };
 type ConsumptionRow = {
-  leftConsumed: string | number | bigint | null;
-  rightConsumed: string | number | bigint | null;
+  leftConsumed: string | number | bigint;
+  rightConsumed: string | number | bigint;
 };
 type CountRow = { total: string | number | bigint | null };
 type IdRow = { id: string };
@@ -519,7 +519,7 @@ export class BinarySettlementService {
 
   private assertSupportedQualificationRules(rules: unknown): void {
     if (rules === null || rules === undefined) return;
-    let parsed = rules;
+    let parsed: unknown = rules;
     if (typeof rules === 'string') {
       try {
         parsed = JSON.parse(rules) as unknown;
