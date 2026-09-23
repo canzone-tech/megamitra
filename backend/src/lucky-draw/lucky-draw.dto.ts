@@ -1,8 +1,10 @@
+import { Type } from 'class-transformer';
 import {
   ArrayMinSize,
   IsArray,
   IsBoolean,
   IsIn,
+  IsInt,
   IsISO8601,
   IsNumberString,
   IsObject,
@@ -12,6 +14,8 @@ import {
   Length,
   Matches,
   MaxLength,
+  Min,
+  ValidateNested,
 } from 'class-validator';
 
 export const LUCKY_DRAW_ENTRY_MODES = ['PER_ELIGIBLE_HOOK', 'ONE_PER_USER'] as const;
@@ -50,6 +54,8 @@ export class LuckyDrawPrizeTierDto {
   @Length(1, 120)
   name!: string;
 
+  @IsInt()
+  @Min(1)
   winnerCount!: number;
 
   @IsIn(LUCKY_DRAW_PRIZE_KINDS)
@@ -94,6 +100,8 @@ export class CreateLuckyDrawPolicyVersionDto {
 
   @IsArray()
   @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => LuckyDrawPrizeTierDto)
   prizeTiers!: LuckyDrawPrizeTierDto[];
 }
 
@@ -107,7 +115,12 @@ export class UpdateLuckyDrawPolicyVersionDto {
   @IsOptional()
   @IsIn(LUCKY_DRAW_INSUFFICIENT_ENTRANTS_MODES)
   insufficientEntrantsMode?: LuckyDrawInsufficientEntrantsMode;
-  @IsOptional() @IsArray() @ArrayMinSize(1) prizeTiers?: LuckyDrawPrizeTierDto[];
+  @IsOptional()
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => LuckyDrawPrizeTierDto)
+  prizeTiers?: LuckyDrawPrizeTierDto[];
 }
 
 export class CreateLuckyDrawInstanceDto {
