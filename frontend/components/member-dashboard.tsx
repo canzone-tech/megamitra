@@ -7,30 +7,16 @@ import { ApiClientError, apiJson } from '@/lib/client-api';
 
 type Row = Record<string, unknown>;
 type Page<T> = { items: T[]; page: number; limit: number; total: number; totalPages: number };
-
 type Dashboard = {
-  user: {
-    id: string;
-    username: string;
-    firstName: string | null;
-    lastName: string | null;
-    status: string;
-  };
+  user: { id: string; username: string; firstName: string | null; lastName: string | null; status: string };
   wallets: Row[];
   enrollments: { counts: Row[]; dues: Row[] };
   referralRewards: Row[];
   binary: { summary: Row; unitQueues: Row[] };
   luckyDraw: { summary: Row; claimCounts: Row[] };
 };
-
 type RewardsResponse = { wins: Page<Row>; eligibility: Page<Row> };
-
-type Data = {
-  dashboard: Dashboard;
-  enrollments: Page<Row>;
-  referrals: Page<Row>;
-  rewards: RewardsResponse;
-};
+type Data = { dashboard: Dashboard; enrollments: Page<Row>; referrals: Page<Row>; rewards: RewardsResponse };
 
 function text(value: unknown): string {
   if (value === null || value === undefined || value === '') return '—';
@@ -95,7 +81,10 @@ export function MemberDashboard() {
   }, [router]);
 
   useEffect(() => {
-    void load();
+    const timer = window.setTimeout(() => {
+      void load();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [load]);
 
   const displayName = useMemo(() => {
@@ -119,19 +108,12 @@ export function MemberDashboard() {
     <div className="mm-member-shell">
       <header className="mm-site-header">
         <Link className="mm-brand" href="/member"><span className="mm-brand-mark">M</span><span>Mega<span className="mm-brand-accent">Mitra</span></span></Link>
-        <nav className="mm-nav">
-          <Link className="mm-button light" href="/">Public site</Link>
-          <button className="mm-button" type="button" onClick={() => void logout()}>Sign out</button>
-        </nav>
+        <nav className="mm-nav"><Link className="mm-button light" href="/">Public site</Link><button className="mm-button" type="button" onClick={() => void logout()}>Sign out</button></nav>
       </header>
 
       <main className="mm-member-main">
         <div className="mm-member-hero">
-          <div>
-            <p className="mm-eyebrow">My MegaMitra</p>
-            <h1 className="mm-title">{data ? `Hello, ${displayName}` : 'Member dashboard'}</h1>
-            <p className="mm-subtitle">Your view is scoped to your authenticated account and derived from authoritative program, ledger and rewards records.</p>
-          </div>
+          <div><p className="mm-eyebrow">My MegaMitra</p><h1 className="mm-title">{data ? `Hello, ${displayName}` : 'Member dashboard'}</h1><p className="mm-subtitle">Your view is scoped to your authenticated account and derived from authoritative program, ledger and rewards records.</p></div>
           <button className="mm-button blue" type="button" disabled={loading} onClick={() => void load()}>{loading ? 'Refreshing…' : 'Refresh'}</button>
         </div>
 
@@ -146,40 +128,13 @@ export function MemberDashboard() {
             </section>
 
             <div className="mm-wide-grid">
-              <section className="mm-card">
-                <div className="mm-card-head"><h2>Program progress</h2><span className="mm-chip">{data.enrollments.total} enrollment{data.enrollments.total === 1 ? '' : 's'}</span></div>
-                <div className="mm-card-body">
-                  {data.enrollments.items.length ? <div className="mm-list">
-                    {data.enrollments.items.map((row) => <div className="mm-list-row" key={text(row.id)}><div><strong>{text(row.programName)}</strong><br /><span>{text(row.status)} · {text(row.enrollmentDate)}</span></div><div style={{ textAlign: 'right' }}><strong>{money(row.outstandingAmount, row.currencyCode)}</strong><br /><span>outstanding</span></div></div>)}
-                  </div> : <div className="mm-empty">No program enrollments yet.</div>}
-                </div>
-              </section>
-
-              <section className="mm-card">
-                <div className="mm-card-head"><h2>Reward snapshot</h2><span className="mm-chip">Recorded facts</span></div>
-                <div className="mm-card-body mm-list">
-                  <div className="mm-list-row"><span>Referral rewards</span><strong>{data.referrals.total}</strong></div>
-                  <div className="mm-list-row"><span>Eligible draw hooks</span><strong>{text(drawSummary.eligibleHookCount ?? 0)}</strong></div>
-                  <div className="mm-list-row"><span>Draw entries</span><strong>{text(drawSummary.entrantCount ?? 0)}</strong></div>
-                  <div className="mm-list-row"><span>Open prize claims</span><strong>{countByStatus(data.dashboard.luckyDraw.claimCounts, 'PENDING') + countByStatus(data.dashboard.luckyDraw.claimCounts, 'CLAIMED')}</strong></div>
-                </div>
-              </section>
+              <section className="mm-card"><div className="mm-card-head"><h2>Program progress</h2><span className="mm-chip">{data.enrollments.total} enrollment{data.enrollments.total === 1 ? '' : 's'}</span></div><div className="mm-card-body">{data.enrollments.items.length ? <div className="mm-list">{data.enrollments.items.map((row) => <div className="mm-list-row" key={text(row.id)}><div><strong>{text(row.programName)}</strong><br /><span>{text(row.status)} · {text(row.enrollmentDate)}</span></div><div style={{ textAlign: 'right' }}><strong>{money(row.outstandingAmount, row.currencyCode)}</strong><br /><span>outstanding</span></div></div>)}</div> : <div className="mm-empty">No program enrollments yet.</div>}</div></section>
+              <section className="mm-card"><div className="mm-card-head"><h2>Reward snapshot</h2><span className="mm-chip">Recorded facts</span></div><div className="mm-card-body mm-list"><div className="mm-list-row"><span>Referral rewards</span><strong>{data.referrals.total}</strong></div><div className="mm-list-row"><span>Eligible draw hooks</span><strong>{text(drawSummary.eligibleHookCount ?? 0)}</strong></div><div className="mm-list-row"><span>Draw entries</span><strong>{text(drawSummary.entrantCount ?? 0)}</strong></div><div className="mm-list-row"><span>Open prize claims</span><strong>{countByStatus(data.dashboard.luckyDraw.claimCounts, 'PENDING') + countByStatus(data.dashboard.luckyDraw.claimCounts, 'CLAIMED')}</strong></div></div></section>
             </div>
 
             <div className="mm-wide-grid">
-              <section className="mm-card">
-                <div className="mm-card-head"><h2>Recent referral rewards</h2><span className="mm-chip">{data.referrals.total} total</span></div>
-                <div className="mm-card-body">
-                  {data.referrals.items.length ? <div className="mm-list">{data.referrals.items.map((row) => <div className="mm-list-row" key={text(row.id)}><div><strong>{text(row.referredUsername)}</strong><br /><span>{text(row.status)}</span></div><strong>{money(row.netRewardAmount, row.currencyCode)}</strong></div>)}</div> : <div className="mm-empty">No referral rewards recorded.</div>}
-                </div>
-              </section>
-
-              <section className="mm-card">
-                <div className="mm-card-head"><h2>Lucky-draw outcomes</h2><span className="mm-chip">{data.rewards.wins.total} win{data.rewards.wins.total === 1 ? '' : 's'}</span></div>
-                <div className="mm-card-body">
-                  {data.rewards.wins.items.length ? <div className="mm-list">{data.rewards.wins.items.map((row) => <div className="mm-list-row" key={text(row.winnerId)}><div><strong>{text(row.prizeTierName)}</strong><br /><span>{text(row.claimStatus ?? 'Awaiting claim record')}</span></div><span>{text(row.prizeKind)}</span></div>)}</div> : <div className="mm-empty">No draw wins recorded.</div>}
-                </div>
-              </section>
+              <section className="mm-card"><div className="mm-card-head"><h2>Recent referral rewards</h2><span className="mm-chip">{data.referrals.total} total</span></div><div className="mm-card-body">{data.referrals.items.length ? <div className="mm-list">{data.referrals.items.map((row) => <div className="mm-list-row" key={text(row.id)}><div><strong>{text(row.referredUsername)}</strong><br /><span>{text(row.status)}</span></div><strong>{money(row.netRewardAmount, row.currencyCode)}</strong></div>)}</div> : <div className="mm-empty">No referral rewards recorded.</div>}</div></section>
+              <section className="mm-card"><div className="mm-card-head"><h2>Lucky-draw outcomes</h2><span className="mm-chip">{data.rewards.wins.total} win{data.rewards.wins.total === 1 ? '' : 's'}</span></div><div className="mm-card-body">{data.rewards.wins.items.length ? <div className="mm-list">{data.rewards.wins.items.map((row) => <div className="mm-list-row" key={text(row.winnerId)}><div><strong>{text(row.prizeTierName)}</strong><br /><span>{text(row.claimStatus ?? 'Awaiting claim record')}</span></div><span>{text(row.prizeKind)}</span></div>)}</div> : <div className="mm-empty">No draw wins recorded.</div>}</div></section>
             </div>
           </>
         ) : loading ? <div className="mm-card mm-empty">Loading your MegaMitra dashboard…</div> : null}
