@@ -5,6 +5,7 @@ import { PasswordService } from '../src/auth/password.service';
 import { configureApp } from '../src/bootstrap/configure-app';
 import { PrismaService } from '../src/database/prisma.service';
 import {
+  BinaryCapOverflowMode,
   BinaryPlacementSide,
   BinaryVolumeEventType,
   UserStatus,
@@ -220,6 +221,9 @@ describe('MegaMitra binary business-domain integration', () => {
           leftVolumePerPair: '1.0000',
           rightVolumePerPair: '1.0000',
           pairPayoutAmount: '0.00',
+          currencyCode: 'INR',
+          settlementTimezone: 'Asia/Kolkata',
+          capOverflowMode: BinaryCapOverflowMode.CARRY,
           carryForwardEnabled: true,
           qualificationRules: { test: true },
           settlementRules: { test: true },
