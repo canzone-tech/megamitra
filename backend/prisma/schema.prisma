@@ -119,25 +119,25 @@ model User {
   updatedAt           DateTime   @updatedAt @db.DateTime(3)
 
   roles                     UserRole[]
-  auditLogs                 AuditLog[]                 @relation("AuditActor")
+  auditLogs                 AuditLog[]                  @relation("AuditActor")
   sessions                  AuthSession[]
   identifierClaims          UserIdentifierClaim[]
-  securityConfigUpdates     SystemSecurityConfig[]     @relation("SecurityConfigUpdater")
-  authConfigUpdates         SystemAuthConfig[]         @relation("AuthConfigUpdater")
-  registrationConfigUpdates SystemRegistrationConfig[] @relation("RegistrationConfigUpdater")
-  sponsorRelationship       SponsorRelationship?       @relation("SponsorMember")
-  sponsoredMembers          SponsorRelationship[]      @relation("SponsorOwner")
-  binaryPlacement           BinaryPlacement?           @relation("PlacementMember")
-  binaryChildren            BinaryPlacement[]          @relation("PlacementParent")
-  binaryAncestorLinks       BinaryAncestry[]           @relation("BinaryAncestor")
-  binaryDescendantLinks     BinaryAncestry[]           @relation("BinaryDescendant")
-  binaryVolumeEvents        BinaryVolumeEvent[]        @relation("VolumeSourceMember")
-  binaryVolumeCredits       BinaryUplineVolumeCredit[] @relation("VolumeCreditAncestor")
+  securityConfigUpdates     SystemSecurityConfig[]      @relation("SecurityConfigUpdater")
+  authConfigUpdates         SystemAuthConfig[]          @relation("AuthConfigUpdater")
+  registrationConfigUpdates SystemRegistrationConfig[]  @relation("RegistrationConfigUpdater")
+  sponsorRelationship       SponsorRelationship?        @relation("SponsorMember")
+  sponsoredMembers          SponsorRelationship[]       @relation("SponsorOwner")
+  binaryPlacement           BinaryPlacement?            @relation("PlacementMember")
+  binaryChildren            BinaryPlacement[]           @relation("PlacementParent")
+  binaryAncestorLinks       BinaryAncestry[]            @relation("BinaryAncestor")
+  binaryDescendantLinks     BinaryAncestry[]            @relation("BinaryDescendant")
+  binaryVolumeEvents        BinaryVolumeEvent[]         @relation("VolumeSourceMember")
+  binaryVolumeCredits       BinaryUplineVolumeCredit[]  @relation("VolumeCreditAncestor")
   binaryQualifyingEvents    BinaryQualifyingUnitEvent[] @relation("QualifyingUnitSourceMember")
   binaryQualifyingUnits     BinaryUplineQualifyingUnit[] @relation("QualifyingUnitAncestor")
-  binarySettlements         BinaryPairSettlement[]     @relation("SettlementMember")
-  binaryPairMatches         BinaryPairMatch[]          @relation("PairMatchMember")
-  ledgerAccounts            LedgerAccount[]            @relation("LedgerAccountOwner")
+  binarySettlements         BinaryPairSettlement[]      @relation("SettlementMember")
+  binaryPairMatches         BinaryPairMatch[]           @relation("PairMatchMember")
+  ledgerAccounts            LedgerAccount[]             @relation("LedgerAccountOwner")
 
   @@index([email])
   @@index([phone])
@@ -459,22 +459,22 @@ model BinaryUplineVolumeCredit {
 }
 
 model BinaryQualifyingUnitEvent {
-  id                  String                         @id @default(uuid()) @db.Char(36)
-  sourceKey           String                         @unique @db.VarChar(191)
-  requestFingerprint  String                         @db.Char(64)
-  sourceMemberUserId  String                         @db.Char(36)
-  planVersionId       String                         @db.Char(36)
-  eventType           BinaryQualifyingUnitEventType
-  reversalOfEventId   String?                        @unique @db.Char(36)
-  occurredAt          DateTime                       @db.DateTime(3)
-  metadata            Json?
-  createdByUserId     String?                        @db.Char(36)
-  createdAt           DateTime                       @default(now()) @db.DateTime(3)
-  sourceMember        User                           @relation("QualifyingUnitSourceMember", fields: [sourceMemberUserId], references: [id], onDelete: Restrict)
-  planVersion         BinaryPlanVersion              @relation(fields: [planVersionId], references: [id], onDelete: Restrict)
-  reversalOf          BinaryQualifyingUnitEvent?     @relation("QualifyingUnitReversal", fields: [reversalOfEventId], references: [id], onDelete: Restrict)
-  reversedBy          BinaryQualifyingUnitEvent?     @relation("QualifyingUnitReversal")
-  uplineUnits         BinaryUplineQualifyingUnit[]
+  id                 String                        @id @default(uuid()) @db.Char(36)
+  sourceKey          String                        @unique @db.VarChar(191)
+  requestFingerprint String                        @db.Char(64)
+  sourceMemberUserId String                        @db.Char(36)
+  planVersionId      String                        @db.Char(36)
+  eventType          BinaryQualifyingUnitEventType
+  reversalOfEventId  String?                       @unique @db.Char(36)
+  occurredAt         DateTime                      @db.DateTime(3)
+  metadata           Json?
+  createdByUserId    String?                       @db.Char(36)
+  createdAt          DateTime                      @default(now()) @db.DateTime(3)
+  sourceMember       User                          @relation("QualifyingUnitSourceMember", fields: [sourceMemberUserId], references: [id], onDelete: Restrict)
+  planVersion        BinaryPlanVersion             @relation(fields: [planVersionId], references: [id], onDelete: Restrict)
+  reversalOf         BinaryQualifyingUnitEvent?    @relation("QualifyingUnitReversal", fields: [reversalOfEventId], references: [id], onDelete: Restrict)
+  reversedBy         BinaryQualifyingUnitEvent?    @relation("QualifyingUnitReversal")
+  uplineUnits        BinaryUplineQualifyingUnit[]
 
   @@index([sourceMemberUserId, occurredAt], map: "binary_qualifying_unit_events_source_member_time_idx")
   @@index([planVersionId, occurredAt], map: "binary_qualifying_unit_events_plan_time_idx")
@@ -482,19 +482,19 @@ model BinaryQualifyingUnitEvent {
 }
 
 model BinaryUplineQualifyingUnit {
-  id             String                    @id @default(uuid()) @db.Char(36)
-  unitEventId    String                    @db.Char(36)
-  ancestorUserId String                    @db.Char(36)
-  planVersionId  String                    @db.Char(36)
+  id             String                     @id @default(uuid()) @db.Char(36)
+  unitEventId    String                     @db.Char(36)
+  ancestorUserId String                     @db.Char(36)
+  planVersionId  String                     @db.Char(36)
   side           BinaryPlacementSide
   depth          Int
-  sequence       BigInt
-  createdAt      DateTime                  @default(now()) @db.DateTime(3)
-  unitEvent      BinaryQualifyingUnitEvent @relation(fields: [unitEventId], references: [id], onDelete: Restrict)
-  ancestor       User                      @relation("QualifyingUnitAncestor", fields: [ancestorUserId], references: [id], onDelete: Restrict)
-  planVersion    BinaryPlanVersion         @relation(fields: [planVersionId], references: [id], onDelete: Restrict)
-  leftPairMatch  BinaryPairMatch?          @relation("PairMatchLeftUnit")
-  rightPairMatch BinaryPairMatch?          @relation("PairMatchRightUnit")
+  sequence       Int
+  createdAt      DateTime                   @default(now()) @db.DateTime(3)
+  unitEvent      BinaryQualifyingUnitEvent  @relation(fields: [unitEventId], references: [id], onDelete: Restrict)
+  ancestor       User                       @relation("QualifyingUnitAncestor", fields: [ancestorUserId], references: [id], onDelete: Restrict)
+  planVersion    BinaryPlanVersion          @relation(fields: [planVersionId], references: [id], onDelete: Restrict)
+  leftPairMatch  BinaryPairMatch?           @relation("PairMatchLeftUnit")
+  rightPairMatch BinaryPairMatch?           @relation("PairMatchRightUnit")
   disposition    BinaryUnitDisposition?
 
   @@unique([unitEventId, ancestorUserId], map: "binary_upline_qualifying_units_event_ancestor_key")
@@ -505,37 +505,37 @@ model BinaryUplineQualifyingUnit {
 }
 
 model BinaryPairSettlement {
-  id                        String             @id @default(uuid()) @db.Char(36)
-  sourceKey                 String             @unique @db.VarChar(191)
-  requestFingerprint        String?            @db.Char(64)
-  memberUserId              String             @db.Char(36)
-  planVersionId             String             @db.Char(36)
-  settledAt                 DateTime           @db.DateTime(3)
-  settlementLocalDate       String             @db.Char(10)
-  settlementLocalMonth      String             @db.Char(7)
-  leftAvailableBefore       Decimal            @db.Decimal(18, 4)
-  rightAvailableBefore      Decimal            @db.Decimal(18, 4)
+  id                        String                  @id @default(uuid()) @db.Char(36)
+  sourceKey                 String                  @unique @db.VarChar(191)
+  requestFingerprint        String?                 @db.Char(64)
+  memberUserId              String                  @db.Char(36)
+  planVersionId             String                  @db.Char(36)
+  settledAt                 DateTime                @db.DateTime(3)
+  settlementLocalDate       String                  @db.Char(10)
+  settlementLocalMonth      String                  @db.Char(7)
+  leftAvailableBefore       Decimal                 @db.Decimal(18, 4)
+  rightAvailableBefore      Decimal                 @db.Decimal(18, 4)
   pairCountCalculated       Int
   pairCountPayable          Int
   capLimitedPairs           Int
-  leftVolumeConsumed        Decimal            @db.Decimal(18, 4)
-  rightVolumeConsumed       Decimal            @db.Decimal(18, 4)
-  leftCarryAfter            Decimal            @db.Decimal(18, 4)
-  rightCarryAfter           Decimal            @db.Decimal(18, 4)
-  leftUnitsAvailableBefore  Int                @default(0)
-  rightUnitsAvailableBefore Int                @default(0)
-  leftUnitsConsumed         Int                @default(0)
-  rightUnitsConsumed        Int                @default(0)
-  leftUnitsCarryAfter       Int                @default(0)
-  rightUnitsCarryAfter      Int                @default(0)
-  payoutAmount              Decimal            @db.Decimal(18, 2)
-  currencyCode              String             @db.VarChar(3)
-  ledgerTransactionId       String?            @unique @db.Char(36)
-  createdByUserId           String?            @db.Char(36)
-  createdAt                 DateTime           @default(now()) @db.DateTime(3)
-  member                    User               @relation("SettlementMember", fields: [memberUserId], references: [id], onDelete: Restrict)
-  planVersion               BinaryPlanVersion  @relation(fields: [planVersionId], references: [id], onDelete: Restrict)
-  ledgerTransaction         LedgerTransaction? @relation(fields: [ledgerTransactionId], references: [id], onDelete: Restrict)
+  leftVolumeConsumed        Decimal                 @db.Decimal(18, 4)
+  rightVolumeConsumed       Decimal                 @db.Decimal(18, 4)
+  leftCarryAfter            Decimal                 @db.Decimal(18, 4)
+  rightCarryAfter           Decimal                 @db.Decimal(18, 4)
+  leftUnitsAvailableBefore  Int                     @default(0)
+  rightUnitsAvailableBefore Int                     @default(0)
+  leftUnitsConsumed         Int                     @default(0)
+  rightUnitsConsumed        Int                     @default(0)
+  leftUnitsCarryAfter       Int                     @default(0)
+  rightUnitsCarryAfter      Int                     @default(0)
+  payoutAmount              Decimal                 @db.Decimal(18, 2)
+  currencyCode              String                  @db.VarChar(3)
+  ledgerTransactionId       String?                 @unique @db.Char(36)
+  createdByUserId           String?                 @db.Char(36)
+  createdAt                 DateTime                @default(now()) @db.DateTime(3)
+  member                    User                    @relation("SettlementMember", fields: [memberUserId], references: [id], onDelete: Restrict)
+  planVersion               BinaryPlanVersion       @relation(fields: [planVersionId], references: [id], onDelete: Restrict)
+  ledgerTransaction         LedgerTransaction?      @relation(fields: [ledgerTransactionId], references: [id], onDelete: Restrict)
   pairMatches               BinaryPairMatch[]
   unitDispositions          BinaryUnitDisposition[]
 
@@ -547,19 +547,19 @@ model BinaryPairSettlement {
 }
 
 model BinaryPairMatch {
-  id            String                    @id @default(uuid()) @db.Char(36)
-  settlementId  String                    @db.Char(36)
-  memberUserId  String                    @db.Char(36)
-  planVersionId String                    @db.Char(36)
-  pairSequence  BigInt
-  leftUnitId    String                    @unique @db.Char(36)
-  rightUnitId   String                    @unique @db.Char(36)
+  id            String                     @id @default(uuid()) @db.Char(36)
+  settlementId  String                     @db.Char(36)
+  memberUserId  String                     @db.Char(36)
+  planVersionId String                     @db.Char(36)
+  pairSequence  Int
+  leftUnitId    String                     @unique @db.Char(36)
+  rightUnitId   String                     @unique @db.Char(36)
   payable       Boolean
-  payoutAmount  Decimal                   @db.Decimal(18, 2)
-  createdAt     DateTime                  @default(now()) @db.DateTime(3)
-  settlement    BinaryPairSettlement      @relation(fields: [settlementId], references: [id], onDelete: Restrict)
-  member        User                      @relation("PairMatchMember", fields: [memberUserId], references: [id], onDelete: Restrict)
-  planVersion   BinaryPlanVersion         @relation(fields: [planVersionId], references: [id], onDelete: Restrict)
+  payoutAmount  Decimal                    @db.Decimal(18, 2)
+  createdAt     DateTime                   @default(now()) @db.DateTime(3)
+  settlement    BinaryPairSettlement       @relation(fields: [settlementId], references: [id], onDelete: Restrict)
+  member        User                       @relation("PairMatchMember", fields: [memberUserId], references: [id], onDelete: Restrict)
+  planVersion   BinaryPlanVersion          @relation(fields: [planVersionId], references: [id], onDelete: Restrict)
   leftUnit      BinaryUplineQualifyingUnit @relation("PairMatchLeftUnit", fields: [leftUnitId], references: [id], onDelete: Restrict)
   rightUnit     BinaryUplineQualifyingUnit @relation("PairMatchRightUnit", fields: [rightUnitId], references: [id], onDelete: Restrict)
 
@@ -570,14 +570,14 @@ model BinaryPairMatch {
 }
 
 model BinaryUnitDisposition {
-  id           String                    @id @default(uuid()) @db.Char(36)
-  uplineUnitId String                    @unique @db.Char(36)
-  settlementId String                    @db.Char(36)
+  id           String                      @id @default(uuid()) @db.Char(36)
+  uplineUnitId String                      @unique @db.Char(36)
+  settlementId String                      @db.Char(36)
   disposition  BinaryUnitDispositionType
-  reason       String?                   @db.VarChar(100)
-  createdAt    DateTime                  @default(now()) @db.DateTime(3)
-  uplineUnit   BinaryUplineQualifyingUnit @relation(fields: [uplineUnitId], references: [id], onDelete: Restrict)
-  settlement   BinaryPairSettlement      @relation(fields: [settlementId], references: [id], onDelete: Restrict)
+  reason       String?                     @db.VarChar(100)
+  createdAt    DateTime                    @default(now()) @db.DateTime(3)
+  uplineUnit   BinaryUplineQualifyingUnit  @relation(fields: [uplineUnitId], references: [id], onDelete: Restrict)
+  settlement   BinaryPairSettlement        @relation(fields: [settlementId], references: [id], onDelete: Restrict)
 
   @@index([settlementId], map: "binary_unit_dispositions_settlementId_idx")
   @@map("binary_unit_dispositions")
