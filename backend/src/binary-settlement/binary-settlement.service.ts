@@ -73,7 +73,9 @@ export class BinarySettlementService {
         throw new BadRequestException('Binary plan version is not effective at settlement time');
       }
       if (!version.currencyCode || !version.settlementTimezone || !version.capOverflowMode) {
-        throw new ConflictException('Published plan is missing settlement currency, timezone or cap overflow policy');
+        throw new ConflictException(
+          'Published plan is missing settlement currency, timezone or cap overflow policy',
+        );
       }
       this.assertSupportedQualificationRules(version.qualificationRules);
 
@@ -86,52 +88,52 @@ export class BinarySettlementService {
         select: { id: true },
       });
       if (laterSettlement) {
-        throw new ConflictException('Cannot insert a settlement before a later settlement for the same member and plan version');
+        throw new ConflictException(
+          'Cannot insert a settlement before a later settlement for the same member and plan version',
+        );
       }
 
       const local = this.localPeriod(settledAt, version.settlementTimezone);
-      const [leftAvailable, rightAvailable, previous, dailyUsed, monthlyUsed] = await Promise.all([
-        this.availableVolume(
-          tx,
-          dto.memberUserId,
-          dto.planVersionId,
-          BinaryPlacementSide.LEFT,
-          settledAt,
-          version.carryForwardExpiryDays,
-        ),
-        this.availableVolume(
-          tx,
-          dto.memberUserId,
-          dto.planVersionId,
-          BinaryPlacementSide.RIGHT,
-          settledAt,
-          version.carryForwardExpiryDays,
-        ),
-        tx.binaryPairSettlement.aggregate({
-          where: {
-            memberUserId: dto.memberUserId,
-            planVersionId: dto.planVersionId,
-            settledAt: { lte: settledAt },
-          },
-          _sum: { leftVolumeConsumed: true, rightVolumeConsumed: true },
-        }),
-        tx.binaryPairSettlement.aggregate({
-          where: {
-            memberUserId: dto.memberUserId,
-            planVersionId: dto.planVersionId,
-            settlementLocalDate: local.date,
-          },
-          _sum: { pairCountPayable: true },
-        }),
-        tx.binaryPairSettlement.aggregate({
-          where: {
-            memberUserId: dto.memberUserId,
-            planVersionId: dto.planVersionId,
-            settlementLocalMonth: local.month,
-          },
-          _sum: { pairCountPayable: true },
-        }),
-      ]);
+      const leftAvailable = await this.availableVolume(
+        tx,
+        dto.memberUserId,
+        dto.planVersionId,
+        BinaryPlacementSide.LEFT,
+        settledAt,
+        version.carryForwardExpiryDays,
+      );
+      const rightAvailable = await this.availableVolume(
+        tx,
+        dto.memberUserId,
+        dto.planVersionId,
+        BinaryPlacementSide.RIGHT,
+        settledAt,
+        version.carryForwardExpiryDays,
+      );
+      const previous = await tx.binaryPairSettlement.aggregate({
+        where: {
+          memberUserId: dto.memberUserId,
+          planVersionId: dto.planVersionId,
+          settledAt: { lte: settledAt },
+        },
+        _sum: { leftVolumeConsumed: true, rightVolumeConsumed: true },
+      });
+      const dailyUsed = await tx.binaryPairSettlement.aggregate({
+        where: {
+          memberUserId: dto.memberUserId,
+          planVersionId: dto.planVersionId,
+          settlementLocalDate: local.date,
+        },
+        _sum: { pairCountPayable: true },
+      });
+      const monthlyUsed = await tx.binaryPairSettlement.aggregate({
+        where: {
+          memberUserId: dto.memberUserId,
+          planVersionId: dto.planVersionId,
+          settlementLocalMonth: local.month,
+        },
+        _sum: { pairCountPayable: true },
+      });
 
       const priorLeftConsumed = previous._sum.leftVolumeConsumed ?? new Prisma.Decimal(0);
       const priorRightConsumed = previous._sum.rightVolumeConsumed ?? new Prisma.Decimal(0);
@@ -139,7 +141,9 @@ export class BinarySettlementService {
       const right = this.subtractPriorConsumption(rightAvailable, priorRightConsumed);
 
       if (left.lessThan(0) || right.lessThan(0)) {
-        throw new ConflictException('Volume reversals exceed remaining carry; explicit reconciliation is required');
+        throw new ConflictException(
+          'Volume reversals exceed remaining carry; explicit reconciliation is required',
+        );
       }
 
       const leftPairs = left.dividedBy(version.leftVolumePerPair).floor().toNumber();
@@ -259,7 +263,9 @@ export class BinarySettlementService {
           ledgerTransactionId,
           createdByUserId: actorUserId,
         },
-        include: { ledgerTransaction: { include: { entries: { include: { account: true } } } } },
+        include: {
+          ledgerTransaction: { include: { entries: { include: { account: true } } } },
+        },
       });
     });
 
@@ -310,14 +316,13 @@ export class BinarySettlementService {
     settledAt: Date,
     expiryDays: number | null,
   ): Promise<{ all: Prisma.Decimal; eligible: Prisma.Decimal }> {
-    const baseWhere = {
-      ancestorUserId: memberUserId,
-      planVersionId,
-      side,
-      volumeEvent: { occurredAt: { lte: settledAt } },
-    } as const;
     const allAggregate = await tx.binaryUplineVolumeCredit.aggregate({
-      where: baseWhere,
+      where: {
+        ancestorUserId: memberUserId,
+        planVersionId,
+        side,
+        volumeEvent: { occurredAt: { lte: settledAt } },
+      },
       _sum: { volume: true },
     });
     const all = allAggregate._sum.volume ?? new Prisma.Decimal(0);
@@ -370,7 +375,10 @@ export class BinarySettlementService {
   }
 
   private assertSupportedQualificationRules(rules: Prisma.JsonValue | null): void {
-    if (!rules || (typeof rules === 'object' && !Array.isArray(rules) && Object.keys(rules).length === 0)) {
+    if (
+      !rules ||
+      (typeof rules === 'object' && !Array.isArray(rules) && Object.keys(rules).length === 0)
+    ) {
       return;
     }
     throw new ConflictException(
