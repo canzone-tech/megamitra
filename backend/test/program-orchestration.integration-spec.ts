@@ -394,7 +394,7 @@ describe('MegaMitra program event orchestration integration', () => {
     expect(processed.body.run.binaryLinks).toHaveLength(1);
     expect(processed.body.run.referralHooks).toHaveLength(1);
     expect(processed.body.run.referralHooks[0].status).toBe('READY');
-    expect(String(processed.body.run.referralHooks[0].basisAmount)).toBe('350.00');
+    expect(Number(processed.body.run.referralHooks[0].basisAmount)).toBe(350);
     expect(processed.body.run.drawHooks).toHaveLength(1);
     expect(processed.body.run.drawHooks[0].status).toBe('ELIGIBLE');
 
