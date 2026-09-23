@@ -1,0 +1,32 @@
+name: Frontend CI
+
+on:
+  push:
+    branches:
+      - main
+      - dev/local-foundation
+  pull_request:
+    branches:
+      - main
+      - dev/local-foundation
+
+jobs:
+  verify-frontends:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Verify admin and member apps
+        run: bash scripts/verify-frontends.sh
+
+      - name: Verify pinned framework versions
+        run: |
+          npm --prefix admin ls next react react-dom typescript
+          npm --prefix frontend ls next react react-dom typescript
