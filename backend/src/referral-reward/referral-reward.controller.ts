@@ -2,7 +2,9 @@ import { Body, Controller, Get, Param, Patch, Post } from '@nestjs/common';
 import type { AuthUser } from '../auth/auth-user';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { Permissions } from '../rbac/permissions.decorator';
+import { ReferralRefundRuleService } from './referral-refund-rule.service';
 import {
+  ConfigureReferralRefundRuleDto,
   CreateReferralRewardEventDto,
   CreateReferralRewardPolicyDto,
   CreateReferralRewardPolicyVersionDto,
@@ -13,7 +15,10 @@ import { ReferralRewardService } from './referral-reward.service';
 
 @Controller('admin/referral-reward-policies')
 export class ReferralRewardPolicyController {
-  constructor(private readonly policies: ReferralRewardPolicyService) {}
+  constructor(
+    private readonly policies: ReferralRewardPolicyService,
+    private readonly refundRules: ReferralRefundRuleService,
+  ) {}
 
   @Permissions('referral.policy.manage')
   @Post()
@@ -54,6 +59,22 @@ export class ReferralRewardPolicyController {
     @CurrentUser() actor: AuthUser,
   ) {
     return this.policies.updateDraft(versionId, dto, actor.id);
+  }
+
+  @Permissions('referral.policy.manage')
+  @Post('versions/:versionId/refund-rule')
+  configureRefundRule(
+    @Param('versionId') versionId: string,
+    @Body() dto: ConfigureReferralRefundRuleDto,
+    @CurrentUser() actor: AuthUser,
+  ) {
+    return this.refundRules.configure(versionId, dto.mode, actor.id);
+  }
+
+  @Permissions('referral.policy.read')
+  @Get('versions/:versionId/refund-rule')
+  getRefundRule(@Param('versionId') versionId: string) {
+    return this.refundRules.get(versionId);
   }
 
   @Permissions('referral.policy.manage')
