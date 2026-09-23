@@ -177,10 +177,11 @@ export class GenealogyService {
       if (currentUserId === memberUserId) {
         throw new BadRequestException('Sponsor relationship would create a cycle');
       }
-      const relationship = await this.prisma.sponsorRelationship.findUnique({
-        where: { memberUserId: currentUserId },
-        select: { sponsorUserId: true },
-      });
+      const relationship: { sponsorUserId: string } | null =
+        await this.prisma.sponsorRelationship.findUnique({
+          where: { memberUserId: currentUserId },
+          select: { sponsorUserId: true },
+        });
       currentUserId = relationship?.sponsorUserId ?? null;
       hops += 1;
       if (hops > 10000) throw new BadRequestException('Sponsor chain exceeds supported traversal depth');
