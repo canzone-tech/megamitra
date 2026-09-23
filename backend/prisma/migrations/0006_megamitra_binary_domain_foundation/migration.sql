@@ -10,9 +10,7 @@ CREATE TABLE `sponsor_relationships` (
   CONSTRAINT `sponsor_relationships_memberUserId_fkey`
     FOREIGN KEY (`memberUserId`) REFERENCES `users` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT `sponsor_relationships_sponsorUserId_fkey`
-    FOREIGN KEY (`sponsorUserId`) REFERENCES `users` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
-  CONSTRAINT `sponsor_relationships_not_self_check`
-    CHECK (`memberUserId` <> `sponsorUserId`)
+    FOREIGN KEY (`sponsorUserId`) REFERENCES `users` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 CREATE TABLE `binary_placements` (
@@ -29,9 +27,7 @@ CREATE TABLE `binary_placements` (
   CONSTRAINT `binary_placements_memberUserId_fkey`
     FOREIGN KEY (`memberUserId`) REFERENCES `users` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT `binary_placements_parentUserId_fkey`
-    FOREIGN KEY (`parentUserId`) REFERENCES `users` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
-  CONSTRAINT `binary_placements_not_self_check`
-    CHECK (`memberUserId` <> `parentUserId`)
+    FOREIGN KEY (`parentUserId`) REFERENCES `users` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 CREATE TABLE `binary_ancestry` (
@@ -47,8 +43,7 @@ CREATE TABLE `binary_ancestry` (
     FOREIGN KEY (`ancestorUserId`) REFERENCES `users` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT `binary_ancestry_descendantUserId_fkey`
     FOREIGN KEY (`descendantUserId`) REFERENCES `users` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
-  CONSTRAINT `binary_ancestry_depth_check` CHECK (`depth` > 0),
-  CONSTRAINT `binary_ancestry_not_self_check` CHECK (`ancestorUserId` <> `descendantUserId`)
+  CONSTRAINT `binary_ancestry_depth_check` CHECK (`depth` > 0)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 CREATE TABLE `binary_plans` (
