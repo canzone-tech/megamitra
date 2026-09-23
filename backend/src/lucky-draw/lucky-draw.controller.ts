@@ -9,7 +9,15 @@ import {
   ExecuteLuckyDrawDto,
   UpdateLuckyDrawPolicyVersionDto,
 } from './lucky-draw.dto';
+import {
+  CancelLuckyDrawPrizeClaimDto,
+  ClaimLuckyDrawPrizeDto,
+  ConfigureLuckyDrawFulfillmentRuleDto,
+  FulfillLuckyDrawPrizeDto,
+  ReverseLuckyDrawPrizeFulfillmentDto,
+} from './lucky-draw-fulfillment.dto';
 import { LuckyDrawExecutionService } from './lucky-draw-execution.service';
+import { LuckyDrawFulfillmentService } from './lucky-draw-fulfillment.service';
 import { LuckyDrawPolicyService } from './lucky-draw-policy.service';
 
 @Controller('admin/lucky-draw-policies')
@@ -115,5 +123,101 @@ export class LuckyDrawExecutionController {
   @Post(':drawId/void')
   voidScheduled(@Param('drawId') drawId: string, @CurrentUser() actor: AuthUser) {
     return this.draws.voidScheduled(drawId, actor.id);
+  }
+}
+
+@Controller('admin/lucky-draw-fulfillment')
+export class LuckyDrawFulfillmentController {
+  constructor(private readonly fulfillment: LuckyDrawFulfillmentService) {}
+
+  @Permissions('draw.fulfillment.manage')
+  @Post('policy-versions/:versionId/rule')
+  configureRule(
+    @Param('versionId') versionId: string,
+    @Body() dto: ConfigureLuckyDrawFulfillmentRuleDto,
+    @CurrentUser() actor: AuthUser,
+  ) {
+    return this.fulfillment.configureRule(versionId, dto, actor.id);
+  }
+
+  @Permissions('draw.fulfillment.read')
+  @Get('policy-versions/:versionId/rule')
+  getRule(@Param('versionId') versionId: string) {
+    return this.fulfillment.getRule(versionId);
+  }
+
+  @Permissions('draw.fulfillment.manage')
+  @Post('draws/:drawId/claims/initialize')
+  initializeClaims(@Param('drawId') drawId: string, @CurrentUser() actor: AuthUser) {
+    return this.fulfillment.initializeClaims(drawId, actor.id);
+  }
+
+  @Permissions('draw.fulfillment.manage')
+  @Post('claims/expire-pending')
+  expirePending(@Query('limit') limit: string | undefined, @CurrentUser() actor: AuthUser) {
+    const parsed = limit ? Number.parseInt(limit, 10) : 100;
+    return this.fulfillment.expirePending(actor.id, Number.isFinite(parsed) ? parsed : 100);
+  }
+
+  @Permissions('draw.fulfillment.read')
+  @Get('claims')
+  listClaims(
+    @Query('drawId') drawId?: string,
+    @Query('userId') userId?: string,
+    @Query('status') status?: string,
+  ) {
+    return this.fulfillment.listClaims({ drawId, userId, status });
+  }
+
+  @Permissions('draw.fulfillment.read')
+  @Get('claims/:claimId')
+  getClaim(@Param('claimId') claimId: string) {
+    return this.fulfillment.getClaim(claimId);
+  }
+
+  @Permissions('draw.fulfillment.manage')
+  @Post('claims/:claimId/claim')
+  claim(
+    @Param('claimId') claimId: string,
+    @Body() dto: ClaimLuckyDrawPrizeDto,
+    @CurrentUser() actor: AuthUser,
+  ) {
+    return this.fulfillment.claim(claimId, dto, actor.id);
+  }
+
+  @Permissions('draw.fulfillment.manage')
+  @Post('claims/:claimId/fulfill')
+  fulfill(
+    @Param('claimId') claimId: string,
+    @Body() dto: FulfillLuckyDrawPrizeDto,
+    @CurrentUser() actor: AuthUser,
+  ) {
+    return this.fulfillment.fulfill(claimId, dto, actor.id);
+  }
+
+  @Permissions('draw.fulfillment.manage')
+  @Post('claims/:claimId/cancel')
+  cancelClaim(
+    @Param('claimId') claimId: string,
+    @Body() dto: CancelLuckyDrawPrizeClaimDto,
+    @CurrentUser() actor: AuthUser,
+  ) {
+    return this.fulfillment.cancelClaim(claimId, dto, actor.id);
+  }
+
+  @Permissions('draw.fulfillment.read')
+  @Get('fulfillments/:fulfillmentId')
+  getFulfillment(@Param('fulfillmentId') fulfillmentId: string) {
+    return this.fulfillment.getFulfillment(fulfillmentId);
+  }
+
+  @Permissions('draw.fulfillment.manage')
+  @Post('fulfillments/:fulfillmentId/reverse')
+  reverseFulfillment(
+    @Param('fulfillmentId') fulfillmentId: string,
+    @Body() dto: ReverseLuckyDrawPrizeFulfillmentDto,
+    @CurrentUser() actor: AuthUser,
+  ) {
+    return this.fulfillment.reverseFulfillment(fulfillmentId, dto, actor.id);
   }
 }
