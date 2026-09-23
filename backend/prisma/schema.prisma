@@ -84,9 +84,27 @@ enum BinaryCapOverflowMode {
   FLUSH
 }
 
+enum ReferralRewardMode {
+  FIXED
+  PERCENTAGE
+}
+
+enum ReferralRoundingMode {
+  HALF_UP
+  DOWN
+  UP
+}
+
+enum ReferralRewardEventStatus {
+  POSTED
+  INELIGIBLE
+  NO_PAYOUT
+}
+
 enum LedgerAccountKind {
   USER_WALLET
   COMMISSION_EXPENSE
+  REFERRAL_REWARD_EXPENSE
 }
 
 enum LedgerEntryDirection {
@@ -96,6 +114,7 @@ enum LedgerEntryDirection {
 
 enum LedgerTransactionType {
   BINARY_PAIR_COMMISSION
+  REFERRAL_REWARD
   ADJUSTMENT
   REVERSAL
 }
@@ -119,25 +138,27 @@ model User {
   updatedAt           DateTime   @updatedAt @db.DateTime(3)
 
   roles                     UserRole[]
-  auditLogs                 AuditLog[]                  @relation("AuditActor")
+  auditLogs                 AuditLog[]                   @relation("AuditActor")
   sessions                  AuthSession[]
   identifierClaims          UserIdentifierClaim[]
-  securityConfigUpdates     SystemSecurityConfig[]      @relation("SecurityConfigUpdater")
-  authConfigUpdates         SystemAuthConfig[]          @relation("AuthConfigUpdater")
-  registrationConfigUpdates SystemRegistrationConfig[]  @relation("RegistrationConfigUpdater")
-  sponsorRelationship       SponsorRelationship?        @relation("SponsorMember")
-  sponsoredMembers          SponsorRelationship[]       @relation("SponsorOwner")
-  binaryPlacement           BinaryPlacement?            @relation("PlacementMember")
-  binaryChildren            BinaryPlacement[]           @relation("PlacementParent")
-  binaryAncestorLinks       BinaryAncestry[]            @relation("BinaryAncestor")
-  binaryDescendantLinks     BinaryAncestry[]            @relation("BinaryDescendant")
-  binaryVolumeEvents        BinaryVolumeEvent[]         @relation("VolumeSourceMember")
-  binaryVolumeCredits       BinaryUplineVolumeCredit[]  @relation("VolumeCreditAncestor")
-  binaryQualifyingEvents    BinaryQualifyingUnitEvent[] @relation("QualifyingUnitSourceMember")
+  securityConfigUpdates     SystemSecurityConfig[]       @relation("SecurityConfigUpdater")
+  authConfigUpdates         SystemAuthConfig[]           @relation("AuthConfigUpdater")
+  registrationConfigUpdates SystemRegistrationConfig[]   @relation("RegistrationConfigUpdater")
+  sponsorRelationship       SponsorRelationship?         @relation("SponsorMember")
+  sponsoredMembers          SponsorRelationship[]        @relation("SponsorOwner")
+  referralRewardsAsSponsor  ReferralRewardEvent[]        @relation("ReferralRewardSponsor")
+  referralRewardsAsReferred ReferralRewardEvent[]        @relation("ReferralRewardReferred")
+  binaryPlacement           BinaryPlacement?             @relation("PlacementMember")
+  binaryChildren            BinaryPlacement[]            @relation("PlacementParent")
+  binaryAncestorLinks       BinaryAncestry[]             @relation("BinaryAncestor")
+  binaryDescendantLinks     BinaryAncestry[]             @relation("BinaryDescendant")
+  binaryVolumeEvents        BinaryVolumeEvent[]          @relation("VolumeSourceMember")
+  binaryVolumeCredits       BinaryUplineVolumeCredit[]   @relation("VolumeCreditAncestor")
+  binaryQualifyingEvents    BinaryQualifyingUnitEvent[]  @relation("QualifyingUnitSourceMember")
   binaryQualifyingUnits     BinaryUplineQualifyingUnit[] @relation("QualifyingUnitAncestor")
-  binarySettlements         BinaryPairSettlement[]      @relation("SettlementMember")
-  binaryPairMatches         BinaryPairMatch[]           @relation("PairMatchMember")
-  ledgerAccounts            LedgerAccount[]             @relation("LedgerAccountOwner")
+  binarySettlements         BinaryPairSettlement[]       @relation("SettlementMember")
+  binaryPairMatches         BinaryPairMatch[]            @relation("PairMatchMember")
+  ledgerAccounts            LedgerAccount[]              @relation("LedgerAccountOwner")
 
   @@index([email])
   @@index([phone])
@@ -331,6 +352,80 @@ model SponsorRelationship {
   @@map("sponsor_relationships")
 }
 
+model ReferralRewardPolicy {
+  id              String                        @id @default(uuid()) @db.Char(36)
+  code            String                        @unique @db.VarChar(50)
+  name            String                        @db.VarChar(120)
+  description     String?                       @db.VarChar(500)
+  createdByUserId String?                       @db.Char(36)
+  createdAt       DateTime                      @default(now()) @db.DateTime(3)
+  updatedAt       DateTime                      @updatedAt @db.DateTime(3)
+  versions        ReferralRewardPolicyVersion[]
+
+  @@map("referral_reward_policies")
+}
+
+model ReferralRewardPolicyVersion {
+  id                  String                 @id @default(uuid()) @db.Char(36)
+  policyId            String                 @db.Char(36)
+  version             Int
+  lifecycle           PolicyLifecycle        @default(DRAFT)
+  effectiveFrom       DateTime               @db.DateTime(3)
+  effectiveTo         DateTime?              @db.DateTime(3)
+  rewardMode          ReferralRewardMode
+  fixedAmount         Decimal?               @db.Decimal(18, 2)
+  percentageRate      Decimal?               @db.Decimal(9, 4)
+  currencyCode        String                 @db.VarChar(3)
+  roundingMode        ReferralRoundingMode
+  minimumRewardAmount Decimal?               @db.Decimal(18, 2)
+  maximumRewardAmount Decimal?               @db.Decimal(18, 2)
+  eligibilityRules    Json?
+  createdByUserId     String?                @db.Char(36)
+  publishedByUserId   String?                @db.Char(36)
+  retiredByUserId     String?                @db.Char(36)
+  publishedAt         DateTime?              @db.DateTime(3)
+  retiredAt           DateTime?              @db.DateTime(3)
+  createdAt           DateTime               @default(now()) @db.DateTime(3)
+  updatedAt           DateTime               @updatedAt @db.DateTime(3)
+  policy              ReferralRewardPolicy   @relation(fields: [policyId], references: [id], onDelete: Restrict)
+  rewardEvents        ReferralRewardEvent[]
+
+  @@unique([policyId, version], map: "referral_reward_policy_versions_policy_version_key")
+  @@index([policyId, lifecycle], map: "referral_reward_policy_versions_policy_lifecycle_idx")
+  @@index([lifecycle, effectiveFrom, effectiveTo], map: "referral_reward_policy_versions_effective_idx")
+  @@map("referral_reward_policy_versions")
+}
+
+model ReferralRewardEvent {
+  id                  String                     @id @default(uuid()) @db.Char(36)
+  sourceKey           String                     @unique @db.VarChar(191)
+  requestFingerprint  String                     @db.Char(64)
+  referredUserId      String                     @db.Char(36)
+  sponsorUserId       String                     @db.Char(36)
+  policyVersionId     String                     @db.Char(36)
+  basisAmount         Decimal                    @db.Decimal(18, 2)
+  currencyCode        String                     @db.VarChar(3)
+  eligible            Boolean
+  eligibilitySnapshot Json
+  rewardAmount        Decimal                    @db.Decimal(18, 2)
+  status              ReferralRewardEventStatus
+  ledgerTransactionId String?                    @unique @db.Char(36)
+  occurredAt          DateTime                   @db.DateTime(3)
+  metadata            Json?
+  createdByUserId     String?                    @db.Char(36)
+  createdAt           DateTime                   @default(now()) @db.DateTime(3)
+  referredUser        User                       @relation("ReferralRewardReferred", fields: [referredUserId], references: [id], onDelete: Restrict)
+  sponsor             User                       @relation("ReferralRewardSponsor", fields: [sponsorUserId], references: [id], onDelete: Restrict)
+  policyVersion       ReferralRewardPolicyVersion @relation(fields: [policyVersionId], references: [id], onDelete: Restrict)
+  ledgerTransaction   LedgerTransaction?         @relation(fields: [ledgerTransactionId], references: [id], onDelete: Restrict)
+
+  @@index([sponsorUserId, occurredAt], map: "referral_reward_events_sponsor_time_idx")
+  @@index([referredUserId, occurredAt], map: "referral_reward_events_referred_time_idx")
+  @@index([policyVersionId, occurredAt], map: "referral_reward_events_policy_time_idx")
+  @@index([status, occurredAt], map: "referral_reward_events_status_time_idx")
+  @@map("referral_reward_events")
+}
+
 model BinaryPlacement {
   id              String              @id @default(uuid()) @db.Char(36)
   memberUserId    String              @unique @db.Char(36)
@@ -375,18 +470,18 @@ model BinaryPlan {
 }
 
 model BinaryPlanVersion {
-  id                     String                     @id @default(uuid()) @db.Char(36)
-  planId                 String                     @db.Char(36)
+  id                     String                      @id @default(uuid()) @db.Char(36)
+  planId                 String                      @db.Char(36)
   version                Int
-  lifecycle              PolicyLifecycle            @default(DRAFT)
-  effectiveFrom          DateTime                   @db.DateTime(3)
-  effectiveTo            DateTime?                  @db.DateTime(3)
-  qualifyingUnit         Decimal                    @db.Decimal(18, 4)
-  leftVolumePerPair      Decimal                    @db.Decimal(18, 4)
-  rightVolumePerPair     Decimal                    @db.Decimal(18, 4)
-  pairPayoutAmount       Decimal                    @db.Decimal(18, 2)
-  currencyCode           String?                    @db.VarChar(3)
-  settlementTimezone     String?                    @db.VarChar(100)
+  lifecycle              PolicyLifecycle             @default(DRAFT)
+  effectiveFrom          DateTime                    @db.DateTime(3)
+  effectiveTo            DateTime?                   @db.DateTime(3)
+  qualifyingUnit         Decimal                     @db.Decimal(18, 4)
+  leftVolumePerPair      Decimal                     @db.Decimal(18, 4)
+  rightVolumePerPair     Decimal                     @db.Decimal(18, 4)
+  pairPayoutAmount       Decimal                     @db.Decimal(18, 2)
+  currencyCode           String?                     @db.VarChar(3)
+  settlementTimezone     String?                     @db.VarChar(100)
   capOverflowMode        BinaryCapOverflowMode?
   dailyPairCap           Int?
   monthlyPairCap         Int?
@@ -394,14 +489,14 @@ model BinaryPlanVersion {
   carryForwardExpiryDays Int?
   qualificationRules     Json?
   settlementRules        Json?
-  createdByUserId        String?                    @db.Char(36)
-  publishedByUserId      String?                    @db.Char(36)
-  retiredByUserId        String?                    @db.Char(36)
-  publishedAt            DateTime?                  @db.DateTime(3)
-  retiredAt              DateTime?                  @db.DateTime(3)
-  createdAt              DateTime                   @default(now()) @db.DateTime(3)
-  updatedAt              DateTime                   @updatedAt @db.DateTime(3)
-  plan                   BinaryPlan                 @relation(fields: [planId], references: [id], onDelete: Restrict)
+  createdByUserId        String?                     @db.Char(36)
+  publishedByUserId      String?                     @db.Char(36)
+  retiredByUserId        String?                     @db.Char(36)
+  publishedAt            DateTime?                   @db.DateTime(3)
+  retiredAt              DateTime?                   @db.DateTime(3)
+  createdAt              DateTime                    @default(now()) @db.DateTime(3)
+  updatedAt              DateTime                    @updatedAt @db.DateTime(3)
+  plan                   BinaryPlan                  @relation(fields: [planId], references: [id], onDelete: Restrict)
   volumeEvents           BinaryVolumeEvent[]
   uplineCredits          BinaryUplineVolumeCredit[]
   qualifyingUnitEvents   BinaryQualifyingUnitEvent[]
@@ -570,14 +665,14 @@ model BinaryPairMatch {
 }
 
 model BinaryUnitDisposition {
-  id           String                      @id @default(uuid()) @db.Char(36)
-  uplineUnitId String                      @unique @db.Char(36)
-  settlementId String                      @db.Char(36)
+  id           String                     @id @default(uuid()) @db.Char(36)
+  uplineUnitId String                     @unique @db.Char(36)
+  settlementId String                     @db.Char(36)
   disposition  BinaryUnitDispositionType
-  reason       String?                     @db.VarChar(100)
-  createdAt    DateTime                    @default(now()) @db.DateTime(3)
-  uplineUnit   BinaryUplineQualifyingUnit  @relation(fields: [uplineUnitId], references: [id], onDelete: Restrict)
-  settlement   BinaryPairSettlement        @relation(fields: [settlementId], references: [id], onDelete: Restrict)
+  reason       String?                    @db.VarChar(100)
+  createdAt    DateTime                   @default(now()) @db.DateTime(3)
+  uplineUnit   BinaryUplineQualifyingUnit @relation(fields: [uplineUnitId], references: [id], onDelete: Restrict)
+  settlement   BinaryPairSettlement       @relation(fields: [settlementId], references: [id], onDelete: Restrict)
 
   @@index([settlementId], map: "binary_unit_dispositions_settlementId_idx")
   @@map("binary_unit_dispositions")
@@ -600,15 +695,16 @@ model LedgerAccount {
 }
 
 model LedgerTransaction {
-  id               String                  @id @default(uuid()) @db.Char(36)
-  sourceKey        String                  @unique @db.VarChar(191)
-  type             LedgerTransactionType
-  description      String?                 @db.VarChar(500)
-  occurredAt       DateTime                @db.DateTime(3)
-  createdByUserId  String?                 @db.Char(36)
-  createdAt        DateTime                @default(now()) @db.DateTime(3)
-  entries          LedgerEntry[]
-  binarySettlement BinaryPairSettlement?
+  id                  String               @id @default(uuid()) @db.Char(36)
+  sourceKey           String               @unique @db.VarChar(191)
+  type                LedgerTransactionType
+  description         String?              @db.VarChar(500)
+  occurredAt          DateTime             @db.DateTime(3)
+  createdByUserId     String?              @db.Char(36)
+  createdAt           DateTime             @default(now()) @db.DateTime(3)
+  entries             LedgerEntry[]
+  binarySettlement    BinaryPairSettlement?
+  referralRewardEvent ReferralRewardEvent?
 
   @@index([type, occurredAt])
   @@index([createdAt])
