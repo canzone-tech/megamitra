@@ -1,6 +1,8 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
-import { ADMIN_ACCESS_COOKIE, ADMIN_REFRESH_COOKIE } from './lib/server-session';
+
+const ADMIN_ACCESS_COOKIE = 'megamitra_admin_access';
+const ADMIN_REFRESH_COOKIE = 'megamitra_admin_refresh';
 
 export default function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
