@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ReferralEligibilityService } from './referral-eligibility.service';
+import { ReferralRefundRuleService } from './referral-refund-rule.service';
 import {
   ReferralRewardController,
   ReferralRewardPolicyController,
@@ -9,7 +10,17 @@ import { ReferralRewardService } from './referral-reward.service';
 
 @Module({
   controllers: [ReferralRewardPolicyController, ReferralRewardController],
-  providers: [ReferralEligibilityService, ReferralRewardPolicyService, ReferralRewardService],
-  exports: [ReferralEligibilityService, ReferralRewardPolicyService, ReferralRewardService],
+  providers: [
+    ReferralEligibilityService,
+    ReferralRefundRuleService,
+    ReferralRewardPolicyService,
+    ReferralRewardService,
+  ],
+  exports: [
+    ReferralEligibilityService,
+    ReferralRefundRuleService,
+    ReferralRewardPolicyService,
+    ReferralRewardService,
+  ],
 })
 export class ReferralRewardModule {}
