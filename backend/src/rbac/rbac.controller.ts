@@ -1,5 +1,5 @@
 import { Body, Controller, Get, Param, Post, Put } from '@nestjs/common';
-import { AuthUser } from '../auth/auth-user';
+import type { AuthUser } from '../auth/auth-user';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { Permissions } from './permissions.decorator';
 import { CreateRoleDto, ReplaceRolePermissionsDto } from './rbac.dto';
@@ -29,7 +29,11 @@ export class RbacController {
 
   @Permissions('rbac.manage')
   @Put('roles/:roleName/permissions')
-  replacePermissions(@Param('roleName') roleName: string, @Body() dto: ReplaceRolePermissionsDto, @CurrentUser() actor: AuthUser) {
+  replacePermissions(
+    @Param('roleName') roleName: string,
+    @Body() dto: ReplaceRolePermissionsDto,
+    @CurrentUser() actor: AuthUser,
+  ) {
     return this.rbac.replacePermissions(roleName, dto.permissions, actor.id);
   }
 }
