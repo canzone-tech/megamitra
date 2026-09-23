@@ -73,7 +73,7 @@ export class BinaryUnitService {
               planVersionId: dto.planVersionId,
               side: ancestor.firstLegSide,
               depth: ancestor.depth,
-              sequence: state.nextValue,
+              sequence: Number(state.nextValue),
             },
           });
         }
@@ -215,7 +215,12 @@ export class BinaryUnitService {
       where: { ancestorUserId: userId },
       orderBy: [{ planVersionId: 'asc' }, { side: 'asc' }, { sequence: 'asc' }],
       include: {
-        unitEvent: { include: { sourceMember: { select: { id: true, username: true } }, reversedBy: true } },
+        unitEvent: {
+          include: {
+            sourceMember: { select: { id: true, username: true } },
+            reversedBy: true,
+          },
+        },
         leftPairMatch: true,
         rightPairMatch: true,
         disposition: true,
