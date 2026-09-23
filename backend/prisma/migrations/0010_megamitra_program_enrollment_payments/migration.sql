@@ -171,9 +171,7 @@ CREATE TABLE `program_payment_allocations` (
     FOREIGN KEY (`enrollmentId`) REFERENCES `program_enrollments` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
   CONSTRAINT `program_payment_allocations_installmentId_fkey`
     FOREIGN KEY (`installmentId`) REFERENCES `program_installments` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
-  CONSTRAINT `program_payment_allocations_amount_check` CHECK (`amount` > 0),
-  CONSTRAINT `program_payment_allocations_target_check`
-    CHECK ((`allocationType` = 'INSTALLMENT' AND `installmentId` IS NOT NULL) OR (`allocationType` <> 'INSTALLMENT' AND `installmentId` IS NULL))
+  CONSTRAINT `program_payment_allocations_amount_check` CHECK (`amount` > 0)
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 CREATE TABLE `program_refund_records` (
