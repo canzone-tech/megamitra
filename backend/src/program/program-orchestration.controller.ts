@@ -8,10 +8,14 @@ import {
   UpdateProgramEventPolicyDto,
 } from './program-orchestration.dto';
 import { ProgramOrchestrationService } from './program-orchestration.service';
+import { ProgramReferralRewardConsumerService } from './program-referral-reward-consumer.service';
 
 @Controller('admin/program-orchestration')
 export class ProgramOrchestrationController {
-  constructor(private readonly orchestration: ProgramOrchestrationService) {}
+  constructor(
+    private readonly orchestration: ProgramOrchestrationService,
+    private readonly referralConsumer: ProgramReferralRewardConsumerService,
+  ) {}
 
   @Permissions('program.orchestration.manage')
   @Post('policies')
@@ -70,6 +74,44 @@ export class ProgramOrchestrationController {
     return this.orchestration.processPending(actor.id, Number.isFinite(parsed) ? parsed : 25);
   }
 
+  @Permissions('program.orchestration.manage')
+  @Post('referral-hooks/:id/consume')
+  consumeReferralHook(@Param('id') id: string, @CurrentUser() actor: AuthUser) {
+    return this.referralConsumer.consumeHook(id, actor.id);
+  }
+
+  @Permissions('program.orchestration.manage')
+  @Post('referral-hooks-process-ready')
+  processReadyReferralHooks(
+    @Query('limit') limit: string | undefined,
+    @CurrentUser() actor: AuthUser,
+  ) {
+    const parsed = limit ? Number.parseInt(limit, 10) : 25;
+    return this.referralConsumer.processReady(actor.id, Number.isFinite(parsed) ? parsed : 25);
+  }
+
+  @Permissions('program.orchestration.manage')
+  @Post('refund-events/:eventId/reconcile-referral')
+  reconcileReferralRefund(
+    @Param('eventId') eventId: string,
+    @CurrentUser() actor: AuthUser,
+  ) {
+    return this.referralConsumer.reconcileRefundEvent(eventId, actor.id);
+  }
+
+  @Permissions('program.orchestration.manage')
+  @Post('referral-refunds-process-pending')
+  processPendingReferralRefunds(
+    @Query('limit') limit: string | undefined,
+    @CurrentUser() actor: AuthUser,
+  ) {
+    const parsed = limit ? Number.parseInt(limit, 10) : 25;
+    return this.referralConsumer.processPendingRefunds(
+      actor.id,
+      Number.isFinite(parsed) ? parsed : 25,
+    );
+  }
+
   @Permissions('program.orchestration.read')
   @Get('runs/:id')
   getRun(@Param('id') id: string) {
@@ -80,6 +122,12 @@ export class ProgramOrchestrationController {
   @Get('referral-hooks/:id')
   getReferralHook(@Param('id') id: string) {
     return this.orchestration.getReferralHook(id);
+  }
+
+  @Permissions('program.orchestration.read')
+  @Get('referral-refund-evaluations/:id')
+  getReferralRefundEvaluation(@Param('id') id: string) {
+    return this.referralConsumer.getEvaluation(id);
   }
 
   @Permissions('program.orchestration.read')
