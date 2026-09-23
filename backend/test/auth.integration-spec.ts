@@ -1,3 +1,4 @@
+import type { INestApplication } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { randomUUID } from 'node:crypto';
 import { AppModule } from '../src/app.module';
@@ -9,15 +10,50 @@ import {
   UsernameCreationMode,
 } from '../src/generated/prisma/enums';
 
+type AuthConfigSnapshot = {
+  loginWithUsername: boolean;
+  loginWithEmail: boolean;
+  loginWithMobile: boolean;
+  captchaOnLoginEnabled: boolean;
+  captchaOnRegistrationEnabled: boolean;
+  captchaTtlSeconds: number;
+  accessTokenTtlSeconds: number;
+  refreshTokenTtlSeconds: number;
+};
+
+type SecurityConfigSnapshot = {
+  idleTimeoutMinutes: number;
+  absoluteSessionTimeoutMinutes: number;
+  maxActiveSessions: number;
+  maxFailedLoginAttempts: number;
+  lockoutMinutes: number;
+  passwordMinLength: number;
+  passwordMaxLength: number;
+  refreshTokenRotationEnabled: boolean;
+};
+
+type RegistrationConfigSnapshot = {
+  publicRegistrationEnabled: boolean;
+  emailRequired: boolean;
+  mobileRequired: boolean;
+  passwordMode: PasswordCreationMode;
+  usernameMode: UsernameCreationMode;
+  usernamePrefixEnabled: boolean;
+  usernamePrefix: string | null;
+  defaultRoleName: string;
+  allowMultipleAccountsPerEmail: boolean;
+  allowMultipleAccountsPerMobile: boolean;
+};
+
 describe('MegaMitra auth integration', () => {
-  let app: Awaited<ReturnType<typeof NestFactory.create>>;
+  let app: INestApplication;
   let prisma: PrismaService;
   let baseUrl: string;
   const createdUserIds: string[] = [];
 
-  let originalAuth: Record<string, unknown>;
-  let originalSecurity: Record<string, unknown>;
-  let originalRegistration: Record<string, unknown>;
+  let originalAuth: AuthConfigSnapshot;
+  let originalSecurity: SecurityConfigSnapshot;
+  let originalRegistration: RegistrationConfigSnapshot;
 
   async function request(
     path: string,
@@ -148,7 +184,7 @@ describe('MegaMitra auth integration', () => {
         }),
       ]);
     }
-    await app?.close();
+    if (app) await app.close();
   });
 
   it('covers registration, role enforcement, forced password change, rotation, replay, logout, and lockout', async () => {
