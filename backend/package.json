@@ -6,18 +6,19 @@
   "license": "UNLICENSED",
   "scripts": {
     "build": "nest build",
-    "format": "prettier --write \"src/**/*.ts\" \"scripts/**/*.ts\"",
+    "format": "prettier --write \"src/**/*.ts\" \"scripts/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:prod": "node dist/main",
-    "lint": "eslint \"{src,scripts}/**/*.ts\"",
+    "lint": "eslint \"{src,scripts,test}/**/*.ts\"",
     "lint:fix": "npm run lint -- --fix",
     "prisma:generate": "prisma generate",
     "prisma:validate": "prisma validate",
     "test": "jest",
     "test:watch": "jest --watch",
+    "test:integration": "jest --config jest.integration.config.cjs --runInBand",
     "super-admin:bootstrap": "ts-node scripts/bootstrap-super-admin.ts",
-    "verify:local": "bash scripts/verify-local.sh"
+    "verify": "./scripts/verify-local.sh"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",

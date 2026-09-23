@@ -2,6 +2,7 @@ export interface AuthUser {
   id: string;
   sessionId: string;
   username: string;
+  mustChangePassword: boolean;
   roles: string[];
   permissions: string[];
 }

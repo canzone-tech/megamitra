@@ -86,14 +86,15 @@ model User {
 }
 
 model Role {
-  id          String     @id @default(uuid()) @db.Char(36)
-  name        String     @unique @db.VarChar(100)
-  description String?    @db.VarChar(255)
-  status      RoleStatus @default(ACTIVE)
-  createdAt   DateTime   @default(now()) @db.DateTime(3)
-  updatedAt   DateTime   @updatedAt @db.DateTime(3)
-  users       UserRole[]
-  permissions RolePermission[]
+  id                   String                     @id @default(uuid()) @db.Char(36)
+  name                 String                     @unique @db.VarChar(100)
+  description          String?                    @db.VarChar(255)
+  status               RoleStatus                 @default(ACTIVE)
+  createdAt            DateTime                   @default(now()) @db.DateTime(3)
+  updatedAt            DateTime                   @updatedAt @db.DateTime(3)
+  users                UserRole[]
+  permissions          RolePermission[]
+  registrationDefaults SystemRegistrationConfig[] @relation("RegistrationDefaultRole")
 
   @@index([status])
   @@map("roles")
@@ -158,6 +159,8 @@ model AuthSession {
   userId             String    @db.Char(36)
   refreshTokenHash   String    @unique @db.Char(64)
   expiresAt          DateTime  @db.DateTime(3)
+  lastSeenAt         DateTime  @db.DateTime(3)
+  absoluteExpiresAt  DateTime  @db.DateTime(3)
   revokedAt          DateTime? @db.DateTime(3)
   revocationReason   String?   @db.VarChar(100)
   rotatedToSessionId String?   @db.Char(36)
@@ -167,6 +170,8 @@ model AuthSession {
 
   @@index([userId, revokedAt])
   @@index([expiresAt])
+  @@index([absoluteExpiresAt])
+  @@index([userId, lastSeenAt])
   @@map("auth_sessions")
 }
 
@@ -177,6 +182,8 @@ model SystemSecurityConfig {
   maxActiveSessions             Int      @default(5)
   maxFailedLoginAttempts        Int      @default(5)
   lockoutMinutes                Int      @default(15)
+  passwordMinLength             Int      @default(12)
+  passwordMaxLength             Int      @default(128)
   refreshTokenRotationEnabled   Boolean  @default(true)
   updatedByUserId               String?  @db.Char(36)
   createdAt                     DateTime @default(now()) @db.DateTime(3)
@@ -194,7 +201,7 @@ model SystemAuthConfig {
   loginWithMobile              Boolean  @default(true)
   captchaOnLoginEnabled        Boolean  @default(false)
   captchaOnRegistrationEnabled Boolean  @default(false)
-  captchaTtlSeconds             Int      @default(300)
+  captchaTtlSeconds            Int      @default(300)
   accessTokenTtlSeconds         Int      @default(900)
   refreshTokenTtlSeconds        Int      @default(2592000)
   updatedByUserId               String?  @db.Char(36)
@@ -215,14 +222,17 @@ model SystemRegistrationConfig {
   usernameMode                      UsernameCreationMode @default(AUTO_OR_MANUAL)
   usernamePrefixEnabled             Boolean              @default(false)
   usernamePrefix                    String?              @db.VarChar(20)
+  defaultRoleName                   String               @default("MEMBER") @db.VarChar(100)
   allowMultipleAccountsPerEmail     Boolean              @default(false)
   allowMultipleAccountsPerMobile    Boolean              @default(false)
   updatedByUserId                   String?              @db.Char(36)
   createdAt                         DateTime             @default(now()) @db.DateTime(3)
   updatedAt                         DateTime             @updatedAt @db.DateTime(3)
   updatedByUser                     User?                @relation("RegistrationConfigUpdater", fields: [updatedByUserId], references: [id], onDelete: SetNull)
+  defaultRole                       Role                 @relation("RegistrationDefaultRole", fields: [defaultRoleName], references: [name], onDelete: Restrict, onUpdate: Cascade)
 
   @@index([updatedByUserId])
+  @@index([defaultRoleName])
   @@map("system_registration_config")
 }
 

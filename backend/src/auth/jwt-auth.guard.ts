@@ -1,11 +1,16 @@
-import { CanActivate, ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { JwtService } from '@nestjs/jwt';
 import { Reflector } from '@nestjs/core';
-import { Request } from 'express';
+import { JwtService } from '@nestjs/jwt';
+import type { Request } from 'express';
 import { PrismaService } from '../database/prisma.service';
-import { UserStatus } from '../generated/prisma/enums';
-import { AuthUser, JwtPayload } from './auth-user';
+import { RoleStatus, UserStatus } from '../generated/prisma/enums';
+import type { AuthUser, JwtPayload } from './auth-user';
 import { IS_PUBLIC_KEY } from './public.decorator';
 
 @Injectable()
@@ -24,9 +29,13 @@ export class JwtAuthGuard implements CanActivate {
     ]);
     if (isPublic) return true;
 
-    const request = context.switchToHttp().getRequest<Request & { user?: AuthUser }>();
+    const request = context
+      .switchToHttp()
+      .getRequest<Request & { user?: AuthUser }>();
     const authorization = request.headers.authorization;
-    if (!authorization?.startsWith('Bearer ')) throw new UnauthorizedException();
+    if (!authorization?.startsWith('Bearer ')) {
+      throw new UnauthorizedException();
+    }
 
     const token = authorization.slice(7);
     let payload: JwtPayload;
@@ -42,40 +51,76 @@ export class JwtAuthGuard implements CanActivate {
 
     if (payload.typ !== 'access') throw new UnauthorizedException();
 
-    const session = await this.prisma.authSession.findFirst({
-      where: {
-        id: payload.sid,
-        userId: payload.sub,
-        revokedAt: null,
-        expiresAt: { gt: new Date() },
-      },
-      include: {
-        user: {
-          include: {
-            roles: {
-              include: {
-                role: {
-                  include: {
-                    permissions: { include: { permission: true } },
+    const [session, security] = await Promise.all([
+      this.prisma.authSession.findFirst({
+        where: {
+          id: payload.sid,
+          userId: payload.sub,
+          revokedAt: null,
+        },
+        include: {
+          user: {
+            include: {
+              roles: {
+                include: {
+                  role: {
+                    include: {
+                      permissions: { include: { permission: true } },
+                    },
                   },
                 },
               },
             },
           },
         },
-      },
-    });
+      }),
+      this.prisma.systemSecurityConfig.findUniqueOrThrow({ where: { id: 1 } }),
+    ]);
 
     if (!session || session.user.status !== UserStatus.ACTIVE) {
       throw new UnauthorizedException('Session is not active');
     }
 
+    const now = new Date();
+    let expiryReason: string | null = null;
+    if (session.expiresAt <= now) expiryReason = 'refresh_expired';
+    else if (session.absoluteExpiresAt <= now) expiryReason = 'absolute_timeout';
+    else if (
+      session.lastSeenAt.getTime() + security.idleTimeoutMinutes * 60_000 <=
+      now.getTime()
+    ) {
+      expiryReason = 'idle_timeout';
+    }
+
+    if (expiryReason) {
+      await this.prisma.authSession.updateMany({
+        where: { id: session.id, revokedAt: null },
+        data: { revokedAt: now, revocationReason: expiryReason },
+      });
+      throw new UnauthorizedException('Session has expired');
+    }
+
+    await this.prisma.authSession.update({
+      where: { id: session.id },
+      data: { lastSeenAt: now },
+    });
+
+    const activeRoles = session.user.roles.filter(
+      (item) => item.role.status === RoleStatus.ACTIVE,
+    );
     request.user = {
       id: session.user.id,
       sessionId: session.id,
       username: session.user.username,
-      roles: session.user.roles.map((item) => item.role.name),
-      permissions: [...new Set(session.user.roles.flatMap((item) => item.role.permissions.map((rp) => rp.permission.code)))],
+      mustChangePassword: session.user.mustChangePassword,
+      roles: activeRoles.map((item) => item.role.name),
+      permissions: [
+        ...new Set(
+          activeRoles.flatMap((item) =>
+            item.role.permissions.map((rp) => rp.permission.code),
+          ),
+        ),
+      ],
     };
 
     return true;

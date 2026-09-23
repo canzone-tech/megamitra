@@ -33,7 +33,7 @@ npx prisma migrate status
 
 echo "==> Checking MegaMitra-only branding"
 # Exclude this verifier itself because the forbidden-brand regex is defined below.
-if grep -RniE 'FixTradeZone|fixtradezone|fix trade zone' src prisma scripts package.json \
+if grep -RniE 'FixTradeZone|fixtradezone|fix trade zone' src prisma scripts test package.json \
   --exclude-dir=generated \
   --exclude=verify-local.sh; then
   echo "ERROR: foreign project branding found"
@@ -43,8 +43,11 @@ fi
 echo "==> Lint"
 npm run lint
 
-echo "==> Tests"
+echo "==> Unit tests"
 npm test -- --runInBand
+
+echo "==> Integration tests"
+npm run test:integration
 
 echo "==> Build"
 npm run build

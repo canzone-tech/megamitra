@@ -16,7 +16,6 @@ export class RegisterDto {
 
   @IsOptional()
   @IsString()
-  @MinLength(8)
   password?: string;
 
   @IsOptional()
@@ -58,4 +57,12 @@ export class RefreshDto {
   @IsString()
   @MinLength(1)
   refreshToken!: string;
+}
+
+export class ChangePasswordDto {
+  @IsString()
+  currentPassword!: string;
+
+  @IsString()
+  newPassword!: string;
 }

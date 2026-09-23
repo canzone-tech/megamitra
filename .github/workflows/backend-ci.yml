@@ -1,0 +1,114 @@
+name: Backend CI
+
+on:
+  push:
+    branches:
+      - main
+      - dev/local-foundation
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-ci.yml'
+  pull_request:
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify-backend:
+    runs-on: ubuntu-24.04
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root_test_password
+          MYSQL_DATABASE: megamitra
+          MYSQL_USER: megamitra_app
+          MYSQL_PASSWORD: megamitra_test_password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot_test_password"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      NODE_ENV: test
+      PORT: 3100
+      MYSQL_HOST: 127.0.0.1
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: megamitra
+      MYSQL_USER: megamitra_app
+      MYSQL_PASSWORD: megamitra_test_password
+      DATABASE_URL: mysql://megamitra_app:megamitra_test_password@127.0.0.1:3306/megamitra
+      MONGODB_URI: mongodb://127.0.0.1:27017/megamitra
+      REDIS_HOST: 127.0.0.1
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ''
+      CAPTCHA_HMAC_SECRET: ci-captcha-secret-00000000000000000000000000000000
+      JWT_ACCESS_SECRET: ci-access-secret-000000000000000000000000000000000
+      JWT_REFRESH_SECRET: ci-refresh-secret-00000000000000000000000000000000
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Verify dependency overrides
+        run: npm ls deepmerge-ts mariadb mysql2
+
+      - name: Validate Prisma schema
+        run: npm run prisma:validate
+
+      - name: Generate Prisma client
+        run: npm run prisma:generate
+
+      - name: Apply migrations
+        run: npx prisma migrate deploy
+
+      - name: Verify migration status
+        run: npx prisma migrate status
+
+      - name: Verify MegaMitra-only backend
+        run: |
+          if grep -RniE 'FixTradeZone|fixtradezone|fix trade zone' src prisma scripts test package.json --exclude-dir=generated --exclude=verify-local.sh; then
+            echo 'Foreign project branding found'
+            exit 1
+          fi
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test -- --runInBand
+
+      - name: Integration tests
+        run: npm run test:integration
+
+      - name: Build
+        run: npm run build

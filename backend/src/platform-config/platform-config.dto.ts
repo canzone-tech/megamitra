@@ -1,5 +1,18 @@
-import { IsBoolean, IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
-import { PasswordCreationMode, UsernameCreationMode } from '../generated/prisma/enums';
+import {
+  IsBoolean,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  MaxLength,
+  Min,
+  MinLength,
+} from 'class-validator';
+import {
+  PasswordCreationMode,
+  UsernameCreationMode,
+} from '../generated/prisma/enums';
 
 export class UpdateAuthConfigDto {
   @IsOptional() @IsBoolean() loginWithUsername?: boolean;
@@ -18,6 +31,8 @@ export class UpdateSecurityConfigDto {
   @IsOptional() @IsInt() @Min(1) @Max(100) maxActiveSessions?: number;
   @IsOptional() @IsInt() @Min(1) @Max(100) maxFailedLoginAttempts?: number;
   @IsOptional() @IsInt() @Min(1) lockoutMinutes?: number;
+  @IsOptional() @IsInt() @Min(8) @Max(256) passwordMinLength?: number;
+  @IsOptional() @IsInt() @Min(8) @Max(256) passwordMaxLength?: number;
   @IsOptional() @IsBoolean() refreshTokenRotationEnabled?: boolean;
 }
 
@@ -29,6 +44,7 @@ export class UpdateRegistrationConfigDto {
   @IsOptional() @IsEnum(UsernameCreationMode) usernameMode?: UsernameCreationMode;
   @IsOptional() @IsBoolean() usernamePrefixEnabled?: boolean;
   @IsOptional() @IsString() usernamePrefix?: string;
+  @IsOptional() @IsString() @MinLength(1) @MaxLength(100) defaultRoleName?: string;
   @IsOptional() @IsBoolean() allowMultipleAccountsPerEmail?: boolean;
   @IsOptional() @IsBoolean() allowMultipleAccountsPerMobile?: boolean;
 }
