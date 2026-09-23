@@ -281,7 +281,7 @@ export class ReferralRewardService {
       : new Prisma.Decimal(0);
 
     let ledgerTransactionId: string | null = null;
-    let status = ReferralRewardEventStatus.INELIGIBLE;
+    let status: ReferralRewardEventStatus = ReferralRewardEventStatus.INELIGIBLE;
     if (eligibility.eligible && rewardAmount.greaterThan(0)) {
       ledgerTransactionId = await this.postLedgerTransaction(
         connection,
@@ -367,18 +367,17 @@ export class ReferralRewardService {
       amount = Prisma.Decimal.min(amount, new Prisma.Decimal(version.maximumRewardAmount));
     }
 
-    const rounding = this.roundingConstant(version.roundingMode);
-    return amount.toDecimalPlaces(2, rounding);
+    return this.roundReward(amount, version.roundingMode);
   }
 
-  private roundingConstant(roundingMode: string): number {
+  private roundReward(amount: Prisma.Decimal, roundingMode: string): Prisma.Decimal {
     switch (roundingMode) {
       case ReferralRoundingMode.HALF_UP:
-        return Prisma.Decimal.ROUND_HALF_UP;
+        return amount.toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
       case ReferralRoundingMode.DOWN:
-        return Prisma.Decimal.ROUND_DOWN;
+        return amount.toDecimalPlaces(2, Prisma.Decimal.ROUND_DOWN);
       case ReferralRoundingMode.UP:
-        return Prisma.Decimal.ROUND_UP;
+        return amount.toDecimalPlaces(2, Prisma.Decimal.ROUND_UP);
       default:
         throw new ConflictException('Published referral policy has an unsupported rounding mode');
     }
