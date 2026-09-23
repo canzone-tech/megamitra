@@ -295,7 +295,7 @@ export class BinarySettlementService {
     const capLimitedPairs = pairCountCalculated - pairCountPayable;
     let leftConsumed = leftPerPair.mul(pairCountPayable);
     let rightConsumed = rightPerPair.mul(pairCountPayable);
-    if (Boolean(version.carryForwardEnabled)) {
+    if (version.carryForwardEnabled) {
       if (version.capOverflowMode === BinaryCapOverflowMode.FLUSH && capLimitedPairs > 0) {
         leftConsumed = leftConsumed.plus(leftPerPair.mul(capLimitedPairs));
         rightConsumed = rightConsumed.plus(rightPerPair.mul(capLimitedPairs));
