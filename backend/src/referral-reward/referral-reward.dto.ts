@@ -1,5 +1,6 @@
 import {
   IsEnum,
+  IsIn,
   IsISO8601,
   IsNumberString,
   IsObject,
@@ -11,6 +12,10 @@ import {
   MaxLength,
 } from 'class-validator';
 import { ReferralRewardMode, ReferralRoundingMode } from '../generated/prisma/enums';
+import {
+  REFERRAL_REFUND_HANDLING_MODES,
+  type ReferralRefundHandlingMode,
+} from './referral-refund-rule.service';
 
 export class CreateReferralRewardPolicyDto {
   @IsString()
@@ -77,6 +82,11 @@ export class UpdateReferralRewardPolicyVersionDto {
   @IsOptional() @IsNumberString() minimumRewardAmount?: string;
   @IsOptional() @IsNumberString() maximumRewardAmount?: string;
   @IsOptional() @IsObject() eligibilityRules?: Record<string, unknown>;
+}
+
+export class ConfigureReferralRefundRuleDto {
+  @IsIn(REFERRAL_REFUND_HANDLING_MODES)
+  mode!: ReferralRefundHandlingMode;
 }
 
 export class CreateReferralRewardEventDto {
