@@ -7,11 +7,10 @@ import { PrismaService } from '../src/database/prisma.service';
 import {
   BinaryCapOverflowMode,
   BinaryPlacementSide,
-  BinaryVolumeEventType,
   UserStatus,
 } from '../src/generated/prisma/enums';
 
-describe('MegaMitra pair settlement and ledger integration', () => {
+describe('MegaMitra explicit binary pair matching and ledger integration', () => {
   let app: Awaited<ReturnType<typeof NestFactory.create>>;
   let prisma: PrismaService;
   let passwords: PasswordService;
@@ -20,7 +19,7 @@ describe('MegaMitra pair settlement and ledger integration', () => {
   const userIds: string[] = [];
   const planIds: string[] = [];
   const versionIds: string[] = [];
-  const eventIds: string[] = [];
+  const unitEventIds: string[] = [];
   const settlementIds: string[] = [];
   const ledgerTransactionIds: string[] = [];
 
@@ -84,16 +83,47 @@ describe('MegaMitra pair settlement and ledger integration', () => {
         where: {
           OR: [
             { actorUserId: { in: userIds } },
-            { entityId: { in: [...userIds, ...planIds, ...versionIds, ...eventIds, ...settlementIds] } },
+            {
+              entityId: {
+                in: [
+                  ...userIds,
+                  ...planIds,
+                  ...versionIds,
+                  ...unitEventIds,
+                  ...settlementIds,
+                ],
+              },
+            },
           ],
         },
       });
-      await prisma.ledgerEntry.deleteMany({ where: { transactionId: { in: ledgerTransactionIds } } });
-      await prisma.binaryPairSettlement.deleteMany({ where: { id: { in: settlementIds } } });
-      await prisma.ledgerTransaction.deleteMany({ where: { id: { in: ledgerTransactionIds } } });
-      await prisma.ledgerAccount.deleteMany({ where: { ownerUserId: { in: userIds } } });
-      await prisma.binaryUplineVolumeCredit.deleteMany({ where: { volumeEventId: { in: eventIds } } });
-      await prisma.binaryVolumeEvent.deleteMany({ where: { id: { in: eventIds } } });
+      await prisma.binaryPairMatch.deleteMany({
+        where: { settlementId: { in: settlementIds } },
+      });
+      await prisma.binaryUnitDisposition.deleteMany({
+        where: { settlementId: { in: settlementIds } },
+      });
+      await prisma.ledgerEntry.deleteMany({
+        where: { transactionId: { in: ledgerTransactionIds } },
+      });
+      await prisma.binaryPairSettlement.deleteMany({
+        where: { id: { in: settlementIds } },
+      });
+      await prisma.ledgerTransaction.deleteMany({
+        where: { id: { in: ledgerTransactionIds } },
+      });
+      await prisma.ledgerAccount.deleteMany({
+        where: { ownerUserId: { in: userIds } },
+      });
+      await prisma.binaryUplineQualifyingUnit.deleteMany({
+        where: { unitEventId: { in: unitEventIds } },
+      });
+      await prisma.binaryQualifyingUnitEvent.deleteMany({
+        where: { id: { in: unitEventIds }, reversalOfEventId: { not: null } },
+      });
+      await prisma.binaryQualifyingUnitEvent.deleteMany({
+        where: { id: { in: unitEventIds } },
+      });
       await prisma.binaryAncestry.deleteMany({
         where: {
           OR: [
@@ -103,10 +133,20 @@ describe('MegaMitra pair settlement and ledger integration', () => {
         },
       });
       await prisma.binaryPlacement.deleteMany({
-        where: { OR: [{ memberUserId: { in: userIds } }, { parentUserId: { in: userIds } }] },
+        where: {
+          OR: [{ memberUserId: { in: userIds } }, { parentUserId: { in: userIds } }],
+        },
       });
       await prisma.binaryPlanVersion.deleteMany({ where: { id: { in: versionIds } } });
       await prisma.binaryPlan.deleteMany({ where: { id: { in: planIds } } });
+      await prisma.systemSequence.deleteMany({
+        where: {
+          OR: [
+            ...versionIds.map((id) => ({ key: { contains: id } })),
+            ...userIds.map((id) => ({ key: { contains: id } })),
+          ],
+        },
+      });
       await prisma.userRole.deleteMany({ where: { userId: { in: userIds } } });
       await prisma.authSession.deleteMany({ where: { userId: { in: userIds } } });
       await prisma.user.deleteMany({ where: { id: { in: userIds } } });
@@ -114,10 +154,10 @@ describe('MegaMitra pair settlement and ledger integration', () => {
     await app?.close();
   });
 
-  it('matches configured pair ratio, applies cap, posts balanced ledger and derives wallet', async () => {
+  it('pairs A with C then B with D, applies cap, carries unmatched units, and posts balanced ledger', async () => {
     const suffix = randomUUID().replaceAll('-', '').slice(0, 10);
-    const [root, left, right] = await Promise.all(
-      ['root', 'left', 'right'].map((label) =>
+    const users = await Promise.all(
+      ['root', 'left_branch', 'right_branch', 'A', 'B', 'C', 'D'].map((label) =>
         prisma.user.create({
           data: {
             username: `settle_${label}_${suffix}`,
@@ -127,11 +167,40 @@ describe('MegaMitra pair settlement and ledger integration', () => {
         }),
       ),
     );
-    userIds.push(root.id, left.id, right.id);
+    const [root, leftBranch, rightBranch, a, b, c, d] = users;
+    userIds.push(...users.map((user) => user.id));
 
     for (const placement of [
-      { memberUserId: left.id, parentUserId: root.id, side: BinaryPlacementSide.LEFT },
-      { memberUserId: right.id, parentUserId: root.id, side: BinaryPlacementSide.RIGHT },
+      {
+        memberUserId: leftBranch.id,
+        parentUserId: root.id,
+        side: BinaryPlacementSide.LEFT,
+      },
+      {
+        memberUserId: rightBranch.id,
+        parentUserId: root.id,
+        side: BinaryPlacementSide.RIGHT,
+      },
+      {
+        memberUserId: a.id,
+        parentUserId: leftBranch.id,
+        side: BinaryPlacementSide.LEFT,
+      },
+      {
+        memberUserId: b.id,
+        parentUserId: leftBranch.id,
+        side: BinaryPlacementSide.RIGHT,
+      },
+      {
+        memberUserId: c.id,
+        parentUserId: rightBranch.id,
+        side: BinaryPlacementSide.LEFT,
+      },
+      {
+        memberUserId: d.id,
+        parentUserId: rightBranch.id,
+        side: BinaryPlacementSide.RIGHT,
+      },
     ]) {
       const response = await request(
         '/admin/genealogy/placements',
@@ -158,7 +227,7 @@ describe('MegaMitra pair settlement and ledger integration', () => {
         body: JSON.stringify({
           effectiveFrom: new Date(Date.now() - 60_000).toISOString(),
           qualifyingUnit: '1.0000',
-          leftVolumePerPair: '2.0000',
+          leftVolumePerPair: '1.0000',
           rightVolumePerPair: '1.0000',
           pairPayoutAmount: '25.00',
           currencyCode: 'INR',
@@ -179,62 +248,92 @@ describe('MegaMitra pair settlement and ledger integration', () => {
     );
     expect(publish.status).toBe(201);
 
-    const occurredAt = new Date().toISOString();
-    for (const input of [
-      { sourceKey: `left-${suffix}`, sourceMemberUserId: left.id, volume: '6.0000' },
-      { sourceKey: `right-${suffix}`, sourceMemberUserId: right.id, volume: '3.0000' },
-    ]) {
+    const occurredBase = Date.now();
+    const qualifyingInputs = [
+      { label: 'A', member: a, offset: 0 },
+      { label: 'C', member: c, offset: 1_000 },
+      { label: 'B', member: b, offset: 2_000 },
+      { label: 'D', member: d, offset: 3_000 },
+    ];
+    for (const input of qualifyingInputs) {
       const response = await request(
-        '/admin/binary-volume/events',
+        '/admin/binary-units/events',
         authenticated({
           method: 'POST',
           body: JSON.stringify({
-            ...input,
+            sourceKey: `unit-${input.label}-${suffix}`,
+            sourceMemberUserId: input.member.id,
             planVersionId: versionId,
-            eventType: BinaryVolumeEventType.CREDIT,
-            occurredAt,
+            occurredAt: new Date(occurredBase + input.offset).toISOString(),
           }),
         }),
       );
       expect(response.status).toBe(201);
-      eventIds.push(String((response.body.event as { id: string }).id));
+      unitEventIds.push(String((response.body.event as { id: string }).id));
     }
 
-    const settledAt = new Date(Date.now() + 1_000).toISOString();
+    const settledAt = new Date(occurredBase + 10_000).toISOString();
     const sourceKey = `settlement-${suffix}`;
-    const settlementResponse = await request(
+    const first = await request(
       '/admin/binary-settlements',
       authenticated({
         method: 'POST',
-        body: JSON.stringify({ sourceKey, memberUserId: root.id, planVersionId: versionId, settledAt }),
+        body: JSON.stringify({
+          sourceKey,
+          memberUserId: root.id,
+          planVersionId: versionId,
+          settledAt,
+        }),
       }),
     );
-    expect(settlementResponse.status).toBe(201);
-    expect(settlementResponse.body.idempotent).toBe(false);
+    expect(first.status).toBe(201);
+    expect(first.body.idempotent).toBe(false);
 
-    const settlement = settlementResponse.body.settlement as {
+    const firstSettlement = first.body.settlement as {
       id: string;
       pairCountCalculated: number;
       pairCountPayable: number;
       capLimitedPairs: number;
-      leftCarryAfter: string;
-      rightCarryAfter: string;
+      leftUnitsAvailableBefore: number;
+      rightUnitsAvailableBefore: number;
+      leftUnitsCarryAfter: number;
+      rightUnitsCarryAfter: number;
       payoutAmount: string;
       ledgerTransactionId: string;
       ledgerTransaction: { entries: Array<{ direction: string; amount: string }> };
+      pairMatches: Array<{
+        pairSequence: number;
+        payable: boolean;
+        leftUnit: { unitEvent: { sourceMember: { username: string } } };
+        rightUnit: { unitEvent: { sourceMember: { username: string } } };
+      }>;
     };
-    settlementIds.push(settlement.id);
-    ledgerTransactionIds.push(settlement.ledgerTransactionId);
-    expect(settlement.pairCountCalculated).toBe(3);
-    expect(settlement.pairCountPayable).toBe(1);
-    expect(settlement.capLimitedPairs).toBe(2);
-    expect(Number(settlement.leftCarryAfter)).toBe(4);
-    expect(Number(settlement.rightCarryAfter)).toBe(2);
-    expect(Number(settlement.payoutAmount)).toBe(25);
-    expect(settlement.ledgerTransaction.entries).toHaveLength(2);
+    settlementIds.push(firstSettlement.id);
+    ledgerTransactionIds.push(firstSettlement.ledgerTransactionId);
+
+    expect(firstSettlement.pairCountCalculated).toBe(2);
+    expect(firstSettlement.pairCountPayable).toBe(1);
+    expect(firstSettlement.capLimitedPairs).toBe(1);
+    expect(firstSettlement.leftUnitsAvailableBefore).toBe(2);
+    expect(firstSettlement.rightUnitsAvailableBefore).toBe(2);
+    expect(firstSettlement.leftUnitsCarryAfter).toBe(1);
+    expect(firstSettlement.rightUnitsCarryAfter).toBe(1);
+    expect(Number(firstSettlement.payoutAmount)).toBe(25);
+    expect(firstSettlement.ledgerTransaction.entries).toHaveLength(2);
+    expect(firstSettlement.pairMatches).toHaveLength(1);
+    expect(firstSettlement.pairMatches[0]).toMatchObject({
+      pairSequence: 1,
+      payable: true,
+    });
+    expect(firstSettlement.pairMatches[0]?.leftUnit.unitEvent.sourceMember.username).toBe(
+      a.username,
+    );
+    expect(firstSettlement.pairMatches[0]?.rightUnit.unitEvent.sourceMember.username).toBe(
+      c.username,
+    );
 
     const ledger = await request(
-      `/admin/ledger/transactions/${settlement.ledgerTransactionId}`,
+      `/admin/ledger/transactions/${firstSettlement.ledgerTransactionId}`,
       authenticated(),
     );
     expect(ledger.status).toBe(200);
@@ -253,13 +352,18 @@ describe('MegaMitra pair settlement and ledger integration', () => {
       '/admin/binary-settlements',
       authenticated({
         method: 'POST',
-        body: JSON.stringify({ sourceKey, memberUserId: root.id, planVersionId: versionId, settledAt }),
+        body: JSON.stringify({
+          sourceKey,
+          memberUserId: root.id,
+          planVersionId: versionId,
+          settledAt,
+        }),
       }),
     );
     expect(duplicate.status).toBe(201);
     expect(duplicate.body.idempotent).toBe(true);
 
-    const second = await request(
+    const sameDay = await request(
       '/admin/binary-settlements',
       authenticated({
         method: 'POST',
@@ -271,24 +375,72 @@ describe('MegaMitra pair settlement and ledger integration', () => {
         }),
       }),
     );
-    expect(second.status).toBe(201);
-    const secondSettlement = second.body.settlement as {
+    expect(sameDay.status).toBe(201);
+    const sameDaySettlement = sameDay.body.settlement as {
       id: string;
+      pairCountCalculated: number;
       pairCountPayable: number;
+      leftUnitsCarryAfter: number;
+      rightUnitsCarryAfter: number;
       payoutAmount: string;
-      leftCarryAfter: string;
-      rightCarryAfter: string;
+      pairMatches: unknown[];
     };
-    settlementIds.push(secondSettlement.id);
-    expect(secondSettlement.pairCountPayable).toBe(0);
-    expect(Number(secondSettlement.payoutAmount)).toBe(0);
-    expect(Number(secondSettlement.leftCarryAfter)).toBe(4);
-    expect(Number(secondSettlement.rightCarryAfter)).toBe(2);
+    settlementIds.push(sameDaySettlement.id);
+    expect(sameDaySettlement.pairCountCalculated).toBe(1);
+    expect(sameDaySettlement.pairCountPayable).toBe(0);
+    expect(sameDaySettlement.leftUnitsCarryAfter).toBe(1);
+    expect(sameDaySettlement.rightUnitsCarryAfter).toBe(1);
+    expect(Number(sameDaySettlement.payoutAmount)).toBe(0);
+    expect(sameDaySettlement.pairMatches).toHaveLength(0);
+
+    const nextDay = await request(
+      '/admin/binary-settlements',
+      authenticated({
+        method: 'POST',
+        body: JSON.stringify({
+          sourceKey: `${sourceKey}-next-day`,
+          memberUserId: root.id,
+          planVersionId: versionId,
+          settledAt: new Date(Date.parse(settledAt) + 86_400_000).toISOString(),
+        }),
+      }),
+    );
+    expect(nextDay.status).toBe(201);
+    const nextDaySettlement = nextDay.body.settlement as {
+      id: string;
+      pairCountCalculated: number;
+      pairCountPayable: number;
+      leftUnitsCarryAfter: number;
+      rightUnitsCarryAfter: number;
+      payoutAmount: string;
+      ledgerTransactionId: string;
+      pairMatches: Array<{
+        pairSequence: number;
+        leftUnit: { unitEvent: { sourceMember: { username: string } } };
+        rightUnit: { unitEvent: { sourceMember: { username: string } } };
+      }>;
+    };
+    settlementIds.push(nextDaySettlement.id);
+    ledgerTransactionIds.push(nextDaySettlement.ledgerTransactionId);
+    expect(nextDaySettlement.pairCountCalculated).toBe(1);
+    expect(nextDaySettlement.pairCountPayable).toBe(1);
+    expect(nextDaySettlement.leftUnitsCarryAfter).toBe(0);
+    expect(nextDaySettlement.rightUnitsCarryAfter).toBe(0);
+    expect(Number(nextDaySettlement.payoutAmount)).toBe(25);
+    expect(nextDaySettlement.pairMatches).toHaveLength(1);
+    expect(nextDaySettlement.pairMatches[0]?.pairSequence).toBe(2);
+    expect(nextDaySettlement.pairMatches[0]?.leftUnit.unitEvent.sourceMember.username).toBe(
+      b.username,
+    );
+    expect(nextDaySettlement.pairMatches[0]?.rightUnit.unitEvent.sourceMember.username).toBe(
+      d.username,
+    );
 
     const walletAfter = await request(
       `/admin/ledger/wallets/users/${root.id}/INR`,
       authenticated(),
     );
-    expect(Number(walletAfter.body.balance)).toBe(25);
+    expect(walletAfter.status).toBe(200);
+    expect(Number(walletAfter.body.balance)).toBe(50);
   });
 });
