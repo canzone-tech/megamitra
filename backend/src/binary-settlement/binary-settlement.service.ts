@@ -52,12 +52,9 @@ type PlanVersionRow = {
 
 type CountRow = { total: string | number | bigint | null };
 type IdRow = { id: string };
-type PairSequenceRow = { total: string | number | bigint | null };
 type UnitRow = {
   id: string;
-  sequence: string | number | bigint;
-  sourceMemberUserId: string;
-  sourceUsername: string;
+  sequence: string | number;
   expired: boolean | number;
 };
 
@@ -156,10 +153,18 @@ export class BinarySettlementService {
           orderBy: { pairSequence: 'asc' },
           include: {
             leftUnit: {
-              include: { unitEvent: { include: { sourceMember: { select: { id: true, username: true } } } } },
+              include: {
+                unitEvent: {
+                  include: { sourceMember: { select: { id: true, username: true } } },
+                },
+              },
             },
             rightUnit: {
-              include: { unitEvent: { include: { sourceMember: { select: { id: true, username: true } } } } },
+              include: {
+                unitEvent: {
+                  include: { sourceMember: { select: { id: true, username: true } } },
+                },
+              },
             },
           },
         },
@@ -246,24 +251,22 @@ export class BinarySettlementService {
     await this.assertNoReversedConsumedUnits(connection, dto.memberUserId, dto.planVersionId);
 
     const local = this.localPeriod(settledAt, version.settlementTimezone);
-    const [leftQueue, rightQueue] = await Promise.all([
-      this.loadUnitQueue(
-        connection,
-        dto.memberUserId,
-        dto.planVersionId,
-        BinaryPlacementSide.LEFT,
-        settledAt,
-        version.carryForwardExpiryDays,
-      ),
-      this.loadUnitQueue(
-        connection,
-        dto.memberUserId,
-        dto.planVersionId,
-        BinaryPlacementSide.RIGHT,
-        settledAt,
-        version.carryForwardExpiryDays,
-      ),
-    ]);
+    const leftQueue = await this.loadUnitQueue(
+      connection,
+      dto.memberUserId,
+      dto.planVersionId,
+      BinaryPlacementSide.LEFT,
+      settledAt,
+      version.carryForwardExpiryDays,
+    );
+    const rightQueue = await this.loadUnitQueue(
+      connection,
+      dto.memberUserId,
+      dto.planVersionId,
+      BinaryPlacementSide.RIGHT,
+      settledAt,
+      version.carryForwardExpiryDays,
+    );
 
     const dailyRows = await connection.query<CountRow[]>(
       `SELECT COALESCE(SUM(pairCountPayable), 0) AS total
@@ -296,7 +299,7 @@ export class BinarySettlementService {
     }
 
     const capLimitedPairs = pairCountCalculated - pairCountPayable;
-    const carryEnabled = Boolean(version.carryForwardEnabled);
+    const carryEnabled = version.carryForwardEnabled === true || version.carryForwardEnabled === 1;
     const consumePairCount =
       !carryEnabled || version.capOverflowMode === BinaryCapOverflowMode.FLUSH
         ? pairCountCalculated
@@ -327,61 +330,14 @@ export class BinarySettlementService {
 
     let ledgerTransactionId: string | null = null;
     if (payoutAmount.greaterThan(0)) {
-      const walletCode = `USER_WALLET:${dto.memberUserId}:${currencyCode}`;
-      const expenseCode = `COMMISSION_EXPENSE:${currencyCode}`;
-      await this.ensureLedgerAccount(
+      ledgerTransactionId = await this.postLedgerTransaction(
         connection,
-        walletCode,
-        `${member.username} wallet ${currencyCode}`,
-        LedgerAccountKind.USER_WALLET,
-        dto.memberUserId,
+        dto,
+        actorUserId,
+        settledAt,
+        member,
+        payoutAmount,
         currencyCode,
-      );
-      await this.ensureLedgerAccount(
-        connection,
-        expenseCode,
-        `Commission expense ${currencyCode}`,
-        LedgerAccountKind.COMMISSION_EXPENSE,
-        null,
-        currencyCode,
-      );
-
-      const walletId = await this.ledgerAccountId(connection, walletCode);
-      const expenseId = await this.ledgerAccountId(connection, expenseCode);
-      ledgerTransactionId = randomUUID();
-      await connection.query(
-        `INSERT INTO ledger_transactions
-           (id, sourceKey, type, description, occurredAt, createdByUserId, createdAt)
-         VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP(3))`,
-        [
-          ledgerTransactionId,
-          `BINARY_PAIR:${dto.sourceKey}`,
-          LedgerTransactionType.BINARY_PAIR_COMMISSION,
-          `Binary pair commission for ${member.username}`,
-          settledAt,
-          actorUserId,
-        ],
-      );
-      await connection.query(
-        `INSERT INTO ledger_entries
-           (id, transactionId, accountId, direction, amount, currencyCode, createdAt)
-         VALUES
-           (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP(3)),
-           (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP(3))`,
-        [
-          randomUUID(),
-          ledgerTransactionId,
-          expenseId,
-          LedgerEntryDirection.DEBIT,
-          payoutAmount.toFixed(2),
-          currencyCode,
-          randomUUID(),
-          ledgerTransactionId,
-          walletId,
-          LedgerEntryDirection.CREDIT,
-          payoutAmount.toFixed(2),
-          currencyCode,
-        ],
       );
     }
 
@@ -431,13 +387,13 @@ export class BinarySettlementService {
       ],
     );
 
-    const pairSequenceRows = await connection.query<PairSequenceRow[]>(
+    const pairSequenceRows = await connection.query<CountRow[]>(
       `SELECT COALESCE(MAX(pairSequence), 0) AS total
        FROM binary_pair_matches
        WHERE memberUserId = ? AND planVersionId = ?`,
       [dto.memberUserId, dto.planVersionId],
     );
-    const priorPairSequence = BigInt(pairSequenceRows[0]?.total ?? 0);
+    const priorPairSequence = Number(pairSequenceRows[0]?.total ?? 0);
 
     for (let index = 0; index < consumePairCount; index += 1) {
       const leftUnit = leftQueue.eligible[index];
@@ -456,7 +412,7 @@ export class BinarySettlementService {
           settlementId,
           dto.memberUserId,
           dto.planVersionId,
-          priorPairSequence + BigInt(index + 1),
+          priorPairSequence + index + 1,
           leftUnit.id,
           rightUnit.id,
           payable,
@@ -483,6 +439,74 @@ export class BinarySettlementService {
     return { id: settlementId, idempotent: false };
   }
 
+  private async postLedgerTransaction(
+    connection: PoolConnection,
+    dto: RunBinaryPairSettlementDto,
+    actorUserId: string,
+    settledAt: Date,
+    member: MemberRow,
+    payoutAmount: Prisma.Decimal,
+    currencyCode: string,
+  ): Promise<string> {
+    const walletCode = `USER_WALLET:${dto.memberUserId}:${currencyCode}`;
+    const expenseCode = `COMMISSION_EXPENSE:${currencyCode}`;
+    await this.ensureLedgerAccount(
+      connection,
+      walletCode,
+      `${member.username} wallet ${currencyCode}`,
+      LedgerAccountKind.USER_WALLET,
+      dto.memberUserId,
+      currencyCode,
+    );
+    await this.ensureLedgerAccount(
+      connection,
+      expenseCode,
+      `Commission expense ${currencyCode}`,
+      LedgerAccountKind.COMMISSION_EXPENSE,
+      null,
+      currencyCode,
+    );
+
+    const walletId = await this.ledgerAccountId(connection, walletCode);
+    const expenseId = await this.ledgerAccountId(connection, expenseCode);
+    const transactionId = randomUUID();
+    await connection.query(
+      `INSERT INTO ledger_transactions
+         (id, sourceKey, type, description, occurredAt, createdByUserId, createdAt)
+       VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP(3))`,
+      [
+        transactionId,
+        `BINARY_PAIR:${dto.sourceKey}`,
+        LedgerTransactionType.BINARY_PAIR_COMMISSION,
+        `Binary pair commission for ${member.username}`,
+        settledAt,
+        actorUserId,
+      ],
+    );
+    await connection.query(
+      `INSERT INTO ledger_entries
+         (id, transactionId, accountId, direction, amount, currencyCode, createdAt)
+       VALUES
+         (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP(3)),
+         (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP(3))`,
+      [
+        randomUUID(),
+        transactionId,
+        expenseId,
+        LedgerEntryDirection.DEBIT,
+        payoutAmount.toFixed(2),
+        currencyCode,
+        randomUUID(),
+        transactionId,
+        walletId,
+        LedgerEntryDirection.CREDIT,
+        payoutAmount.toFixed(2),
+        currencyCode,
+      ],
+    );
+    return transactionId;
+  }
+
   private async loadUnitQueue(
     connection: PoolConnection,
     memberUserId: string,
@@ -498,11 +522,9 @@ export class BinarySettlementService {
       ? [settledAt, memberUserId, planVersionId, side, settledAt]
       : [memberUserId, planVersionId, side, settledAt];
     const rows = await connection.query<UnitRow[]>(
-      `SELECT u.id, u.sequence, e.sourceMemberUserId, source.username AS sourceUsername,
-              ${expiryExpression} AS expired
+      `SELECT u.id, u.sequence, ${expiryExpression} AS expired
        FROM binary_upline_qualifying_units u
        INNER JOIN binary_qualifying_unit_events e ON e.id = u.unitEventId
-       INNER JOIN users source ON source.id = e.sourceMemberUserId
        LEFT JOIN binary_qualifying_unit_events reversal ON reversal.reversalOfEventId = e.id
        LEFT JOIN binary_pair_matches left_match ON left_match.leftUnitId = u.id
        LEFT JOIN binary_pair_matches right_match ON right_match.rightUnitId = u.id
@@ -518,8 +540,8 @@ export class BinarySettlementService {
       values,
     );
     return {
-      eligible: rows.filter((row) => !Boolean(row.expired)),
-      expired: rows.filter((row) => Boolean(row.expired)),
+      eligible: rows.filter((row) => !row.expired),
+      expired: rows.filter((row) => row.expired === true || row.expired === 1),
     };
   }
 
