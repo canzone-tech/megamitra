@@ -48,21 +48,10 @@ function Status({ value }: { value: unknown }) {
   return <span className={`mm-chip ${tone}`}>{status}</span>;
 }
 
-function QueueCard({
-  title,
-  total,
-  children,
-}: {
-  title: string;
-  total: number;
-  children: React.ReactNode;
-}) {
+function QueueCard({ title, total, children }: { title: string; total: number; children: React.ReactNode }) {
   return (
     <section className="mm-card">
-      <div className="mm-card-head">
-        <h2>{title}</h2>
-        <span className="mm-chip">{total} total</span>
-      </div>
+      <div className="mm-card-head"><h2>{title}</h2><span className="mm-chip">{total} total</span></div>
       <div className="mm-card-body mm-table-wrap">{children}</div>
     </section>
   );
@@ -102,7 +91,10 @@ export function OperationsDashboard() {
   }, [router]);
 
   useEffect(() => {
-    void load();
+    const timer = window.setTimeout(() => {
+      void load();
+    }, 0);
+    return () => window.clearTimeout(timer);
   }, [load]);
 
   async function logout() {
@@ -125,71 +117,34 @@ export function OperationsDashboard() {
   return (
     <div className="mm-admin-shell">
       <header className="mm-topbar">
-        <div className="mm-brand">
-          <span className="mm-brand-mark">M</span>
-          <div>
-            <div>Mega<span className="mm-brand-accent">Mitra</span></div>
-            <div className="mm-brand-subtitle">Admin operations</div>
-          </div>
-        </div>
+        <div className="mm-brand"><span className="mm-brand-mark">M</span><div><div>Mega<span className="mm-brand-accent">Mitra</span></div><div className="mm-brand-subtitle">Admin operations</div></div></div>
         <button className="mm-button secondary" type="button" onClick={() => void logout()}>Sign out</button>
       </header>
 
       <main className="mm-page">
         <div className="mm-hero-row">
-          <div>
-            <p className="mm-eyebrow">Operational truth</p>
-            <h1 className="mm-title">Control room</h1>
-            <p className="mm-subtitle">Read-only queues from authoritative events, hooks, draws and fulfillment records. Business actions remain in their dedicated APIs.</p>
-          </div>
-          <button className="mm-button" type="button" disabled={loading} onClick={() => void load()}>
-            {loading ? 'Refreshing…' : 'Refresh queues'}
-          </button>
+          <div><p className="mm-eyebrow">Operational truth</p><h1 className="mm-title">Control room</h1><p className="mm-subtitle">Read-only queues from authoritative events, hooks, draws and fulfillment records. Business actions remain in their dedicated APIs.</p></div>
+          <button className="mm-button" type="button" disabled={loading} onClick={() => void load()}>{loading ? 'Refreshing…' : 'Refresh queues'}</button>
         </div>
 
         {error ? <div className="mm-error" role="alert">{error}</div> : null}
         {data ? (
           <>
             <div className="mm-grid stats" style={{ marginBottom: 20 }}>
-              {stats.map(([label, value, accent]) => (
-                <div className="mm-card mm-stat" style={{ '--accent': accent } as React.CSSProperties} key={label}>
-                  <div className="mm-stat-label">{label}</div>
-                  <div className="mm-stat-value">{value}</div>
-                </div>
-              ))}
+              {stats.map(([label, value, accent]) => <div className="mm-card mm-stat" style={{ '--accent': accent } as React.CSSProperties} key={label}><div className="mm-stat-label">{label}</div><div className="mm-stat-value">{value}</div></div>)}
             </div>
-
             <div className="mm-grid two">
               <QueueCard title="Program orchestration" total={data.orchestration.total}>
-                {data.orchestration.items.length ? (
-                  <table className="mm-table"><thead><tr><th>Event</th><th>Member</th><th>Status</th><th>Occurred</th></tr></thead><tbody>
-                    {data.orchestration.items.map((row) => <tr key={text(row.businessEventId)}><td><strong>{text(row.type)}</strong><br /><span>{text(row.businessEventId).slice(0, 8)}</span></td><td>{text(row.memberUsername)}</td><td><Status value={row.processingStatus} /></td><td>{date(row.occurredAt)}</td></tr>)}
-                  </tbody></table>
-                ) : <div className="mm-empty">No orchestration rows.</div>}
+                {data.orchestration.items.length ? <table className="mm-table"><thead><tr><th>Event</th><th>Member</th><th>Status</th><th>Occurred</th></tr></thead><tbody>{data.orchestration.items.map((row) => <tr key={text(row.businessEventId)}><td><strong>{text(row.type)}</strong><br /><span>{text(row.businessEventId).slice(0, 8)}</span></td><td>{text(row.memberUsername)}</td><td><Status value={row.processingStatus} /></td><td>{date(row.occurredAt)}</td></tr>)}</tbody></table> : <div className="mm-empty">No orchestration rows.</div>}
               </QueueCard>
-
               <QueueCard title="Referral handoffs" total={data.referrals.total}>
-                {data.referrals.items.length ? (
-                  <table className="mm-table"><thead><tr><th>Referred</th><th>Sponsor</th><th>Basis</th><th>Status</th></tr></thead><tbody>
-                    {data.referrals.items.map((row) => <tr key={text(row.id)}><td>{text(row.referredUsername)}</td><td>{text(row.sponsorUsername)}</td><td>{text(row.basisAmount)} {text(row.currencyCode)}</td><td><Status value={row.status} /></td></tr>)}
-                  </tbody></table>
-                ) : <div className="mm-empty">No referral handoffs.</div>}
+                {data.referrals.items.length ? <table className="mm-table"><thead><tr><th>Referred</th><th>Sponsor</th><th>Basis</th><th>Status</th></tr></thead><tbody>{data.referrals.items.map((row) => <tr key={text(row.id)}><td>{text(row.referredUsername)}</td><td>{text(row.sponsorUsername)}</td><td>{text(row.basisAmount)} {text(row.currencyCode)}</td><td><Status value={row.status} /></td></tr>)}</tbody></table> : <div className="mm-empty">No referral handoffs.</div>}
               </QueueCard>
-
               <QueueCard title="Lucky draws" total={data.draws.total}>
-                {data.draws.items.length ? (
-                  <table className="mm-table"><thead><tr><th>Policy</th><th>Draw at</th><th>Entries</th><th>Status</th></tr></thead><tbody>
-                    {data.draws.items.map((row) => <tr key={text(row.id)}><td><strong>{text(row.policyName)}</strong><br /><span>{text(row.policyCode)}</span></td><td>{date(row.drawAt)}</td><td>{text(row.eligibleEntryCount)}</td><td><Status value={row.status} /></td></tr>)}
-                  </tbody></table>
-                ) : <div className="mm-empty">No draw instances.</div>}
+                {data.draws.items.length ? <table className="mm-table"><thead><tr><th>Policy</th><th>Draw at</th><th>Entries</th><th>Status</th></tr></thead><tbody>{data.draws.items.map((row) => <tr key={text(row.id)}><td><strong>{text(row.policyName)}</strong><br /><span>{text(row.policyCode)}</span></td><td>{date(row.drawAt)}</td><td>{text(row.eligibleEntryCount)}</td><td><Status value={row.status} /></td></tr>)}</tbody></table> : <div className="mm-empty">No draw instances.</div>}
               </QueueCard>
-
               <QueueCard title="Prize claims" total={data.claims.total}>
-                {data.claims.items.length ? (
-                  <table className="mm-table"><thead><tr><th>Member</th><th>Prize</th><th>Deadline</th><th>Status</th></tr></thead><tbody>
-                    {data.claims.items.map((row) => <tr key={text(row.id)}><td>{text(row.username)}</td><td>{text(row.prizeTierName)}<br /><span>{text(row.prizeKind)}</span></td><td>{date(row.claimDeadline)}</td><td><Status value={row.status} /></td></tr>)}
-                  </tbody></table>
-                ) : <div className="mm-empty">No prize claims.</div>}
+                {data.claims.items.length ? <table className="mm-table"><thead><tr><th>Member</th><th>Prize</th><th>Deadline</th><th>Status</th></tr></thead><tbody>{data.claims.items.map((row) => <tr key={text(row.id)}><td>{text(row.username)}</td><td>{text(row.prizeTierName)}<br /><span>{text(row.prizeKind)}</span></td><td>{date(row.claimDeadline)}</td><td><Status value={row.status} /></td></tr>)}</tbody></table> : <div className="mm-empty">No prize claims.</div>}
               </QueueCard>
             </div>
           </>
