@@ -4,7 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import type { PoolConnection } from 'mariadb';
 import { AuditService } from '../audit/audit.service';
 import { FinancialDbService } from '../database/financial-db.service';
@@ -14,6 +14,7 @@ import {
   AuditAction,
   BinaryCapOverflowMode,
   BinaryPlacementSide,
+  BinaryUnitDispositionType,
   LedgerAccountKind,
   LedgerEntryDirection,
   LedgerTransactionType,
@@ -25,7 +26,7 @@ type SettlementIdentityRow = {
   id: string;
   memberUserId: string;
   planVersionId: string;
-  settledAt: Date;
+  requestFingerprint: string | null;
 };
 
 type MemberRow = {
@@ -38,8 +39,7 @@ type PlanVersionRow = {
   lifecycle: string;
   effectiveFrom: Date;
   effectiveTo: Date | null;
-  leftVolumePerPair: string;
-  rightVolumePerPair: string;
+  qualifyingUnit: string;
   pairPayoutAmount: string;
   currencyCode: string | null;
   settlementTimezone: string | null;
@@ -48,20 +48,22 @@ type PlanVersionRow = {
   monthlyPairCap: number | null;
   carryForwardEnabled: boolean | number;
   carryForwardExpiryDays: number | null;
-  qualificationRules: unknown;
 };
 
-type DecimalTotalRow = { total: string | number | bigint | null };
-type ConsumptionRow = {
-  leftConsumed: string | number | bigint;
-  rightConsumed: string | number | bigint;
-};
 type CountRow = { total: string | number | bigint | null };
 type IdRow = { id: string };
+type PairSequenceRow = { total: string | number | bigint | null };
+type UnitRow = {
+  id: string;
+  sequence: string | number | bigint;
+  sourceMemberUserId: string;
+  sourceUsername: string;
+  expired: boolean | number;
+};
 
-type AvailableVolume = {
-  all: Prisma.Decimal;
-  eligible: Prisma.Decimal;
+type UnitQueue = {
+  eligible: UnitRow[];
+  expired: UnitRow[];
 };
 
 @Injectable()
@@ -74,9 +76,10 @@ export class BinarySettlementService {
 
   async run(dto: RunBinaryPairSettlementDto, actorUserId: string) {
     const settledAt = new Date(dto.settledAt);
+    const fingerprint = this.requestFingerprint(dto, settledAt);
     const existing = await this.findSettlement(dto.sourceKey);
     if (existing) {
-      this.assertIdempotentMatch(existing, dto, settledAt);
+      this.assertIdempotentMatch(existing, dto, fingerprint);
       return { settlement: existing, idempotent: true };
     }
 
@@ -91,13 +94,20 @@ export class BinarySettlementService {
     let outcome: { id: string; idempotent: boolean };
     try {
       outcome = await this.financialDb.transaction((connection) =>
-        this.runNativeTransaction(connection, dto, actorUserId, settledAt, mutexKey),
+        this.runNativeTransaction(
+          connection,
+          dto,
+          actorUserId,
+          settledAt,
+          fingerprint,
+          mutexKey,
+        ),
       );
     } catch (error) {
       if ((error as { code?: string }).code === 'ER_DUP_ENTRY') {
         const duplicate = await this.findSettlement(dto.sourceKey);
         if (duplicate) {
-          this.assertIdempotentMatch(duplicate, dto, settledAt);
+          this.assertIdempotentMatch(duplicate, dto, fingerprint);
           return { settlement: duplicate, idempotent: true };
         }
       }
@@ -115,7 +125,7 @@ export class BinarySettlementService {
         action: AuditAction.CREATE,
         entityType: 'BinaryPairSettlement',
         entityId: settlement.id,
-        description: 'Binary pair settlement completed',
+        description: 'Binary sequential unit pair settlement completed',
         metadata: {
           sourceKey: settlement.sourceKey,
           planVersionId: settlement.planVersionId,
@@ -139,7 +149,21 @@ export class BinarySettlementService {
     return this.prisma.binaryPairSettlement.findMany({
       where: { memberUserId: userId },
       orderBy: [{ settledAt: 'desc' }, { createdAt: 'desc' }],
-      include: { planVersion: { include: { plan: true } }, ledgerTransaction: true },
+      include: {
+        planVersion: { include: { plan: true } },
+        ledgerTransaction: true,
+        pairMatches: {
+          orderBy: { pairSequence: 'asc' },
+          include: {
+            leftUnit: {
+              include: { unitEvent: { include: { sourceMember: { select: { id: true, username: true } } } } },
+            },
+            rightUnit: {
+              include: { unitEvent: { include: { sourceMember: { select: { id: true, username: true } } } } },
+            },
+          },
+        },
+      },
     });
   }
 
@@ -148,6 +172,7 @@ export class BinarySettlementService {
     dto: RunBinaryPairSettlementDto,
     actorUserId: string,
     settledAt: Date,
+    fingerprint: string,
     mutexKey: string,
   ): Promise<{ id: string; idempotent: boolean }> {
     await connection.query(
@@ -158,7 +183,7 @@ export class BinarySettlementService {
     );
 
     const racedRows = await connection.query<SettlementIdentityRow[]>(
-      `SELECT id, memberUserId, planVersionId, settledAt
+      `SELECT id, memberUserId, planVersionId, requestFingerprint
        FROM binary_pair_settlements
        WHERE sourceKey = ?
        LIMIT 1`,
@@ -166,7 +191,7 @@ export class BinarySettlementService {
     );
     const raced = racedRows[0];
     if (raced) {
-      this.assertIdempotentMatch(raced, dto, settledAt);
+      this.assertIdempotentMatch(raced, dto, fingerprint);
       return { id: raced.id, idempotent: true };
     }
 
@@ -179,10 +204,10 @@ export class BinarySettlementService {
 
     const versionRows = await connection.query<PlanVersionRow[]>(
       `SELECT id, lifecycle, effectiveFrom, effectiveTo,
-              leftVolumePerPair, rightVolumePerPair, pairPayoutAmount,
+              qualifyingUnit, pairPayoutAmount,
               currencyCode, settlementTimezone, capOverflowMode,
               dailyPairCap, monthlyPairCap, carryForwardEnabled,
-              carryForwardExpiryDays, qualificationRules
+              carryForwardExpiryDays
        FROM binary_plan_versions
        WHERE id = ?
        LIMIT 1`,
@@ -204,7 +229,6 @@ export class BinarySettlementService {
         'Published plan is missing settlement currency, timezone or cap overflow policy',
       );
     }
-    this.assertSupportedQualificationRules(version.qualificationRules);
 
     const laterRows = await connection.query<IdRow[]>(
       `SELECT id
@@ -219,32 +243,27 @@ export class BinarySettlementService {
       );
     }
 
-    const local = this.localPeriod(settledAt, version.settlementTimezone);
-    const leftAvailable = await this.availableVolumeNative(
-      connection,
-      dto.memberUserId,
-      dto.planVersionId,
-      BinaryPlacementSide.LEFT,
-      settledAt,
-      version.carryForwardExpiryDays,
-    );
-    const rightAvailable = await this.availableVolumeNative(
-      connection,
-      dto.memberUserId,
-      dto.planVersionId,
-      BinaryPlacementSide.RIGHT,
-      settledAt,
-      version.carryForwardExpiryDays,
-    );
+    await this.assertNoReversedConsumedUnits(connection, dto.memberUserId, dto.planVersionId);
 
-    const consumptionRows = await connection.query<ConsumptionRow[]>(
-      `SELECT COALESCE(SUM(leftVolumeConsumed), 0) AS leftConsumed,
-              COALESCE(SUM(rightVolumeConsumed), 0) AS rightConsumed
-       FROM binary_pair_settlements
-       WHERE memberUserId = ? AND planVersionId = ? AND settledAt <= ?`,
-      [dto.memberUserId, dto.planVersionId, settledAt],
-    );
-    const consumption = consumptionRows[0] ?? { leftConsumed: 0, rightConsumed: 0 };
+    const local = this.localPeriod(settledAt, version.settlementTimezone);
+    const [leftQueue, rightQueue] = await Promise.all([
+      this.loadUnitQueue(
+        connection,
+        dto.memberUserId,
+        dto.planVersionId,
+        BinaryPlacementSide.LEFT,
+        settledAt,
+        version.carryForwardExpiryDays,
+      ),
+      this.loadUnitQueue(
+        connection,
+        dto.memberUserId,
+        dto.planVersionId,
+        BinaryPlacementSide.RIGHT,
+        settledAt,
+        version.carryForwardExpiryDays,
+      ),
+    ]);
 
     const dailyRows = await connection.query<CountRow[]>(
       `SELECT COALESCE(SUM(pairCountPayable), 0) AS total
@@ -259,23 +278,7 @@ export class BinarySettlementService {
       [dto.memberUserId, dto.planVersionId, local.month],
     );
 
-    const priorLeftConsumed = this.decimal(consumption.leftConsumed);
-    const priorRightConsumed = this.decimal(consumption.rightConsumed);
-    const left = this.subtractPriorConsumption(leftAvailable, priorLeftConsumed);
-    const right = this.subtractPriorConsumption(rightAvailable, priorRightConsumed);
-    if (left.lessThan(0) || right.lessThan(0)) {
-      throw new ConflictException(
-        'Volume reversals exceed remaining carry; explicit reconciliation is required',
-      );
-    }
-
-    const leftPerPair = this.decimal(version.leftVolumePerPair);
-    const rightPerPair = this.decimal(version.rightVolumePerPair);
-    const pairPayoutAmount = this.decimal(version.pairPayoutAmount);
-    const leftPairs = left.dividedBy(leftPerPair).floor().toNumber();
-    const rightPairs = right.dividedBy(rightPerPair).floor().toNumber();
-    const pairCountCalculated = Math.max(0, Math.min(leftPairs, rightPairs));
-
+    const pairCountCalculated = Math.min(leftQueue.eligible.length, rightQueue.eligible.length);
     let pairCountPayable = pairCountCalculated;
     const dailyUsed = Number(dailyRows[0]?.total ?? 0);
     const monthlyUsed = Number(monthlyRows[0]?.total ?? 0);
@@ -293,26 +296,35 @@ export class BinarySettlementService {
     }
 
     const capLimitedPairs = pairCountCalculated - pairCountPayable;
-    let leftConsumed = leftPerPair.mul(pairCountPayable);
-    let rightConsumed = rightPerPair.mul(pairCountPayable);
-    if (version.carryForwardEnabled) {
-      if (version.capOverflowMode === BinaryCapOverflowMode.FLUSH && capLimitedPairs > 0) {
-        leftConsumed = leftConsumed.plus(leftPerPair.mul(capLimitedPairs));
-        rightConsumed = rightConsumed.plus(rightPerPair.mul(capLimitedPairs));
-      }
-    } else {
-      leftConsumed = left;
-      rightConsumed = right;
-    }
+    const carryEnabled = Boolean(version.carryForwardEnabled);
+    const consumePairCount =
+      !carryEnabled || version.capOverflowMode === BinaryCapOverflowMode.FLUSH
+        ? pairCountCalculated
+        : pairCountPayable;
 
-    const leftCarry = left.minus(leftConsumed);
-    const rightCarry = right.minus(rightConsumed);
-    if (leftCarry.lessThan(0) || rightCarry.lessThan(0)) {
-      throw new ConflictException('Settlement consumption exceeds available volume');
-    }
+    const pairedLeftIds = new Set(
+      leftQueue.eligible.slice(0, consumePairCount).map((unit) => unit.id),
+    );
+    const pairedRightIds = new Set(
+      rightQueue.eligible.slice(0, consumePairCount).map((unit) => unit.id),
+    );
+    const leftToFlush = carryEnabled
+      ? []
+      : leftQueue.eligible.filter((unit) => !pairedLeftIds.has(unit.id));
+    const rightToFlush = carryEnabled
+      ? []
+      : rightQueue.eligible.filter((unit) => !pairedRightIds.has(unit.id));
 
-    const currencyCode = version.currencyCode.toUpperCase();
+    const leftUnitsConsumed = consumePairCount + leftToFlush.length;
+    const rightUnitsConsumed = consumePairCount + rightToFlush.length;
+    const leftUnitsCarryAfter = leftQueue.eligible.length - leftUnitsConsumed;
+    const rightUnitsCarryAfter = rightQueue.eligible.length - rightUnitsConsumed;
+
+    const qualifyingUnit = this.decimal(version.qualifyingUnit);
+    const pairPayoutAmount = this.decimal(version.pairPayoutAmount);
     const payoutAmount = pairPayoutAmount.mul(pairCountPayable);
+    const currencyCode = version.currencyCode.toUpperCase();
+
     let ledgerTransactionId: string | null = null;
     if (payoutAmount.greaterThan(0)) {
       const walletCode = `USER_WALLET:${dto.memberUserId}:${currencyCode}`;
@@ -376,32 +388,42 @@ export class BinarySettlementService {
     const settlementId = randomUUID();
     await connection.query(
       `INSERT INTO binary_pair_settlements
-         (id, sourceKey, memberUserId, planVersionId, settledAt,
+         (id, sourceKey, requestFingerprint, memberUserId, planVersionId, settledAt,
           settlementLocalDate, settlementLocalMonth,
           leftAvailableBefore, rightAvailableBefore,
           pairCountCalculated, pairCountPayable, capLimitedPairs,
           leftVolumeConsumed, rightVolumeConsumed,
           leftCarryAfter, rightCarryAfter,
+          leftUnitsAvailableBefore, rightUnitsAvailableBefore,
+          leftUnitsConsumed, rightUnitsConsumed,
+          leftUnitsCarryAfter, rightUnitsCarryAfter,
           payoutAmount, currencyCode, ledgerTransactionId,
           createdByUserId, createdAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP(3))`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP(3))`,
       [
         settlementId,
         dto.sourceKey,
+        fingerprint,
         dto.memberUserId,
         dto.planVersionId,
         settledAt,
         local.date,
         local.month,
-        left.toFixed(4),
-        right.toFixed(4),
+        qualifyingUnit.mul(leftQueue.eligible.length).toFixed(4),
+        qualifyingUnit.mul(rightQueue.eligible.length).toFixed(4),
         pairCountCalculated,
         pairCountPayable,
         capLimitedPairs,
-        leftConsumed.toFixed(4),
-        rightConsumed.toFixed(4),
-        leftCarry.toFixed(4),
-        rightCarry.toFixed(4),
+        qualifyingUnit.mul(leftUnitsConsumed).toFixed(4),
+        qualifyingUnit.mul(rightUnitsConsumed).toFixed(4),
+        qualifyingUnit.mul(leftUnitsCarryAfter).toFixed(4),
+        qualifyingUnit.mul(rightUnitsCarryAfter).toFixed(4),
+        leftQueue.eligible.length,
+        rightQueue.eligible.length,
+        leftUnitsConsumed,
+        rightUnitsConsumed,
+        leftUnitsCarryAfter,
+        rightUnitsCarryAfter,
         payoutAmount.toFixed(2),
         currencyCode,
         ledgerTransactionId,
@@ -409,38 +431,139 @@ export class BinarySettlementService {
       ],
     );
 
+    const pairSequenceRows = await connection.query<PairSequenceRow[]>(
+      `SELECT COALESCE(MAX(pairSequence), 0) AS total
+       FROM binary_pair_matches
+       WHERE memberUserId = ? AND planVersionId = ?`,
+      [dto.memberUserId, dto.planVersionId],
+    );
+    const priorPairSequence = BigInt(pairSequenceRows[0]?.total ?? 0);
+
+    for (let index = 0; index < consumePairCount; index += 1) {
+      const leftUnit = leftQueue.eligible[index];
+      const rightUnit = rightQueue.eligible[index];
+      if (!leftUnit || !rightUnit) {
+        throw new ConflictException('Sequential pair queue became inconsistent during settlement');
+      }
+      const payable = index < pairCountPayable;
+      await connection.query(
+        `INSERT INTO binary_pair_matches
+           (id, settlementId, memberUserId, planVersionId, pairSequence,
+            leftUnitId, rightUnitId, payable, payoutAmount, createdAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP(3))`,
+        [
+          randomUUID(),
+          settlementId,
+          dto.memberUserId,
+          dto.planVersionId,
+          priorPairSequence + BigInt(index + 1),
+          leftUnit.id,
+          rightUnit.id,
+          payable,
+          payable ? pairPayoutAmount.toFixed(2) : '0.00',
+        ],
+      );
+    }
+
+    await this.insertDispositions(
+      connection,
+      settlementId,
+      [...leftQueue.expired, ...rightQueue.expired],
+      BinaryUnitDispositionType.EXPIRED,
+      'carry-expiry',
+    );
+    await this.insertDispositions(
+      connection,
+      settlementId,
+      [...leftToFlush, ...rightToFlush],
+      BinaryUnitDispositionType.FLUSHED,
+      'carry-disabled',
+    );
+
     return { id: settlementId, idempotent: false };
   }
 
-  private async availableVolumeNative(
+  private async loadUnitQueue(
     connection: PoolConnection,
     memberUserId: string,
     planVersionId: string,
     side: BinaryPlacementSide,
     settledAt: Date,
     expiryDays: number | null,
-  ): Promise<AvailableVolume> {
-    const allRows = await connection.query<DecimalTotalRow[]>(
-      `SELECT COALESCE(SUM(c.volume), 0) AS total
-       FROM binary_upline_volume_credits c
-       INNER JOIN binary_volume_events e ON e.id = c.volumeEventId
-       WHERE c.ancestorUserId = ? AND c.planVersionId = ? AND c.side = ?
-         AND e.occurredAt <= ?`,
-      [memberUserId, planVersionId, side, settledAt],
+  ): Promise<UnitQueue> {
+    const expiryExpression = expiryDays
+      ? `CASE WHEN e.occurredAt < DATE_SUB(?, INTERVAL ${Math.trunc(expiryDays)} DAY) THEN 1 ELSE 0 END`
+      : '0';
+    const values: Array<string | Date> = expiryDays
+      ? [settledAt, memberUserId, planVersionId, side, settledAt]
+      : [memberUserId, planVersionId, side, settledAt];
+    const rows = await connection.query<UnitRow[]>(
+      `SELECT u.id, u.sequence, e.sourceMemberUserId, source.username AS sourceUsername,
+              ${expiryExpression} AS expired
+       FROM binary_upline_qualifying_units u
+       INNER JOIN binary_qualifying_unit_events e ON e.id = u.unitEventId
+       INNER JOIN users source ON source.id = e.sourceMemberUserId
+       LEFT JOIN binary_qualifying_unit_events reversal ON reversal.reversalOfEventId = e.id
+       LEFT JOIN binary_pair_matches left_match ON left_match.leftUnitId = u.id
+       LEFT JOIN binary_pair_matches right_match ON right_match.rightUnitId = u.id
+       LEFT JOIN binary_unit_dispositions disposition ON disposition.uplineUnitId = u.id
+       WHERE u.ancestorUserId = ? AND u.planVersionId = ? AND u.side = ?
+         AND e.eventType = 'QUALIFY'
+         AND e.occurredAt <= ?
+         AND reversal.id IS NULL
+         AND left_match.id IS NULL
+         AND right_match.id IS NULL
+         AND disposition.id IS NULL
+       ORDER BY u.sequence ASC`,
+      values,
     );
-    const all = this.decimal(allRows[0]?.total ?? 0);
-    if (!expiryDays) return { all, eligible: all };
+    return {
+      eligible: rows.filter((row) => !Boolean(row.expired)),
+      expired: rows.filter((row) => Boolean(row.expired)),
+    };
+  }
 
-    const cutoff = new Date(settledAt.getTime() - expiryDays * 86_400_000);
-    const eligibleRows = await connection.query<DecimalTotalRow[]>(
-      `SELECT COALESCE(SUM(c.volume), 0) AS total
-       FROM binary_upline_volume_credits c
-       INNER JOIN binary_volume_events e ON e.id = c.volumeEventId
-       WHERE c.ancestorUserId = ? AND c.planVersionId = ? AND c.side = ?
-         AND e.occurredAt >= ? AND e.occurredAt <= ?`,
-      [memberUserId, planVersionId, side, cutoff, settledAt],
+  private async assertNoReversedConsumedUnits(
+    connection: PoolConnection,
+    memberUserId: string,
+    planVersionId: string,
+  ): Promise<void> {
+    const rows = await connection.query<IdRow[]>(
+      `SELECT pair_match.id
+       FROM binary_pair_matches pair_match
+       INNER JOIN binary_upline_qualifying_units left_unit ON left_unit.id = pair_match.leftUnitId
+       INNER JOIN binary_qualifying_unit_events left_event ON left_event.id = left_unit.unitEventId
+       LEFT JOIN binary_qualifying_unit_events left_reversal ON left_reversal.reversalOfEventId = left_event.id
+       INNER JOIN binary_upline_qualifying_units right_unit ON right_unit.id = pair_match.rightUnitId
+       INNER JOIN binary_qualifying_unit_events right_event ON right_event.id = right_unit.unitEventId
+       LEFT JOIN binary_qualifying_unit_events right_reversal ON right_reversal.reversalOfEventId = right_event.id
+       WHERE pair_match.memberUserId = ? AND pair_match.planVersionId = ?
+         AND (left_reversal.id IS NOT NULL OR right_reversal.id IS NOT NULL)
+       LIMIT 1`,
+      [memberUserId, planVersionId],
     );
-    return { all, eligible: this.decimal(eligibleRows[0]?.total ?? 0) };
+    if (rows[0]) {
+      throw new ConflictException(
+        'A previously paired qualifying unit was reversed; explicit financial reconciliation is required',
+      );
+    }
+  }
+
+  private async insertDispositions(
+    connection: PoolConnection,
+    settlementId: string,
+    units: UnitRow[],
+    disposition: BinaryUnitDispositionType,
+    reason: string,
+  ): Promise<void> {
+    for (const unit of units) {
+      await connection.query(
+        `INSERT INTO binary_unit_dispositions
+           (id, uplineUnitId, settlementId, disposition, reason, createdAt)
+         VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP(3))`,
+        [randomUUID(), unit.id, settlementId, disposition, reason],
+      );
+    }
   }
 
   private async ensureLedgerAccount(
@@ -476,25 +599,32 @@ export class BinarySettlementService {
         member: { select: { id: true, username: true } },
         planVersion: { include: { plan: true } },
         ledgerTransaction: { include: { entries: { include: { account: true } } } },
+        pairMatches: {
+          orderBy: { pairSequence: 'asc' },
+          include: {
+            leftUnit: {
+              include: {
+                unitEvent: {
+                  include: { sourceMember: { select: { id: true, username: true } } },
+                },
+              },
+            },
+            rightUnit: {
+              include: {
+                unitEvent: {
+                  include: { sourceMember: { select: { id: true, username: true } } },
+                },
+              },
+            },
+          },
+        },
+        unitDispositions: true,
       },
     });
   }
 
-  private subtractPriorConsumption(
-    volume: AvailableVolume,
-    priorConsumed: Prisma.Decimal,
-  ): Prisma.Decimal {
-    const expired = this.maxZero(volume.all.minus(volume.eligible));
-    const consumedAgainstEligible = this.maxZero(priorConsumed.minus(expired));
-    return volume.eligible.minus(consumedAgainstEligible);
-  }
-
   private decimal(value: string | number | bigint | Prisma.Decimal): Prisma.Decimal {
     return value instanceof Prisma.Decimal ? value : new Prisma.Decimal(value.toString());
-  }
-
-  private maxZero(value: Prisma.Decimal): Prisma.Decimal {
-    return value.lessThan(0) ? new Prisma.Decimal(0) : value;
   }
 
   private localPeriod(date: Date, timeZone: string): { date: string; month: string } {
@@ -517,39 +647,28 @@ export class BinarySettlementService {
     return { date: `${year}-${month}-${day}`, month: `${year}-${month}` };
   }
 
-  private assertSupportedQualificationRules(rules: unknown): void {
-    if (rules === null || rules === undefined) return;
-    let parsed: unknown = rules;
-    if (typeof rules === 'string') {
-      try {
-        parsed = JSON.parse(rules) as unknown;
-      } catch {
-        throw new ConflictException('Plan qualification rules are invalid JSON');
-      }
-    }
-    if (
-      typeof parsed === 'object' &&
-      parsed !== null &&
-      !Array.isArray(parsed) &&
-      Object.keys(parsed).length === 0
-    ) {
-      return;
-    }
-    throw new ConflictException(
-      'This plan has qualification rules that require the eligibility engine before settlement',
-    );
+  private requestFingerprint(dto: RunBinaryPairSettlementDto, settledAt: Date): string {
+    return createHash('sha256')
+      .update(`${dto.memberUserId}|${dto.planVersionId}|${settledAt.toISOString()}`)
+      .digest('hex');
   }
 
   private assertIdempotentMatch(
-    existing: { memberUserId: string; planVersionId: string; settledAt: Date },
+    existing: {
+      memberUserId: string;
+      planVersionId: string;
+      requestFingerprint?: string | null;
+    },
     dto: RunBinaryPairSettlementDto,
-    settledAt: Date,
+    fingerprint: string,
   ): void {
-    if (
-      existing.memberUserId !== dto.memberUserId ||
-      existing.planVersionId !== dto.planVersionId ||
-      new Date(existing.settledAt).getTime() !== settledAt.getTime()
-    ) {
+    const identityMatches =
+      existing.memberUserId === dto.memberUserId && existing.planVersionId === dto.planVersionId;
+    const fingerprintMatches =
+      existing.requestFingerprint === null ||
+      existing.requestFingerprint === undefined ||
+      existing.requestFingerprint === fingerprint;
+    if (!identityMatches || !fingerprintMatches) {
       throw new ConflictException('Settlement source key already exists with a different payload');
     }
   }
