@@ -443,34 +443,34 @@ model BinaryUplineVolumeCredit {
 }
 
 model BinaryPairSettlement {
-  id                      String            @id @default(uuid()) @db.Char(36)
-  sourceKey               String            @unique @db.VarChar(191)
-  memberUserId            String            @db.Char(36)
-  planVersionId           String            @db.Char(36)
-  settledAt               DateTime          @db.DateTime(3)
-  settlementLocalDate     String            @db.Char(10)
-  settlementLocalMonth    String            @db.Char(7)
-  leftAvailableBefore     Decimal           @db.Decimal(18, 4)
-  rightAvailableBefore    Decimal           @db.Decimal(18, 4)
+  id                      String             @id @default(uuid()) @db.Char(36)
+  sourceKey               String             @unique @db.VarChar(191)
+  memberUserId            String             @db.Char(36)
+  planVersionId           String             @db.Char(36)
+  settledAt               DateTime           @db.DateTime(3)
+  settlementLocalDate     String             @db.Char(10)
+  settlementLocalMonth    String             @db.Char(7)
+  leftAvailableBefore     Decimal            @db.Decimal(18, 4)
+  rightAvailableBefore    Decimal            @db.Decimal(18, 4)
   pairCountCalculated     Int
   pairCountPayable        Int
   capLimitedPairs         Int
-  leftVolumeConsumed      Decimal           @db.Decimal(18, 4)
-  rightVolumeConsumed     Decimal           @db.Decimal(18, 4)
-  leftCarryAfter          Decimal           @db.Decimal(18, 4)
-  rightCarryAfter         Decimal           @db.Decimal(18, 4)
-  payoutAmount            Decimal           @db.Decimal(18, 2)
-  currencyCode            String            @db.VarChar(3)
-  ledgerTransactionId     String?           @unique @db.Char(36)
-  createdByUserId         String?           @db.Char(36)
-  createdAt               DateTime          @default(now()) @db.DateTime(3)
-  member                  User              @relation("SettlementMember", fields: [memberUserId], references: [id], onDelete: Restrict)
-  planVersion             BinaryPlanVersion @relation(fields: [planVersionId], references: [id], onDelete: Restrict)
+  leftVolumeConsumed      Decimal            @db.Decimal(18, 4)
+  rightVolumeConsumed     Decimal            @db.Decimal(18, 4)
+  leftCarryAfter          Decimal            @db.Decimal(18, 4)
+  rightCarryAfter         Decimal            @db.Decimal(18, 4)
+  payoutAmount            Decimal            @db.Decimal(18, 2)
+  currencyCode            String             @db.VarChar(3)
+  ledgerTransactionId     String?            @unique @db.Char(36)
+  createdByUserId         String?            @db.Char(36)
+  createdAt               DateTime           @default(now()) @db.DateTime(3)
+  member                  User               @relation("SettlementMember", fields: [memberUserId], references: [id], onDelete: Restrict)
+  planVersion             BinaryPlanVersion  @relation(fields: [planVersionId], references: [id], onDelete: Restrict)
   ledgerTransaction       LedgerTransaction? @relation(fields: [ledgerTransactionId], references: [id], onDelete: Restrict)
 
-  @@index([memberUserId, planVersionId, settledAt])
-  @@index([memberUserId, planVersionId, settlementLocalDate])
-  @@index([memberUserId, planVersionId, settlementLocalMonth])
+  @@index([memberUserId, planVersionId, settledAt], map: "binary_pair_settlements_member_plan_settled_idx")
+  @@index([memberUserId, planVersionId, settlementLocalDate], map: "binary_pair_settlements_member_plan_date_idx")
+  @@index([memberUserId, planVersionId, settlementLocalMonth], map: "binary_pair_settlements_member_plan_month_idx")
   @@map("binary_pair_settlements")
 }
 
@@ -491,13 +491,13 @@ model LedgerAccount {
 }
 
 model LedgerTransaction {
-  id               String                @id @default(uuid()) @db.Char(36)
-  sourceKey        String                @unique @db.VarChar(191)
+  id               String                  @id @default(uuid()) @db.Char(36)
+  sourceKey        String                  @unique @db.VarChar(191)
   type             LedgerTransactionType
-  description      String?               @db.VarChar(500)
-  occurredAt       DateTime              @db.DateTime(3)
-  createdByUserId  String?               @db.Char(36)
-  createdAt        DateTime              @default(now()) @db.DateTime(3)
+  description      String?                 @db.VarChar(500)
+  occurredAt       DateTime                @db.DateTime(3)
+  createdByUserId  String?                 @db.Char(36)
+  createdAt        DateTime                @default(now()) @db.DateTime(3)
   entries          LedgerEntry[]
   binarySettlement BinaryPairSettlement?
 
