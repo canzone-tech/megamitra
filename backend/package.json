@@ -16,7 +16,7 @@
     "prisma:validate": "prisma validate",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:integration": "jest --config jest.integration.config.cjs --runInBand",
+    "test:integration": "NODE_OPTIONS=--experimental-vm-modules jest --config jest.integration.config.cjs --runInBand",
     "super-admin:bootstrap": "ts-node scripts/bootstrap-super-admin.ts",
     "verify": "./scripts/verify-local.sh"
   },
