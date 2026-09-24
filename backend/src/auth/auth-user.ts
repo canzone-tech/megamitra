@@ -2,6 +2,8 @@ export interface AuthUser {
   id: string;
   sessionId: string;
   username: string;
+  email: string | null;
+  emailVerifiedAt: Date | null;
   mustChangePassword: boolean;
   roles: string[];
   permissions: string[];
