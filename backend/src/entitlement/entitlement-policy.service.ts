@@ -13,6 +13,7 @@ import {
   normalizeCode,
   normalizeJsonFields,
   normalizeRow,
+  utcSqlDateTime,
   type GrantItem,
   type Row,
 } from './entitlement.support';
@@ -114,10 +115,19 @@ export class EntitlementPolicyService {
            grantItems, rules, createdByUserId, createdAt, updatedAt
          ) VALUES (?, ?, ?, 'DRAFT', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP(3), CURRENT_TIMESTAMP(3))`,
         [
-          id, policyId, version, new Date(dto.effectiveFrom), dto.effectiveTo ? new Date(dto.effectiveTo) : null,
-          dto.minimumPaidInstallments, dto.minimumPaidAmount ?? null, dto.requireEnrollmentCompleted,
-          dto.excludeAnyLuckyDrawWinner, dto.claimWindowDays ?? null, JSON.stringify(grantItems),
-          dto.rules ? JSON.stringify(dto.rules) : null, actorUserId,
+          id,
+          policyId,
+          version,
+          utcSqlDateTime(dto.effectiveFrom),
+          dto.effectiveTo ? utcSqlDateTime(dto.effectiveTo) : null,
+          dto.minimumPaidInstallments,
+          dto.minimumPaidAmount ?? null,
+          dto.requireEnrollmentCompleted,
+          dto.excludeAnyLuckyDrawWinner,
+          dto.claimWindowDays ?? null,
+          JSON.stringify(grantItems),
+          dto.rules ? JSON.stringify(dto.rules) : null,
+          actorUserId,
         ],
       );
       await insertAudit(connection, {
@@ -145,8 +155,8 @@ export class EntitlementPolicyService {
       if (grantItems) await this.assertGrantProducts(connection, grantItems);
       const fields: string[] = [];
       const values: Array<string | number | boolean | Date | null> = [];
-      if (dto.effectiveFrom !== undefined) { fields.push('effectiveFrom = ?'); values.push(new Date(dto.effectiveFrom)); }
-      if (dto.effectiveTo !== undefined) { fields.push('effectiveTo = ?'); values.push(new Date(dto.effectiveTo)); }
+      if (dto.effectiveFrom !== undefined) { fields.push('effectiveFrom = ?'); values.push(utcSqlDateTime(dto.effectiveFrom)); }
+      if (dto.effectiveTo !== undefined) { fields.push('effectiveTo = ?'); values.push(utcSqlDateTime(dto.effectiveTo)); }
       if (dto.minimumPaidInstallments !== undefined) { fields.push('minimumPaidInstallments = ?'); values.push(dto.minimumPaidInstallments); }
       if (dto.minimumPaidAmount !== undefined) { fields.push('minimumPaidAmount = ?'); values.push(dto.minimumPaidAmount); }
       if (dto.requireEnrollmentCompleted !== undefined) { fields.push('requireEnrollmentCompleted = ?'); values.push(dto.requireEnrollmentCompleted); }

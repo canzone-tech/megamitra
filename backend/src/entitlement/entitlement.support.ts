@@ -23,6 +23,12 @@ export function normalizeCode(value: string) {
   return value.trim().toUpperCase();
 }
 
+export function utcSqlDateTime(value: string | Date): string {
+  const date = value instanceof Date ? value : new Date(value);
+  if (!Number.isFinite(date.getTime())) throw new RangeError('Invalid date');
+  return date.toISOString().slice(0, 23).replace('T', ' ');
+}
+
 export function toBoolean(value: unknown): boolean {
   return value === true || value === 1 || value === '1' || value === 'true';
 }
