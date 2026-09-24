@@ -1,4 +1,6 @@
 import { Module } from '@nestjs/common';
+import { MemberPortalReadController } from './member-portal-read.controller';
+import { MemberPortalReadService } from './member-portal-read.service';
 import {
   AdminOperationalReadController,
   MemberOperationalReadController,
@@ -7,8 +9,16 @@ import { OperationalJsonSafeInterceptor } from './operational-json-safe.intercep
 import { OperationalReadService } from './operational-read.service';
 
 @Module({
-  controllers: [MemberOperationalReadController, AdminOperationalReadController],
-  providers: [OperationalReadService, OperationalJsonSafeInterceptor],
-  exports: [OperationalReadService],
+  controllers: [
+    MemberPortalReadController,
+    MemberOperationalReadController,
+    AdminOperationalReadController,
+  ],
+  providers: [
+    MemberPortalReadService,
+    OperationalReadService,
+    OperationalJsonSafeInterceptor,
+  ],
+  exports: [OperationalReadService, MemberPortalReadService],
 })
 export class OperationalReadModule {}
