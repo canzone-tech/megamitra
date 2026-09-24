@@ -11,6 +11,7 @@ import type { Request } from 'express';
 import { PrismaService } from '../database/prisma.service';
 import { RoleStatus, UserStatus } from '../generated/prisma/enums';
 import type { AuthUser, JwtPayload } from './auth-user';
+import { AuthRecoveryService } from './auth-recovery.service';
 import { IS_PUBLIC_KEY } from './public.decorator';
 
 @Injectable()
@@ -20,6 +21,7 @@ export class JwtAuthGuard implements CanActivate {
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
     private readonly prisma: PrismaService,
+    private readonly recovery: AuthRecoveryService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
@@ -51,7 +53,7 @@ export class JwtAuthGuard implements CanActivate {
 
     if (payload.typ !== 'access') throw new UnauthorizedException();
 
-    const [session, security] = await Promise.all([
+    const [session, security, extension] = await Promise.all([
       this.prisma.authSession.findFirst({
         where: {
           id: payload.sid,
@@ -75,6 +77,7 @@ export class JwtAuthGuard implements CanActivate {
         },
       }),
       this.prisma.systemSecurityConfig.findUniqueOrThrow({ where: { id: 1 } }),
+      this.recovery.getExtensionConfig(),
     ]);
 
     if (!session || session.user.status !== UserStatus.ACTIVE) {
@@ -90,6 +93,11 @@ export class JwtAuthGuard implements CanActivate {
       now.getTime()
     ) {
       expiryReason = 'idle_timeout';
+    } else if (
+      extension.emailVerificationRequiredForLogin &&
+      !session.user.emailVerifiedAt
+    ) {
+      expiryReason = 'email_verification_required';
     }
 
     if (expiryReason) {
@@ -97,7 +105,7 @@ export class JwtAuthGuard implements CanActivate {
         where: { id: session.id, revokedAt: null },
         data: { revokedAt: now, revocationReason: expiryReason },
       });
-      throw new UnauthorizedException('Session has expired');
+      throw new UnauthorizedException('Session has expired or no longer satisfies authentication policy');
     }
 
     await this.prisma.authSession.update({
@@ -112,6 +120,8 @@ export class JwtAuthGuard implements CanActivate {
       id: session.user.id,
       sessionId: session.id,
       username: session.user.username,
+      email: session.user.email,
+      emailVerifiedAt: session.user.emailVerifiedAt,
       mustChangePassword: session.user.mustChangePassword,
       roles: activeRoles.map((item) => item.role.name),
       permissions: [
