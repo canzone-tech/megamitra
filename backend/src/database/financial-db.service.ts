@@ -1,6 +1,8 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { createPool, type Pool, type PoolConnection } from 'mariadb';
 
+import { mariaDbUtcConnectionOptions } from './mariadb-options';
+
 type SqlValue = string | number | bigint | boolean | Date | null;
 
 @Injectable()
@@ -9,15 +11,8 @@ export class FinancialDbService implements OnModuleDestroy {
 
   constructor() {
     this.pool = createPool({
-      host: process.env.MYSQL_HOST ?? '127.0.0.1',
-      port: Number(process.env.MYSQL_PORT ?? 3307),
-      user: process.env.MYSQL_USER,
-      password: process.env.MYSQL_PASSWORD,
-      database: process.env.MYSQL_DATABASE,
-      timezone: 'Z',
+      ...mariaDbUtcConnectionOptions(),
       connectionLimit: 5,
-      connectTimeout: 5000,
-      acquireTimeout: 10000,
       bigIntAsNumber: false,
       insertIdAsNumber: false,
     });

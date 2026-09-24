@@ -2,6 +2,7 @@ import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { PrismaMariaDb } from '@prisma/adapter-mariadb';
 
 import { PrismaClient } from '../generated/prisma/client';
+import { mariaDbUtcConnectionOptions } from './mariadb-options';
 
 @Injectable()
 export class PrismaService
@@ -10,16 +11,9 @@ export class PrismaService
 {
   constructor() {
     const adapter = new PrismaMariaDb({
-      host: process.env.MYSQL_HOST ?? '127.0.0.1',
-      port: Number(process.env.MYSQL_PORT ?? 3307),
-      user: process.env.MYSQL_USER,
-      password: process.env.MYSQL_PASSWORD,
-      database: process.env.MYSQL_DATABASE,
-      timezone: 'Z',
+      ...mariaDbUtcConnectionOptions(),
       allowPublicKeyRetrieval: true,
       connectionLimit: 10,
-      connectTimeout: 5000,
-      acquireTimeout: 10000,
     });
 
     super({ adapter });
