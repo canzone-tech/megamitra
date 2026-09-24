@@ -17,6 +17,21 @@ fi
 echo "==> Starting MegaMitra data services"
 docker compose --env-file "${ROOT_DIR}/.env" -f "${ROOT_DIR}/docker-compose.yml" up -d
 
+echo "==> Verifying MongoDB presentation store"
+MONGO_READY=""
+for _ in $(seq 1 30); do
+  MONGO_READY="$(docker compose --env-file "${ROOT_DIR}/.env" -f "${ROOT_DIR}/docker-compose.yml" exec -T mongodb mongosh --quiet --eval 'db.adminCommand({ ping: 1 }).ok' 2>/dev/null || true)"
+  if [[ "${MONGO_READY}" == *"1"* ]]; then
+    break
+  fi
+  sleep 1
+done
+if [[ "${MONGO_READY}" != *"1"* ]]; then
+  echo "ERROR: MongoDB presentation store did not become ready"
+  docker compose --env-file "${ROOT_DIR}/.env" -f "${ROOT_DIR}/docker-compose.yml" ps
+  exit 1
+fi
+
 echo "==> Installing exact backend dependencies"
 npm ci
 
