@@ -45,6 +45,43 @@ export function ForgotPasswordForm() {
   );
 }
 
+export function RequestEmailVerificationForm() {
+  const [email, setEmail] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<ResultState>(null);
+
+  async function submit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusy(true);
+    setResult(null);
+    try {
+      const response = await apiJson<GenericAccepted>('/api/backend/auth/email-verification/request', {
+        method: 'POST',
+        body: JSON.stringify({ email }),
+      });
+      setResult({ tone: 'success', message: response.message });
+    } catch (reason) {
+      setResult({
+        tone: 'error',
+        message: reason instanceof ApiClientError ? reason.message : 'Unable to request a verification email',
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form onSubmit={submit}>
+      <div className="mm-field">
+        <label htmlFor="verification-email">Account email</label>
+        <input className="mm-input" id="verification-email" type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
+      </div>
+      {result ? <div className={result.tone === 'success' ? 'mm-success' : 'mm-error'} role="status">{result.message}</div> : null}
+      <button className="mm-button" type="submit" disabled={busy}>{busy ? 'Submitting…' : 'Send verification link'}</button>
+    </form>
+  );
+}
+
 export function ResetPasswordForm({ token }: { token: string }) {
   const router = useRouter();
   const [password, setPassword] = useState('');
