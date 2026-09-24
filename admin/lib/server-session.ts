@@ -7,6 +7,8 @@ export type SessionUser = {
   id: string;
   sessionId: string;
   username: string;
+  email: string | null;
+  emailVerifiedAt: string | null;
   mustChangePassword: boolean;
   roles: string[];
   permissions: string[];
