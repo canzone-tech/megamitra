@@ -67,6 +67,10 @@ npm test -- --runInBand
 echo "==> Integration tests"
 npm run test:integration
 
+echo "==> Cleaning backend build artifacts"
+rm -rf dist
+find . -maxdepth 1 -type f -name '*.tsbuildinfo' -delete
+
 echo "==> Build backend"
 npm run build
 

@@ -122,8 +122,15 @@ jobs:
       - name: Integration tests
         run: npm run test:integration
 
-      - name: Build
-        run: npm run build
+      - name: Build reproducibly
+        run: |
+          rm -rf dist
+          rm -f ./*.tsbuildinfo
+          npm run build
+          test -f dist/main.js
+          rm -rf dist
+          npm run build
+          test -f dist/main.js
 
       - name: Verify compiled production API
         run: |
