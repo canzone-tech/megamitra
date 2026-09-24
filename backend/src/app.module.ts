@@ -11,6 +11,7 @@ import { envValidationSchema } from './config/env.validation';
 import { PrismaModule } from './database/prisma.module';
 import { GenealogyModule } from './genealogy/genealogy.module';
 import { HealthModule } from './health/health.module';
+import { KycModule } from './kyc/kyc.module';
 import { LedgerModule } from './ledger/ledger.module';
 import { LuckyDrawModule } from './lucky-draw/lucky-draw.module';
 import { OperationalReadModule } from './operations/operational-read.module';
@@ -37,6 +38,7 @@ import { UsersModule } from './users/users.module';
     AuthModule,
     RbacModule,
     UsersModule,
+    KycModule,
     PlatformConfigModule,
     GenealogyModule,
     BinaryPolicyModule,

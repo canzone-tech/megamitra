@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ApiClientError, apiJson } from '@/lib/client-api';
@@ -118,7 +119,7 @@ export function OperationsDashboard() {
     <div className="mm-admin-shell">
       <header className="mm-topbar">
         <div className="mm-brand"><span className="mm-brand-mark">M</span><div><div>Mega<span className="mm-brand-accent">Mitra</span></div><div className="mm-brand-subtitle">Admin operations</div></div></div>
-        <button className="mm-button secondary" type="button" onClick={() => void logout()}>Sign out</button>
+        <nav style={{ display: 'flex', gap: 8 }}><Link className="mm-button secondary" href="/kyc">KYC</Link><Link className="mm-button secondary" href="/security">Security</Link><button className="mm-button secondary" type="button" onClick={() => void logout()}>Sign out</button></nav>
       </header>
 
       <main className="mm-page">

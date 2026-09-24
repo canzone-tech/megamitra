@@ -12,6 +12,7 @@ export default function proxy(request: NextRequest) {
   );
   const isProtected =
     pathname.startsWith('/operations') ||
+    pathname.startsWith('/kyc') ||
     pathname.startsWith('/change-password') ||
     pathname.startsWith('/security');
 
@@ -25,5 +26,11 @@ export default function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/login', '/operations/:path*', '/change-password', '/security/:path*'],
+  matcher: [
+    '/login',
+    '/operations/:path*',
+    '/kyc/:path*',
+    '/change-password',
+    '/security/:path*',
+  ],
 };

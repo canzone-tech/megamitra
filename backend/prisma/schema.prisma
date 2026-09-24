@@ -58,6 +58,24 @@ enum PolicyLifecycle {
   RETIRED
 }
 
+enum KycProfileStatus {
+  NOT_STARTED
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  RESUBMISSION_REQUIRED
+}
+
+enum KycSubmissionStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  RESUBMISSION_REQUIRED
+  SUPERSEDED
+}
+
 enum BinaryPlacementSide {
   LEFT
   RIGHT
@@ -193,6 +211,9 @@ model User {
   binaryQualifyingUnits     BinaryUplineQualifyingUnit[] @relation("QualifyingUnitAncestor")
   binarySettlements         BinaryPairSettlement[]       @relation("SettlementMember")
   binaryPairMatches         BinaryPairMatch[]            @relation("PairMatchMember")
+  kycProfile                KycProfile?                  @relation("KycProfileUser")
+  kycSubmissions            KycSubmission[]              @relation("KycSubmissionUser")
+  kycReviews                KycSubmission[]              @relation("KycReviewer")
   ledgerAccounts            LedgerAccount[]              @relation("LedgerAccountOwner")
 
   @@index([email])
@@ -496,11 +517,11 @@ model ProgramVersion {
   createdByUserId             String?             @db.Char(36)
   publishedByUserId           String?             @db.Char(36)
   retiredByUserId             String?             @db.Char(36)
-  publishedAt                 DateTime?           @db.DateTime(3)
-  retiredAt                   DateTime?           @db.DateTime(3)
-  createdAt                   DateTime            @default(now()) @db.DateTime(3)
-  updatedAt                   DateTime            @updatedAt @db.DateTime(3)
-  program                     Program             @relation(fields: [programId], references: [id], onDelete: Restrict)
+  publishedAt                 DateTime?            @db.DateTime(3)
+  retiredAt                   DateTime?            @db.DateTime(3)
+  createdAt                   DateTime             @default(now()) @db.DateTime(3)
+  updatedAt                   DateTime             @updatedAt @db.DateTime(3)
+  program                     Program              @relation(fields: [programId], references: [id], onDelete: Restrict)
   enrollments                 ProgramEnrollment[]
 
   @@unique([programId, version], map: "program_versions_program_version_key")
@@ -510,32 +531,32 @@ model ProgramVersion {
 }
 
 model ProgramEnrollment {
-  id                       String                  @id @default(uuid()) @db.Char(36)
-  sourceKey                String                  @unique @db.VarChar(191)
-  requestFingerprint       String                  @db.Char(64)
-  userId                   String                  @db.Char(36)
-  programVersionId         String                  @db.Char(36)
-  enrolledAt               DateTime                @db.DateTime(3)
-  enrollmentDate           String                  @db.Char(10)
-  status                   ProgramEnrollmentStatus @default(ACTIVE)
-  eligibilitySnapshot      Json
-  currencyCode             String                  @db.VarChar(3)
-  registrationFeeSnapshot  Decimal                 @db.Decimal(18, 2)
-  installmentAmountSnapshot Decimal                @db.Decimal(18, 2)
-  installmentCountSnapshot Int
-  gracePeriodDaysSnapshot  Int
-  metadata                 Json?
-  createdByUserId          String?                 @db.Char(36)
-  createdAt                DateTime                @default(now()) @db.DateTime(3)
-  updatedAt                DateTime                @updatedAt @db.DateTime(3)
-  user                     User                    @relation("ProgramEnrollmentUser", fields: [userId], references: [id], onDelete: Restrict)
-  programVersion           ProgramVersion          @relation(fields: [programVersionId], references: [id], onDelete: Restrict)
-  installments             ProgramInstallment[]
-  paymentAttempts          ProgramPaymentAttempt[]
-  payments                 ProgramPaymentRecord[]
-  paymentAllocations       ProgramPaymentAllocation[]
-  refunds                  ProgramRefundRecord[]
-  businessEvents           ProgramBusinessEvent[]
+  id                        String                  @id @default(uuid()) @db.Char(36)
+  sourceKey                 String                  @unique @db.VarChar(191)
+  requestFingerprint        String                  @db.Char(64)
+  userId                    String                  @db.Char(36)
+  programVersionId          String                  @db.Char(36)
+  enrolledAt                DateTime                @db.DateTime(3)
+  enrollmentDate            String                  @db.Char(10)
+  status                    ProgramEnrollmentStatus @default(ACTIVE)
+  eligibilitySnapshot       Json
+  currencyCode              String                  @db.VarChar(3)
+  registrationFeeSnapshot   Decimal                 @db.Decimal(18, 2)
+  installmentAmountSnapshot Decimal                 @db.Decimal(18, 2)
+  installmentCountSnapshot  Int
+  gracePeriodDaysSnapshot   Int
+  metadata                  Json?
+  createdByUserId           String?                 @db.Char(36)
+  createdAt                 DateTime                @default(now()) @db.DateTime(3)
+  updatedAt                 DateTime                @updatedAt @db.DateTime(3)
+  user                      User                    @relation("ProgramEnrollmentUser", fields: [userId], references: [id], onDelete: Restrict)
+  programVersion            ProgramVersion          @relation(fields: [programVersionId], references: [id], onDelete: Restrict)
+  installments              ProgramInstallment[]
+  paymentAttempts           ProgramPaymentAttempt[]
+  payments                  ProgramPaymentRecord[]
+  paymentAllocations        ProgramPaymentAllocation[]
+  refunds                   ProgramRefundRecord[]
+  businessEvents            ProgramBusinessEvent[]
 
   @@index([userId, status, enrolledAt], map: "program_enrollments_user_status_idx")
   @@index([programVersionId, status, enrolledAt], map: "program_enrollments_version_status_idx")
@@ -934,6 +955,91 @@ model BinaryUnitDisposition {
 
   @@index([settlementId], map: "binary_unit_dispositions_settlementId_idx")
   @@map("binary_unit_dispositions")
+}
+
+model KycPolicy {
+  id              String             @id @default(uuid()) @db.Char(36)
+  code            String             @unique @db.VarChar(50)
+  name            String             @db.VarChar(120)
+  description     String?            @db.VarChar(500)
+  isDefault       Boolean            @default(false)
+  createdByUserId String?            @db.Char(36)
+  createdAt       DateTime           @default(now()) @db.DateTime(3)
+  updatedAt       DateTime           @updatedAt @db.DateTime(3)
+  versions        KycPolicyVersion[]
+
+  @@index([isDefault], map: "kyc_policies_isDefault_idx")
+  @@map("kyc_policies")
+}
+
+model KycPolicyVersion {
+  id                String            @id @default(uuid()) @db.Char(36)
+  policyId          String            @db.Char(36)
+  version           Int
+  lifecycle         PolicyLifecycle   @default(DRAFT)
+  effectiveFrom     DateTime          @db.DateTime(3)
+  effectiveTo       DateTime?         @db.DateTime(3)
+  requirements      Json
+  reviewRules       Json?
+  createdByUserId   String?           @db.Char(36)
+  publishedByUserId String?           @db.Char(36)
+  retiredByUserId   String?           @db.Char(36)
+  publishedAt       DateTime?         @db.DateTime(3)
+  retiredAt         DateTime?         @db.DateTime(3)
+  createdAt         DateTime          @default(now()) @db.DateTime(3)
+  updatedAt         DateTime          @updatedAt @db.DateTime(3)
+  policy            KycPolicy         @relation(fields: [policyId], references: [id], onDelete: Restrict)
+  submissions       KycSubmission[]
+
+  @@unique([policyId, version], map: "kyc_policy_versions_policy_version_key")
+  @@index([policyId, lifecycle], map: "kyc_policy_versions_policy_lifecycle_idx")
+  @@index([lifecycle, effectiveFrom, effectiveTo], map: "kyc_policy_versions_effective_idx")
+  @@map("kyc_policy_versions")
+}
+
+model KycProfile {
+  id              String           @id @default(uuid()) @db.Char(36)
+  userId          String           @unique @db.Char(36)
+  status          KycProfileStatus @default(NOT_STARTED)
+  approvedAt      DateTime?        @db.DateTime(3)
+  lastSubmittedAt DateTime?        @db.DateTime(3)
+  lastReviewedAt  DateTime?        @db.DateTime(3)
+  createdAt       DateTime         @default(now()) @db.DateTime(3)
+  updatedAt       DateTime         @updatedAt @db.DateTime(3)
+  user            User             @relation("KycProfileUser", fields: [userId], references: [id], onDelete: Restrict)
+  submissions     KycSubmission[]
+
+  @@index([status, updatedAt], map: "kyc_profiles_status_updatedAt_idx")
+  @@map("kyc_profiles")
+}
+
+model KycSubmission {
+  id                 String              @id @default(uuid()) @db.Char(36)
+  sourceKey          String              @unique @db.VarChar(191)
+  requestFingerprint String              @db.Char(64)
+  userId             String              @db.Char(36)
+  profileId          String              @db.Char(36)
+  policyVersionId    String              @db.Char(36)
+  status             KycSubmissionStatus @default(SUBMITTED)
+  data               Json
+  documents          Json
+  submittedAt        DateTime            @db.DateTime(3)
+  reviewedAt         DateTime?           @db.DateTime(3)
+  reviewedByUserId   String?             @db.Char(36)
+  reviewReason       String?             @db.VarChar(1000)
+  createdAt          DateTime            @default(now()) @db.DateTime(3)
+  updatedAt          DateTime            @updatedAt @db.DateTime(3)
+  user               User                @relation("KycSubmissionUser", fields: [userId], references: [id], onDelete: Restrict)
+  profile            KycProfile          @relation(fields: [profileId], references: [id], onDelete: Restrict)
+  policyVersion      KycPolicyVersion     @relation(fields: [policyVersionId], references: [id], onDelete: Restrict)
+  reviewer           User?               @relation("KycReviewer", fields: [reviewedByUserId], references: [id], onDelete: Restrict)
+
+  @@index([userId, status, submittedAt], map: "kyc_submissions_user_status_submitted_idx")
+  @@index([profileId, submittedAt], map: "kyc_submissions_profile_submitted_idx")
+  @@index([policyVersionId, submittedAt], map: "kyc_submissions_policy_submitted_idx")
+  @@index([status, submittedAt], map: "kyc_submissions_status_submitted_idx")
+  @@index([reviewedByUserId], map: "kyc_submissions_reviewer_idx")
+  @@map("kyc_submissions")
 }
 
 model LedgerAccount {
