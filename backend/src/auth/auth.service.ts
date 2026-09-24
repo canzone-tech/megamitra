@@ -26,6 +26,7 @@ import {
   RefreshDto,
   RegisterDto,
 } from './auth.dto';
+import { AuthRecoveryService } from './auth-recovery.service';
 import { PasswordService } from './password.service';
 
 @Injectable()
@@ -37,6 +38,7 @@ export class AuthService {
     private readonly config: ConfigService,
     private readonly captcha: CaptchaService,
     private readonly audit: AuditService,
+    private readonly recovery: AuthRecoveryService,
   ) {}
 
   async register(dto: RegisterDto) {
@@ -151,6 +153,7 @@ export class AuthService {
         entityId: user.id,
         description: 'Public registration created',
       });
+      await this.recovery.sendRegistrationVerification(user.id);
       return {
         user: {
           id: user.id,
@@ -158,6 +161,7 @@ export class AuthService {
           email: user.email,
           phone: user.phone,
           status: user.status,
+          emailVerifiedAt: user.emailVerifiedAt,
         },
         ...(generatedPassword ? { initialPassword: password } : {}),
       };
@@ -172,9 +176,10 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
-    const [authConfig, security] = await Promise.all([
+    const [authConfig, security, extension] = await Promise.all([
       this.prisma.systemAuthConfig.findUniqueOrThrow({ where: { id: 1 } }),
       this.prisma.systemSecurityConfig.findUniqueOrThrow({ where: { id: 1 } }),
+      this.recovery.getExtensionConfig(),
     ]);
     await this.requireCaptcha(
       authConfig.captchaOnLoginEnabled,
@@ -223,6 +228,9 @@ export class AuthService {
     if (user.status !== UserStatus.ACTIVE) {
       throw new ForbiddenException(`Account status is ${user.status}`);
     }
+    if (extension.emailVerificationRequiredForLogin && !user.emailVerifiedAt) {
+      throw new ForbiddenException('Email verification is required before login');
+    }
 
     await this.prisma.user.update({
       where: { id: user.id },
@@ -260,13 +268,14 @@ export class AuthService {
     }
     if (payload.typ !== 'refresh') throw new UnauthorizedException();
 
-    const [session, authConfig, security] = await Promise.all([
+    const [session, authConfig, security, extension] = await Promise.all([
       this.prisma.authSession.findUnique({
         where: { id: payload.sid },
         include: { user: true },
       }),
       this.prisma.systemAuthConfig.findUniqueOrThrow({ where: { id: 1 } }),
       this.prisma.systemSecurityConfig.findUniqueOrThrow({ where: { id: 1 } }),
+      this.recovery.getExtensionConfig(),
     ]);
 
     if (!session || session.userId !== payload.sub) {
@@ -285,14 +294,18 @@ export class AuthService {
       security.idleTimeoutMinutes,
       now,
     );
-    if (expiryReason || session.user.status !== UserStatus.ACTIVE) {
+    if (
+      expiryReason ||
+      session.user.status !== UserStatus.ACTIVE ||
+      (extension.emailVerificationRequiredForLogin && !session.user.emailVerifiedAt)
+    ) {
+      const revocationReason = expiryReason
+        ?? (session.user.status !== UserStatus.ACTIVE
+          ? `user_status_${session.user.status.toLowerCase()}`
+          : 'email_verification_required');
       await this.prisma.authSession.updateMany({
         where: { id: session.id, revokedAt: null },
-        data: {
-          revokedAt: now,
-          revocationReason:
-            expiryReason ?? `user_status_${session.user.status.toLowerCase()}`,
-        },
+        data: { revokedAt: now, revocationReason },
       });
       throw new UnauthorizedException('Session is not active');
     }
@@ -408,8 +421,9 @@ export class AuthService {
     }
 
     const passwordHash = await this.passwords.hash(dto.newPassword);
-    await this.prisma.$transaction([
-      this.prisma.user.update({
+    const now = new Date();
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({
         where: { id: user.id },
         data: {
           passwordHash,
@@ -417,19 +431,26 @@ export class AuthService {
           failedLoginAttempts: 0,
           lockedUntil: null,
         },
-      }),
-      this.prisma.authSession.updateMany({
+      });
+      await tx.authSession.updateMany({
         where: {
           userId: user.id,
           id: { not: user.sessionId },
           revokedAt: null,
         },
         data: {
-          revokedAt: new Date(),
+          revokedAt: now,
           revocationReason: 'password_changed',
         },
-      }),
-    ]);
+      });
+      await tx.$executeRawUnsafe(
+        `UPDATE auth_action_tokens
+         SET invalidatedAt = ?
+         WHERE userId = ? AND consumedAt IS NULL AND invalidatedAt IS NULL`,
+        now,
+        user.id,
+      );
+    });
 
     await this.audit.log({
       actorUserId: user.id,
