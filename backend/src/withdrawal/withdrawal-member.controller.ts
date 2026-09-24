@@ -6,11 +6,15 @@ import {
   CreateWithdrawalRequestDto,
   WithdrawalMemberQueryDto,
 } from './withdrawal.dto';
+import { WithdrawalEligibilityService } from './withdrawal-eligibility.service';
 import { WithdrawalService } from './withdrawal.service';
 
 @Controller('withdrawals')
 export class WithdrawalMemberController {
-  constructor(private readonly withdrawals: WithdrawalService) {}
+  constructor(
+    private readonly withdrawals: WithdrawalService,
+    private readonly eligibility: WithdrawalEligibilityService,
+  ) {}
 
   @Get('me')
   getMine(@CurrentUser() user: AuthUser, @Query() query: WithdrawalMemberQueryDto) {
@@ -31,10 +35,11 @@ export class WithdrawalMemberController {
   }
 
   @Post('me/requests')
-  createRequest(
+  async createRequest(
     @CurrentUser() user: AuthUser,
     @Body() dto: CreateWithdrawalRequestDto,
   ) {
+    await this.eligibility.assertMemberRequestEligible(user.id, dto.currencyCode);
     return this.withdrawals.createRequest(user.id, dto);
   }
 
