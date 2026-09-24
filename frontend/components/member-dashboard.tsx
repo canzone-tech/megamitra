@@ -108,7 +108,7 @@ export function MemberDashboard() {
     <div className="mm-member-shell">
       <header className="mm-site-header">
         <Link className="mm-brand" href="/member"><span className="mm-brand-mark">M</span><span>Mega<span className="mm-brand-accent">Mitra</span></span></Link>
-        <nav className="mm-nav"><Link className="mm-button light" href="/">Public site</Link><button className="mm-button" type="button" onClick={() => void logout()}>Sign out</button></nav>
+        <nav className="mm-nav"><Link className="mm-button light" href="/member/security">Security</Link><Link className="mm-button light" href="/">Public site</Link><button className="mm-button" type="button" onClick={() => void logout()}>Sign out</button></nav>
       </header>
 
       <main className="mm-member-main">
