@@ -85,19 +85,32 @@ export class PlatformConfigService {
       );
     }
 
-    const {
-      passwordResetEnabled: _passwordResetEnabled,
-      passwordResetTokenTtlMinutes: _passwordResetTokenTtlMinutes,
-      passwordResetRequestWindowMinutes: _passwordResetRequestWindowMinutes,
-      passwordResetMaxRequestsPerWindow: _passwordResetMaxRequestsPerWindow,
-      emailVerificationEnabled: _emailVerificationEnabled,
-      emailVerificationRequiredForLogin: _emailVerificationRequiredForLogin,
-      emailVerificationTokenTtlMinutes: _emailVerificationTokenTtlMinutes,
-      emailVerificationRequestWindowMinutes: _emailVerificationRequestWindowMinutes,
-      emailVerificationMaxRequestsPerWindow: _emailVerificationMaxRequestsPerWindow,
-      emailChangeEnabled: _emailChangeEnabled,
-      ...baseDto
-    } = dto;
+    const baseDto = {
+      ...(dto.loginWithUsername !== undefined
+        ? { loginWithUsername: dto.loginWithUsername }
+        : {}),
+      ...(dto.loginWithEmail !== undefined
+        ? { loginWithEmail: dto.loginWithEmail }
+        : {}),
+      ...(dto.loginWithMobile !== undefined
+        ? { loginWithMobile: dto.loginWithMobile }
+        : {}),
+      ...(dto.captchaOnLoginEnabled !== undefined
+        ? { captchaOnLoginEnabled: dto.captchaOnLoginEnabled }
+        : {}),
+      ...(dto.captchaOnRegistrationEnabled !== undefined
+        ? { captchaOnRegistrationEnabled: dto.captchaOnRegistrationEnabled }
+        : {}),
+      ...(dto.captchaTtlSeconds !== undefined
+        ? { captchaTtlSeconds: dto.captchaTtlSeconds }
+        : {}),
+      ...(dto.accessTokenTtlSeconds !== undefined
+        ? { accessTokenTtlSeconds: dto.accessTokenTtlSeconds }
+        : {}),
+      ...(dto.refreshTokenTtlSeconds !== undefined
+        ? { refreshTokenTtlSeconds: dto.refreshTokenTtlSeconds }
+        : {}),
+    };
 
     const result = await this.prisma.$transaction(async (tx) => {
       const base = await tx.systemAuthConfig.update({
