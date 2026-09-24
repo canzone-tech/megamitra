@@ -49,6 +49,11 @@ type EntitlementGenerationLinkRow = {
   createdAt: Date;
 };
 
+type PersistedGenerationRow = {
+  id: string;
+  status: 'GENERATED' | 'INELIGIBLE';
+};
+
 @Injectable()
 export class ProgramEntitlementOrchestrationService extends ProgramOrchestrationService {
   private readonly db: PrismaService;
@@ -211,16 +216,22 @@ export class ProgramEntitlementOrchestrationService extends ProgramOrchestration
 
     const sourceKey = `PROGRAM_EVENT:${businessEventId}:ENTITLEMENT`;
     try {
-      const generation = await this.entitlementGeneration.generate(actorUserId, {
+      await this.entitlementGeneration.generate(actorUserId, {
         sourceKey,
         enrollmentId: event.enrollmentId,
         policyVersionId: binding.entitlementPolicyVersionId,
       });
-      const generationRunId = String(generation.id);
-      const status = String(generation.status);
-      if (status !== 'GENERATED' && status !== 'INELIGIBLE') {
-        throw new ConflictException('Unexpected entitlement generation status');
+
+      const generationRows = await this.db.$queryRawUnsafe<PersistedGenerationRow[]>(
+        `SELECT id, status FROM entitlement_generation_runs WHERE sourceKey = ? LIMIT 1`,
+        sourceKey,
+      );
+      const generation = generationRows[0];
+      if (!generation) {
+        throw new ConflictException('Entitlement generation result was not persisted');
       }
+      const generationRunId = generation.id;
+      const status = generation.status;
 
       const candidateLinkId = randomUUID();
       await this.db.$executeRawUnsafe(
