@@ -23,6 +23,18 @@ export class UpdateAuthConfigDto {
   @IsOptional() @IsInt() @Min(30) captchaTtlSeconds?: number;
   @IsOptional() @IsInt() @Min(60) accessTokenTtlSeconds?: number;
   @IsOptional() @IsInt() @Min(300) refreshTokenTtlSeconds?: number;
+
+  @IsOptional() @IsBoolean() passwordResetEnabled?: boolean;
+  @IsOptional() @IsInt() @Min(5) @Max(1440) passwordResetTokenTtlMinutes?: number;
+  @IsOptional() @IsInt() @Min(1) @Max(1440) passwordResetRequestWindowMinutes?: number;
+  @IsOptional() @IsInt() @Min(1) @Max(100) passwordResetMaxRequestsPerWindow?: number;
+
+  @IsOptional() @IsBoolean() emailVerificationEnabled?: boolean;
+  @IsOptional() @IsBoolean() emailVerificationRequiredForLogin?: boolean;
+  @IsOptional() @IsInt() @Min(5) @Max(10080) emailVerificationTokenTtlMinutes?: number;
+  @IsOptional() @IsInt() @Min(1) @Max(1440) emailVerificationRequestWindowMinutes?: number;
+  @IsOptional() @IsInt() @Min(1) @Max(100) emailVerificationMaxRequestsPerWindow?: number;
+  @IsOptional() @IsBoolean() emailChangeEnabled?: boolean;
 }
 
 export class UpdateSecurityConfigDto {
