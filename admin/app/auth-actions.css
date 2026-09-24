@@ -1,0 +1,8 @@
+.mm-success {
+  margin: 12px 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  color: var(--mm-green-700);
+  background: var(--mm-green-100);
+  font-size: 13px;
+}
