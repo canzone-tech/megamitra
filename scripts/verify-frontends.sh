@@ -76,6 +76,24 @@ expect_status() {
   fi
 }
 
+expect_security_headers() {
+  local url="$1"
+  local headers
+  headers="$(curl -sS -D - -o /dev/null "${url}" | tr -d '\r')"
+  if ! grep -qi '^x-content-type-options: nosniff$' <<<"${headers}"; then
+    echo "ERROR: missing X-Content-Type-Options on ${url}"
+    exit 1
+  fi
+  if ! grep -qi '^x-frame-options: DENY$' <<<"${headers}"; then
+    echo "ERROR: missing X-Frame-Options on ${url}"
+    exit 1
+  fi
+  if grep -qi '^x-powered-by:' <<<"${headers}"; then
+    echo "ERROR: framework powered-by header leaked on ${url}"
+    exit 1
+  fi
+}
+
 smoke_frontends() {
   echo "==> Smoke-testing production Next.js routes"
   ADMIN_LOG="$(mktemp -t megamitra-admin.XXXXXX.log)"
@@ -89,6 +107,8 @@ smoke_frontends() {
 
   wait_for_url "http://127.0.0.1:3101/login" "${ADMIN_PID}" "${ADMIN_LOG}"
   wait_for_url "http://127.0.0.1:3102/" "${MEMBER_PID}" "${MEMBER_LOG}"
+  expect_security_headers "http://127.0.0.1:3101/login"
+  expect_security_headers "http://127.0.0.1:3102/"
 
   expect_status 307 "http://127.0.0.1:3101/operations"
   expect_status 307 "http://127.0.0.1:3101/business-plan"

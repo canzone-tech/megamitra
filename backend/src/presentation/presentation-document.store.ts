@@ -78,6 +78,16 @@ export class PresentationDocumentStore implements OnModuleInit, OnModuleDestroy 
     await this.getCollection().deleteOne({ versionId });
   }
 
+  async ping(): Promise<boolean> {
+    if (!this.client) return false;
+    try {
+      const result = await this.client.db().command({ ping: 1 });
+      return result.ok === 1;
+    } catch {
+      return false;
+    }
+  }
+
   private getCollection(): Collection<PresentationDocument> {
     if (!this.collection) throw new Error('Presentation MongoDB store is not initialized');
     return this.collection;

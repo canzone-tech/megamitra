@@ -91,6 +91,9 @@ jobs:
       - name: Verify dependency overrides
         run: npm ls deepmerge-ts mariadb mongodb mysql2
 
+      - name: Validate operational scripts
+        run: bash -n scripts/*.sh
+
       - name: Validate Prisma schema
         run: npm run prisma:validate
 

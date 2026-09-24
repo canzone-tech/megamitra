@@ -33,3 +33,4 @@ backend/src/generated/
 .data/
 tmp/
 .temp/
+backups/

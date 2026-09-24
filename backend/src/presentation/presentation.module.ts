@@ -6,6 +6,6 @@ import { PresentationService } from './presentation.service';
 @Module({
   controllers: [PresentationRuntimeController, PresentationAdminController],
   providers: [PresentationDocumentStore, PresentationService],
-  exports: [PresentationService],
+  exports: [PresentationDocumentStore, PresentationService],
 })
 export class PresentationModule {}

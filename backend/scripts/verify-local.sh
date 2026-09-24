@@ -14,6 +14,9 @@ if [[ ! -e .env ]]; then
   ln -s ../.env .env
 fi
 
+echo "==> Validating operational shell scripts"
+bash -n scripts/*.sh
+
 echo "==> Starting MegaMitra data services"
 docker compose --env-file "${ROOT_DIR}/.env" -f "${ROOT_DIR}/docker-compose.yml" up -d
 
@@ -95,18 +98,22 @@ for _ in $(seq 1 30); do
     cat "${LOG_FILE}"
     exit 1
   fi
-  HEALTH="$(curl -fsS "http://127.0.0.1:${PORT_VALUE}/health" 2>/dev/null || true)"
-  if [[ "${HEALTH}" == *'"service":"megamitra-api"'* ]] && [[ "${HEALTH}" == *'"mysql":"up"'* ]] && [[ "${HEALTH}" == *'"redis":"up"'* ]]; then
+  HEALTH="$(curl -fsS "http://127.0.0.1:${PORT_VALUE}/health/ready" 2>/dev/null || true)"
+  if [[ "${HEALTH}" == *'"service":"megamitra-api"'* ]] && \
+     [[ "${HEALTH}" == *'"mysql":"up"'* ]] && \
+     [[ "${HEALTH}" == *'"redis":"up"'* ]] && \
+     [[ "${HEALTH}" == *'"mongodb":"up"'* ]]; then
     break
   fi
   sleep 1
 done
 
 if [[ "${HEALTH}" != *'"service":"megamitra-api"'* ]]; then
-  echo "ERROR: MegaMitra health endpoint did not become ready"
+  echo "ERROR: MegaMitra readiness endpoint did not become ready"
   cat "${LOG_FILE}"
   exit 1
 fi
 
 printf '%s\n' "${HEALTH}"
+MEGAMITRA_UAT_BASE_URL="http://127.0.0.1:${PORT_VALUE}" ./scripts/uat-smoke.sh
 echo "MegaMitra local backend verification: PASS"

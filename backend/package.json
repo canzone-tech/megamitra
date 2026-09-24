@@ -18,6 +18,9 @@
     "test:watch": "jest --watch",
     "test:integration": "TZ=Asia/Kolkata NODE_OPTIONS=--experimental-vm-modules jest --config jest.integration.config.cjs --runInBand",
     "super-admin:bootstrap": "ts-node scripts/bootstrap-super-admin.ts",
+    "backup:data": "./scripts/backup-data.sh",
+    "restore:data": "./scripts/restore-data.sh",
+    "uat:smoke": "./scripts/uat-smoke.sh",
     "verify": "./scripts/verify-local.sh"
   },
   "dependencies": {

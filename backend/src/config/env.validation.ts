@@ -27,6 +27,17 @@ export const envValidationSchema = Joi.object({
   JWT_ACCESS_SECRET: Joi.string().min(32).required(),
   JWT_REFRESH_SECRET: Joi.string().min(32).required(),
 
+  TRUST_PROXY_HOPS: Joi.number().integer().min(0).max(10).default(0),
+  SECURITY_HSTS_ENABLED: Joi.boolean().default(false),
+  RATE_LIMIT_ENABLED: Joi.boolean().default(true),
+  RATE_LIMIT_TEST_ENABLED: Joi.boolean().default(false),
+  RATE_LIMIT_GLOBAL_MAX: Joi.number().integer().min(1).max(100000).default(600),
+  RATE_LIMIT_GLOBAL_WINDOW_MS: Joi.number().integer().min(1000).max(3600000).default(60000),
+  RATE_LIMIT_AUTH_MAX: Joi.number().integer().min(1).max(10000).default(30),
+  RATE_LIMIT_AUTH_WINDOW_MS: Joi.number().integer().min(1000).max(3600000).default(300000),
+  RATE_LIMIT_RECOVERY_MAX: Joi.number().integer().min(1).max(10000).default(10),
+  RATE_LIMIT_RECOVERY_WINDOW_MS: Joi.number().integer().min(1000).max(3600000).default(900000),
+
   MEGAMITRA_PUBLIC_URL: Joi.string().uri({ scheme: ['http', 'https'] }).default('http://127.0.0.1:3102'),
   SMTP_HOST: Joi.string().allow('').default(''),
   SMTP_PORT: Joi.number().port().default(587),

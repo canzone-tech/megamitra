@@ -22,6 +22,7 @@ import { ProgramModule } from './program/program.module';
 import { RbacModule } from './rbac/rbac.module';
 import { RedisModule } from './redis/redis.module';
 import { ReferralRewardModule } from './referral-reward/referral-reward.module';
+import { SecurityModule } from './security/security.module';
 import { UsersModule } from './users/users.module';
 import { WithdrawalModule } from './withdrawal/withdrawal.module';
 
@@ -36,6 +37,7 @@ import { WithdrawalModule } from './withdrawal/withdrawal.module';
     }),
     PrismaModule,
     RedisModule,
+    SecurityModule,
     AuditModule,
     CaptchaModule,
     AuthModule,

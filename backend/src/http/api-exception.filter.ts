@@ -16,7 +16,11 @@ export class ApiExceptionFilter implements ExceptionFilter {
 
   catch(exception: unknown, host: ArgumentsHost): void {
     const context = host.switchToHttp();
-    const request = context.getRequest<{ url?: string; method?: string }>();
+    const request = context.getRequest<{
+      url?: string;
+      method?: string;
+      headers?: Record<string, string | string[] | undefined>;
+    }>();
     const status =
       exception instanceof HttpException
         ? exception.getStatus()
@@ -36,9 +40,15 @@ export class ApiExceptionFilter implements ExceptionFilter {
         }
         if (typeof body.errorCode === 'string') code = body.errorCode;
       }
-    } else {
+    }
+
+    const path = (request.url ?? '').split('?')[0] ?? '';
+    const rawRequestId = request.headers?.['x-request-id'];
+    const requestId = Array.isArray(rawRequestId) ? rawRequestId[0] : rawRequestId;
+
+    if (!(exception instanceof HttpException)) {
       this.logger.error(
-        `${request.method ?? 'HTTP'} ${request.url ?? ''} failed`,
+        `${request.method ?? 'HTTP'} ${path} failed requestId=${requestId ?? 'unknown'}`,
         exception instanceof Error ? exception.stack : String(exception),
       );
     }
@@ -49,7 +59,8 @@ export class ApiExceptionFilter implements ExceptionFilter {
         statusCode: status,
         code,
         message,
-        path: request.url ?? '',
+        path,
+        requestId: requestId ?? null,
         timestamp: new Date().toISOString(),
       },
       status,
