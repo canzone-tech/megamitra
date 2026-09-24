@@ -40,13 +40,7 @@ export class WithdrawalMemberController {
     @Body() dto: CreateWithdrawalRequestDto,
   ) {
     await this.eligibility.assertMemberRequestEligible(user.id, dto.currencyCode);
-    try {
-      return await this.withdrawals.createRequest(user.id, dto);
-    } catch (error) {
-      const detail = error instanceof Error ? error.stack ?? error.message : String(error);
-      process.stderr.write(`[withdrawal-create-debug] ${detail}\n`);
-      throw error;
-    }
+    return this.withdrawals.createRequest(user.id, dto);
   }
 
   @Post('me/requests/:id/cancel')

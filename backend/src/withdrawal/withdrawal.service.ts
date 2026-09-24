@@ -939,7 +939,7 @@ export class WithdrawalService {
 
   private async findActivePolicy(currencyCode: string) {
     const rows = await this.prisma.$queryRawUnsafe<PolicyRow[]>(
-      `SELECT v.*, p.id AS policyId, p.code AS policyCode, p.name AS policyName, p.currencyCode
+      `SELECT v.*, p.code AS policyCode, p.name AS policyName, p.currencyCode
        FROM withdrawal_policy_versions v
        INNER JOIN withdrawal_policies p ON p.id = v.policyId
        WHERE p.currencyCode = ? AND p.isDefault = TRUE AND v.lifecycle = 'PUBLISHED'
@@ -954,7 +954,7 @@ export class WithdrawalService {
 
   private async findActivePolicyWithConnection(connection: PoolConnection, currencyCode: string) {
     const rows = (await connection.query(
-      `SELECT v.*, p.id AS policyId, p.code AS policyCode, p.name AS policyName, p.currencyCode
+      `SELECT v.*, p.code AS policyCode, p.name AS policyName, p.currencyCode
        FROM withdrawal_policy_versions v
        INNER JOIN withdrawal_policies p ON p.id = v.policyId
        WHERE p.currencyCode = ? AND p.isDefault = TRUE AND v.lifecycle = 'PUBLISHED'
