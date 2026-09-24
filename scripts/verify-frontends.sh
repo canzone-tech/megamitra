@@ -91,11 +91,13 @@ smoke_frontends() {
   wait_for_url "http://127.0.0.1:3102/" "${MEMBER_PID}" "${MEMBER_LOG}"
 
   expect_status 307 "http://127.0.0.1:3101/operations"
+  expect_status 307 "http://127.0.0.1:3101/kyc"
   expect_status 307 "http://127.0.0.1:3101/security"
   expect_status 200 "http://127.0.0.1:3101/forgot-password"
   expect_status 200 "http://127.0.0.1:3101/request-email-verification"
 
   expect_status 307 "http://127.0.0.1:3102/member"
+  expect_status 307 "http://127.0.0.1:3102/member/kyc"
   expect_status 307 "http://127.0.0.1:3102/member/security"
   expect_status 200 "http://127.0.0.1:3102/forgot-password"
   expect_status 200 "http://127.0.0.1:3102/request-email-verification"
