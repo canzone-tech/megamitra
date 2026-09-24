@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './tokens.css';
 import './globals.css';
+import './auth-actions.css';
 
 export const metadata: Metadata = {
   title: 'MegaMitra Admin',
