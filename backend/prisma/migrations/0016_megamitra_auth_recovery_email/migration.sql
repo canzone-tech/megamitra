@@ -31,7 +31,7 @@ CREATE TABLE `auth_action_tokens` (
   `userId` CHAR(36) NOT NULL,
   `purpose` ENUM('PASSWORD_RESET', 'EMAIL_VERIFICATION', 'EMAIL_CHANGE') NOT NULL,
   `tokenHash` CHAR(64) NOT NULL,
-  `pendingEmail` VARCHAR(191) NULL,
+  `targetEmail` VARCHAR(191) NULL,
   `expiresAt` DATETIME(3) NOT NULL,
   `consumedAt` DATETIME(3) NULL,
   `invalidatedAt` DATETIME(3) NULL,
@@ -41,16 +41,16 @@ CREATE TABLE `auth_action_tokens` (
   UNIQUE KEY `auth_action_tokens_tokenHash_key` (`tokenHash`),
   KEY `auth_action_tokens_user_purpose_created_idx` (`userId`, `purpose`, `createdAt`),
   KEY `auth_action_tokens_expiry_idx` (`expiresAt`),
-  KEY `auth_action_tokens_pending_email_idx` (`pendingEmail`),
+  KEY `auth_action_tokens_target_email_idx` (`targetEmail`),
 
   CONSTRAINT `auth_action_tokens_userId_fkey`
     FOREIGN KEY (`userId`) REFERENCES `users` (`id`)
     ON DELETE CASCADE ON UPDATE CASCADE,
 
-  CONSTRAINT `auth_action_tokens_pending_email_shape_check`
+  CONSTRAINT `auth_action_tokens_target_email_shape_check`
     CHECK (
-      (`purpose` = 'EMAIL_CHANGE' AND `pendingEmail` IS NOT NULL)
-      OR (`purpose` <> 'EMAIL_CHANGE' AND `pendingEmail` IS NULL)
+      (`purpose` = 'PASSWORD_RESET' AND `targetEmail` IS NULL)
+      OR (`purpose` IN ('EMAIL_VERIFICATION', 'EMAIL_CHANGE') AND `targetEmail` IS NOT NULL)
     )
 )
 DEFAULT CHARACTER SET utf8mb4
