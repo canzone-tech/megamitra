@@ -9,6 +9,7 @@ import { BinaryVolumeModule } from './binary-volume/binary-volume.module';
 import { CaptchaModule } from './captcha/captcha.module';
 import { envValidationSchema } from './config/env.validation';
 import { PrismaModule } from './database/prisma.module';
+import { EntitlementModule } from './entitlement/entitlement.module';
 import { GenealogyModule } from './genealogy/genealogy.module';
 import { HealthModule } from './health/health.module';
 import { KycModule } from './kyc/kyc.module';
@@ -41,6 +42,7 @@ import { WithdrawalModule } from './withdrawal/withdrawal.module';
     UsersModule,
     KycModule,
     WithdrawalModule,
+    EntitlementModule,
     PlatformConfigModule,
     GenealogyModule,
     BinaryPolicyModule,

@@ -14,6 +14,7 @@ export default function proxy(request: NextRequest) {
     pathname.startsWith('/operations') ||
     pathname.startsWith('/kyc') ||
     pathname.startsWith('/withdrawals') ||
+    pathname.startsWith('/entitlements') ||
     pathname.startsWith('/change-password') ||
     pathname.startsWith('/security');
 
@@ -32,6 +33,7 @@ export const config = {
     '/operations/:path*',
     '/kyc/:path*',
     '/withdrawals/:path*',
+    '/entitlements/:path*',
     '/change-password',
     '/security/:path*',
   ],
