@@ -14,6 +14,7 @@ export class FinancialDbService implements OnModuleDestroy {
       user: process.env.MYSQL_USER,
       password: process.env.MYSQL_PASSWORD,
       database: process.env.MYSQL_DATABASE,
+      timezone: 'Z',
       connectionLimit: 5,
       connectTimeout: 5000,
       acquireTimeout: 10000,
