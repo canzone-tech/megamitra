@@ -34,6 +34,7 @@
     "class-validator": "^0.15.1",
     "ioredis": "^5.11.1",
     "joi": "^18.2.3",
+    "mongodb": "7.6.0",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "reflect-metadata": "^0.2.2",
@@ -60,14 +61,6 @@
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.7.3",
     "typescript-eslint": "^8.20.0"
-  },
-  "jest": {
-    "moduleFileExtensions": ["js", "json", "ts"],
-    "rootDir": "src",
-    "testRegex": ".*\\.spec\\.ts$",
-    "transform": {"^.+\\.(t|j)s$": "ts-jest"},
-    "testEnvironment": "node",
-    "moduleNameMapper": {"^(\\.{1,2}/.*)\\.js$": "$1"}
   },
   "overrides": {
     "deepmerge-ts": "8.0.0",
