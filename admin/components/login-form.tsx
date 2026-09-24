@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ApiClientError, apiJson } from '@/lib/client-api';
@@ -69,6 +70,10 @@ export function LoginForm() {
       <div className="mm-field">
         <label htmlFor="password">Password</label>
         <input className="mm-input" id="password" name="password" type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required />
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap', marginTop: -8, marginBottom: 18, fontSize: 13 }}>
+        <Link href="/forgot-password">Forgot password?</Link>
+        <Link href="/request-email-verification">Resend verification email</Link>
       </div>
       {captcha ? (
         <div className="mm-field">
