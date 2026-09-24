@@ -1,4 +1,5 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../database/prisma.service';
 import { AuditAction, RoleStatus } from '../generated/prisma/enums';
@@ -8,27 +9,44 @@ import {
   UpdateSecurityConfigDto,
 } from './platform-config.dto';
 
+type AuthExtensionRow = {
+  passwordResetEnabled: boolean | number;
+  passwordResetTokenTtlMinutes: number;
+  passwordResetRequestWindowMinutes: number;
+  passwordResetMaxRequestsPerWindow: number;
+  emailVerificationEnabled: boolean | number;
+  emailVerificationRequiredForLogin: boolean | number;
+  emailVerificationTokenTtlMinutes: number;
+  emailVerificationRequestWindowMinutes: number;
+  emailVerificationMaxRequestsPerWindow: number;
+  emailChangeEnabled: boolean | number;
+};
+
 @Injectable()
 export class PlatformConfigService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
+    private readonly env: ConfigService,
   ) {}
 
   async getAll() {
-    const [auth, security, registration] = await Promise.all([
+    const [auth, authExtension, security, registration] = await Promise.all([
       this.prisma.systemAuthConfig.findUniqueOrThrow({ where: { id: 1 } }),
+      this.getAuthExtension(),
       this.prisma.systemSecurityConfig.findUniqueOrThrow({ where: { id: 1 } }),
       this.prisma.systemRegistrationConfig.findUniqueOrThrow({ where: { id: 1 } }),
     ]);
-    return { auth, security, registration };
+    return { auth: { ...auth, ...authExtension }, security, registration };
   }
 
   async updateAuth(dto: UpdateAuthConfigDto, actorUserId: string) {
-    const current = await this.prisma.systemAuthConfig.findUniqueOrThrow({
-      where: { id: 1 },
-    });
-    const merged = { ...current, ...dto };
+    const [current, extension, registration] = await Promise.all([
+      this.prisma.systemAuthConfig.findUniqueOrThrow({ where: { id: 1 } }),
+      this.getAuthExtension(),
+      this.prisma.systemRegistrationConfig.findUniqueOrThrow({ where: { id: 1 } }),
+    ]);
+    const merged = { ...current, ...extension, ...dto };
     if (
       !merged.loginWithUsername &&
       !merged.loginWithEmail &&
@@ -43,10 +61,71 @@ export class PlatformConfigService {
         'Refresh token TTL must exceed access token TTL',
       );
     }
-    const result = await this.prisma.systemAuthConfig.update({
-      where: { id: 1 },
-      data: { ...dto, updatedByUserId: actorUserId },
+    if (
+      merged.emailVerificationRequiredForLogin &&
+      !merged.emailVerificationEnabled
+    ) {
+      throw new BadRequestException(
+        'Email verification must be enabled before it can be required for login',
+      );
+    }
+    if (merged.emailVerificationRequiredForLogin && !registration.emailRequired) {
+      throw new BadRequestException(
+        'Registration email must be required before email verification can be required for login',
+      );
+    }
+    if (
+      (merged.passwordResetEnabled ||
+        merged.emailVerificationEnabled ||
+        merged.emailChangeEnabled) &&
+      !this.smtpConfigured()
+    ) {
+      throw new BadRequestException(
+        'SMTP_HOST and SMTP_FROM_EMAIL must be configured before enabling email-based authentication features',
+      );
+    }
+
+    const {
+      passwordResetEnabled: _passwordResetEnabled,
+      passwordResetTokenTtlMinutes: _passwordResetTokenTtlMinutes,
+      passwordResetRequestWindowMinutes: _passwordResetRequestWindowMinutes,
+      passwordResetMaxRequestsPerWindow: _passwordResetMaxRequestsPerWindow,
+      emailVerificationEnabled: _emailVerificationEnabled,
+      emailVerificationRequiredForLogin: _emailVerificationRequiredForLogin,
+      emailVerificationTokenTtlMinutes: _emailVerificationTokenTtlMinutes,
+      emailVerificationRequestWindowMinutes: _emailVerificationRequestWindowMinutes,
+      emailVerificationMaxRequestsPerWindow: _emailVerificationMaxRequestsPerWindow,
+      emailChangeEnabled: _emailChangeEnabled,
+      ...baseDto
+    } = dto;
+
+    const result = await this.prisma.$transaction(async (tx) => {
+      const base = await tx.systemAuthConfig.update({
+        where: { id: 1 },
+        data: { ...baseDto, updatedByUserId: actorUserId },
+      });
+      await tx.$executeRawUnsafe(
+        `UPDATE system_auth_config
+         SET passwordResetEnabled = ?, passwordResetTokenTtlMinutes = ?,
+             passwordResetRequestWindowMinutes = ?, passwordResetMaxRequestsPerWindow = ?,
+             emailVerificationEnabled = ?, emailVerificationRequiredForLogin = ?,
+             emailVerificationTokenTtlMinutes = ?, emailVerificationRequestWindowMinutes = ?,
+             emailVerificationMaxRequestsPerWindow = ?, emailChangeEnabled = ?
+         WHERE id = 1`,
+        merged.passwordResetEnabled,
+        merged.passwordResetTokenTtlMinutes,
+        merged.passwordResetRequestWindowMinutes,
+        merged.passwordResetMaxRequestsPerWindow,
+        merged.emailVerificationEnabled,
+        merged.emailVerificationRequiredForLogin,
+        merged.emailVerificationTokenTtlMinutes,
+        merged.emailVerificationRequestWindowMinutes,
+        merged.emailVerificationMaxRequestsPerWindow,
+        merged.emailChangeEnabled,
+      );
+      return base;
     });
+
     await this.audit.log({
       actorUserId,
       action: AuditAction.UPDATE,
@@ -54,7 +133,7 @@ export class PlatformConfigService {
       entityId: '1',
       description: 'Authentication configuration updated',
     });
-    return result;
+    return { ...result, ...(await this.getAuthExtension()) };
   }
 
   async updateSecurity(dto: UpdateSecurityConfigDto, actorUserId: string) {
@@ -90,9 +169,12 @@ export class PlatformConfigService {
     dto: UpdateRegistrationConfigDto,
     actorUserId: string,
   ) {
-    const current = await this.prisma.systemRegistrationConfig.findUniqueOrThrow({
-      where: { id: 1 },
-    });
+    const [current, authExtension] = await Promise.all([
+      this.prisma.systemRegistrationConfig.findUniqueOrThrow({
+        where: { id: 1 },
+      }),
+      this.getAuthExtension(),
+    ]);
     const merged = {
       ...current,
       ...dto,
@@ -106,6 +188,11 @@ export class PlatformConfigService {
     ) {
       throw new BadRequestException(
         'A 1-20 character username prefix is required when prefixing is enabled',
+      );
+    }
+    if (authExtension.emailVerificationRequiredForLogin && !merged.emailRequired) {
+      throw new BadRequestException(
+        'Email cannot be optional while email verification is required for login',
       );
     }
 
@@ -136,5 +223,39 @@ export class PlatformConfigService {
       description: 'Registration configuration updated',
     });
     return result;
+  }
+
+  private async getAuthExtension() {
+    const rows = await this.prisma.$queryRawUnsafe<AuthExtensionRow[]>(
+      `SELECT passwordResetEnabled, passwordResetTokenTtlMinutes,
+              passwordResetRequestWindowMinutes, passwordResetMaxRequestsPerWindow,
+              emailVerificationEnabled, emailVerificationRequiredForLogin,
+              emailVerificationTokenTtlMinutes, emailVerificationRequestWindowMinutes,
+              emailVerificationMaxRequestsPerWindow, emailChangeEnabled
+       FROM system_auth_config
+       WHERE id = 1
+       LIMIT 1`,
+    );
+    const row = rows[0];
+    if (!row) throw new Error('System authentication configuration is missing');
+    return {
+      passwordResetEnabled: Boolean(row.passwordResetEnabled),
+      passwordResetTokenTtlMinutes: Number(row.passwordResetTokenTtlMinutes),
+      passwordResetRequestWindowMinutes: Number(row.passwordResetRequestWindowMinutes),
+      passwordResetMaxRequestsPerWindow: Number(row.passwordResetMaxRequestsPerWindow),
+      emailVerificationEnabled: Boolean(row.emailVerificationEnabled),
+      emailVerificationRequiredForLogin: Boolean(row.emailVerificationRequiredForLogin),
+      emailVerificationTokenTtlMinutes: Number(row.emailVerificationTokenTtlMinutes),
+      emailVerificationRequestWindowMinutes: Number(row.emailVerificationRequestWindowMinutes),
+      emailVerificationMaxRequestsPerWindow: Number(row.emailVerificationMaxRequestsPerWindow),
+      emailChangeEnabled: Boolean(row.emailChangeEnabled),
+    };
+  }
+
+  private smtpConfigured(): boolean {
+    return Boolean(
+      this.env.get<string>('SMTP_HOST')?.trim() &&
+      this.env.get<string>('SMTP_FROM_EMAIL')?.trim(),
+    );
   }
 }
