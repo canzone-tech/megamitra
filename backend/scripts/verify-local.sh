@@ -70,6 +70,13 @@ npm run test:integration
 echo "==> Build backend"
 npm run build
 
+echo "==> Verifying compiled production entrypoint"
+if [[ ! -f dist/main.js ]]; then
+  echo "ERROR: expected compiled API entrypoint backend/dist/main.js was not produced"
+  find dist -maxdepth 3 -type f -name 'main.js' -print 2>/dev/null || true
+  exit 1
+fi
+
 echo "==> Verify Next.js admin and public/member apps"
 bash "${ROOT_DIR}/scripts/verify-frontends.sh"
 
