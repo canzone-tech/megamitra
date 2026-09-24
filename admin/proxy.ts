@@ -10,7 +10,10 @@ export default function proxy(request: NextRequest) {
     request.cookies.get(ADMIN_ACCESS_COOKIE)?.value ||
       request.cookies.get(ADMIN_REFRESH_COOKIE)?.value,
   );
-  const isProtected = pathname.startsWith('/operations') || pathname.startsWith('/change-password');
+  const isProtected =
+    pathname.startsWith('/operations') ||
+    pathname.startsWith('/change-password') ||
+    pathname.startsWith('/security');
 
   if (isProtected && !hasSession) {
     return NextResponse.redirect(new URL('/login', request.url));
@@ -22,5 +25,5 @@ export default function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/login', '/operations/:path*', '/change-password'],
+  matcher: ['/login', '/operations/:path*', '/change-password', '/security/:path*'],
 };
