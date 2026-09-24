@@ -119,7 +119,7 @@ export function OperationsDashboard() {
     <div className="mm-admin-shell">
       <header className="mm-topbar">
         <div className="mm-brand"><span className="mm-brand-mark">M</span><div><div>Mega<span className="mm-brand-accent">Mitra</span></div><div className="mm-brand-subtitle">Admin operations</div></div></div>
-        <nav style={{ display: 'flex', gap: 8 }}><Link className="mm-button secondary" href="/kyc">KYC</Link><Link className="mm-button secondary" href="/security">Security</Link><button className="mm-button secondary" type="button" onClick={() => void logout()}>Sign out</button></nav>
+        <nav style={{ display: 'flex', gap: 8 }}><Link className="mm-button secondary" href="/withdrawals">Withdrawals</Link><Link className="mm-button secondary" href="/kyc">KYC</Link><Link className="mm-button secondary" href="/security">Security</Link><button className="mm-button secondary" type="button" onClick={() => void logout()}>Sign out</button></nav>
       </header>
 
       <main className="mm-page">

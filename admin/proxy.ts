@@ -13,6 +13,7 @@ export default function proxy(request: NextRequest) {
   const isProtected =
     pathname.startsWith('/operations') ||
     pathname.startsWith('/kyc') ||
+    pathname.startsWith('/withdrawals') ||
     pathname.startsWith('/change-password') ||
     pathname.startsWith('/security');
 
@@ -30,6 +31,7 @@ export const config = {
     '/login',
     '/operations/:path*',
     '/kyc/:path*',
+    '/withdrawals/:path*',
     '/change-password',
     '/security/:path*',
   ],
