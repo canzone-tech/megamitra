@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { MemberPortalReadController } from './member-portal-read.controller';
 import { MemberPortalReadService } from './member-portal-read.service';
+import { OperationalCompletionController } from './operational-completion.controller';
+import { OperationalCompletionService } from './operational-completion.service';
 import {
   AdminOperationalReadController,
   MemberOperationalReadController,
@@ -13,12 +15,14 @@ import { OperationalReadService } from './operational-read.service';
     MemberPortalReadController,
     MemberOperationalReadController,
     AdminOperationalReadController,
+    OperationalCompletionController,
   ],
   providers: [
     MemberPortalReadService,
     OperationalReadService,
+    OperationalCompletionService,
     OperationalJsonSafeInterceptor,
   ],
-  exports: [OperationalReadService, MemberPortalReadService],
+  exports: [OperationalReadService, MemberPortalReadService, OperationalCompletionService],
 })
 export class OperationalReadModule {}
