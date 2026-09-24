@@ -277,11 +277,7 @@ export function BusinessPlanConfig() {
   const versions = domain === 'orchestration' ? data?.orchestration ?? [] : selectedParent?.versions ?? [];
 
   const refreshHook = useCallback(async (policyId: string) => {
-    if (!policyId) {
-      setHook(null);
-      setHookPolicyVersionId('');
-      return;
-    }
+    if (!policyId) return;
     try {
       const next = await apiJson<HookResponse>(`/api/backend/admin/program-orchestration/policies/${policyId}/entitlement-hook`);
       setHook(next);
@@ -296,11 +292,7 @@ export function BusinessPlanConfig() {
   }, []);
 
   useEffect(() => {
-    if (domain !== 'orchestration' || !selectedOrchestrationId) {
-      setHook(null);
-      setHookPolicyVersionId('');
-      return;
-    }
+    if (domain !== 'orchestration' || !selectedOrchestrationId) return;
     const timer = window.setTimeout(() => void refreshHook(selectedOrchestrationId), 0);
     return () => window.clearTimeout(timer);
   }, [domain, refreshHook, selectedOrchestrationId]);
@@ -310,6 +302,8 @@ export function BusinessPlanConfig() {
     setEditorText('');
     setError('');
     setMessage('');
+    setHook(null);
+    setHookPolicyVersionId('');
     if (!data) return;
     if (next === 'program') setSelectedParentId(String(data.programs[0]?.id ?? ''));
     if (next === 'binary') setSelectedParentId(String(data.binaryPlans[0]?.id ?? ''));
@@ -394,8 +388,8 @@ export function BusinessPlanConfig() {
   }
 
   async function changeLifecycle(version: Row, action: 'publish' | 'retire') {
-    const verb = action === 'publish' ? 'publish' : 'retire';
-    if (!window.confirm(`${verb[0].toUpperCase()}${verb.slice(1)} ${DOMAIN_LABELS[domain]} version ${text(version.version)}? Published history is immutable.`)) return;
+    const label = action === 'publish' ? 'Publish' : 'Retire';
+    if (!window.confirm(`${label} ${DOMAIN_LABELS[domain]} version ${text(version.version)}? Published history is immutable.`)) return;
     await runAction(async () => {
       await apiJson(lifecyclePath(String(version.id), action), { method: 'POST' });
     }, `${DOMAIN_LABELS[domain]} version ${action === 'publish' ? 'published' : 'retired'}.`);
@@ -471,7 +465,7 @@ export function BusinessPlanConfig() {
                 {domain !== 'orchestration' ? (
                   <label className="mm-field">Policy / plan<select className="mm-input" value={selectedParentId} onChange={(event) => { setSelectedParentId(event.target.value); setEditorText(''); }}><option value="">Choose configuration</option>{namedItems.map((item) => <option value={String(item.id)} key={String(item.id)}>{text(item.code)} · {text(item.name)}</option>)}</select></label>
                 ) : (
-                  <label className="mm-field">Event policy<select className="mm-input" value={selectedOrchestrationId} onChange={(event) => { setSelectedOrchestrationId(event.target.value); setEditorText(''); }}><option value="">Choose event policy</option>{data.orchestration.map((item) => <option value={String(item.id)} key={String(item.id)}>{text(item.triggerType)} · v{text(item.version)} · {text(item.lifecycle)}</option>)}</select></label>
+                  <label className="mm-field">Event policy<select className="mm-input" value={selectedOrchestrationId} onChange={(event) => { setSelectedOrchestrationId(event.target.value); setEditorText(''); setHook(null); setHookPolicyVersionId(''); }}><option value="">Choose event policy</option>{data.orchestration.map((item) => <option value={String(item.id)} key={String(item.id)}>{text(item.triggerType)} · v{text(item.version)} · {text(item.lifecycle)}</option>)}</select></label>
                 )}
 
                 <div className="mm-list">
