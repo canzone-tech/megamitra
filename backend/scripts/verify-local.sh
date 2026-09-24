@@ -21,7 +21,7 @@ echo "==> Installing exact backend dependencies"
 npm ci
 
 echo "==> Checking patched transitive dependency versions"
-npm ls deepmerge-ts mariadb mysql2
+npm ls deepmerge-ts mariadb mongodb mysql2
 
 echo "==> Validating and generating Prisma client"
 npm run prisma:validate

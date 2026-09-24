@@ -17,6 +17,7 @@ import { LedgerModule } from './ledger/ledger.module';
 import { LuckyDrawModule } from './lucky-draw/lucky-draw.module';
 import { OperationalReadModule } from './operations/operational-read.module';
 import { PlatformConfigModule } from './platform-config/platform-config.module';
+import { PresentationModule } from './presentation/presentation.module';
 import { ProgramModule } from './program/program.module';
 import { RbacModule } from './rbac/rbac.module';
 import { RedisModule } from './redis/redis.module';
@@ -44,6 +45,7 @@ import { WithdrawalModule } from './withdrawal/withdrawal.module';
     WithdrawalModule,
     EntitlementModule,
     PlatformConfigModule,
+    PresentationModule,
     GenealogyModule,
     BinaryPolicyModule,
     BinaryVolumeModule,

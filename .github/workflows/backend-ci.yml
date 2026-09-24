@@ -34,6 +34,15 @@ jobs:
           --health-interval=10s
           --health-timeout=5s
           --health-retries=10
+      mongodb:
+        image: mongo:8
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd="mongosh --quiet --eval 'db.runCommand({ ping: 1 }).ok'"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
       redis:
         image: redis:7-alpine
         ports:
@@ -80,7 +89,7 @@ jobs:
         run: npm ci
 
       - name: Verify dependency overrides
-        run: npm ls deepmerge-ts mariadb mysql2
+        run: npm ls deepmerge-ts mariadb mongodb mysql2
 
       - name: Validate Prisma schema
         run: npm run prisma:validate

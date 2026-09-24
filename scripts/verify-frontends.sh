@@ -92,6 +92,7 @@ smoke_frontends() {
 
   expect_status 307 "http://127.0.0.1:3101/operations"
   expect_status 307 "http://127.0.0.1:3101/business-plan"
+  expect_status 307 "http://127.0.0.1:3101/presentation"
   expect_status 307 "http://127.0.0.1:3101/kyc"
   expect_status 307 "http://127.0.0.1:3101/withdrawals"
   expect_status 307 "http://127.0.0.1:3101/entitlements"

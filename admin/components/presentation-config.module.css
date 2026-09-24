@@ -1,0 +1,54 @@
+.topActions { display: flex; gap: 8px; flex-wrap: wrap; }
+.layout { display: grid; grid-template-columns: minmax(0, 1.08fr) minmax(390px, .92fr); gap: 18px; align-items: start; }
+.versionRow { display: grid; grid-template-columns: minmax(220px, 1fr) auto; gap: 14px; align-items: end; margin-bottom: 20px; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; padding-bottom: 16px; }
+.fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.colorField { display: grid; gap: 7px; color: var(--mm-ink-700); font-size: 12px; font-weight: 900; }
+.colorField > div { display: grid; grid-template-columns: 48px 1fr; gap: 8px; }
+.colorField input[type='color'] { width: 48px; height: 43px; padding: 3px; border: 1px solid var(--mm-line); border-radius: 10px; background: white; cursor: pointer; }
+.toggle { min-height: 68px; display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid var(--mm-line); border-radius: 12px; color: var(--mm-ink-700); font-size: 12px; font-weight: 900; background: #fff; }
+.toggle input { width: 18px; height: 18px; accent-color: var(--mm-blue-700); }
+
+.preview { --side-width: 118px; overflow: hidden; display: flex; min-height: 510px; border: 1px solid var(--preview-border); border-radius: 18px; color: var(--preview-text); background: var(--preview-page); box-shadow: 0 16px 44px rgba(22, 29, 52, .12); }
+.preview[data-sidebar-width='COMPACT'] { --side-width: 90px; }
+.preview[data-sidebar-width='WIDE'] { --side-width: 146px; }
+.preview[data-sidebar-position='RIGHT'] { flex-direction: row-reverse; }
+.preview[data-radius='SMALL'] { border-radius: 9px; }
+.preview[data-radius='LARGE'] { border-radius: 28px; }
+.previewSidebar { width: var(--side-width); flex: 0 0 var(--side-width); display: flex; flex-direction: column; gap: 5px; padding: 15px 10px; border-right: 1px solid var(--preview-border); background: var(--preview-card); }
+.preview[data-sidebar-position='RIGHT'] .previewSidebar { border-right: 0; border-left: 1px solid var(--preview-border); }
+.previewSidebar strong { margin-bottom: 16px; color: var(--preview-primary); font-size: 13px; }
+.previewSidebar span { padding: 8px; border-radius: 8px; color: var(--preview-muted); font-size: 9px; font-weight: 800; }
+.preview[data-nav-style='PILL'] .previewSidebar span:first-of-type { color: var(--preview-primary); background: color-mix(in srgb, var(--preview-primary) 10%, white); }
+.preview[data-sidebar-style='DARK'] .previewSidebar { color: white; background: #17152f; border-color: #292744; }
+.preview[data-sidebar-style='DARK'] .previewSidebar strong, .preview[data-sidebar-style='DARK'] .previewSidebar span { color: white; }
+.preview[data-sidebar-style='BRAND'] .previewSidebar { color: white; background: linear-gradient(180deg, var(--preview-primary), var(--preview-secondary)); border-color: transparent; }
+.preview[data-sidebar-style='BRAND'] .previewSidebar strong, .preview[data-sidebar-style='BRAND'] .previewSidebar span { color: white; }
+.previewMain { min-width: 0; flex: 1; }
+.previewTopbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 52px; padding: 10px 14px; border-bottom: 1px solid var(--preview-border); color: var(--preview-text); background: var(--preview-card); font-size: 9px; }
+.preview[data-topbar-density='COMPACT'] .previewTopbar { min-height: 42px; padding-block: 6px; }
+.preview[data-topbar-style='DARK'] .previewTopbar { color: white; background: #17152f; border-color: #292744; }
+.preview[data-topbar-style='BRAND'] .previewTopbar { color: white; background: var(--preview-primary); border-color: transparent; }
+.preview[data-topbar-style='GLASS'] .previewTopbar { background: color-mix(in srgb, var(--preview-card) 88%, transparent); backdrop-filter: blur(10px); }
+.previewBody { padding: 14px; }
+.preview[data-density='COMPACT'] .previewBody { padding: 10px; }
+.preview[data-density='SPACIOUS'] .previewBody { padding: 20px; }
+.previewHero { display: grid; gap: 5px; padding: 17px; border-radius: 14px; color: white; background: linear-gradient(135deg, var(--preview-gradient-from), var(--preview-gradient-via) 58%, var(--preview-gradient-to)); }
+.preview[data-radius='SMALL'] .previewHero, .preview[data-radius='SMALL'] .previewStats > div, .preview[data-radius='SMALL'] .previewCards > div { border-radius: 7px; }
+.preview[data-radius='LARGE'] .previewHero, .preview[data-radius='LARGE'] .previewStats > div, .preview[data-radius='LARGE'] .previewCards > div { border-radius: 20px; }
+.previewHero small { font-size: 8px; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+.previewHero strong { font-size: 19px; }
+.previewHero span { max-width: 360px; font-size: 9px; line-height: 1.5; opacity: .9; }
+.previewStats { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; margin-top: 10px; }
+.previewStats > div, .previewCards > div { padding: 10px; border: 1px solid var(--preview-border); border-radius: 11px; background: var(--preview-card); }
+.previewStats small { display: block; color: var(--preview-muted); font-size: 7px; text-transform: uppercase; }
+.previewStats strong { display: block; margin-top: 5px; color: var(--preview-primary); font-size: 13px; }
+.previewCards { display: grid; grid-template-columns: 1.1fr .9fr; gap: 8px; margin-top: 10px; }
+.previewCards strong { display: block; font-size: 10px; }
+.previewCards span { display: block; margin-top: 5px; color: var(--preview-muted); font-size: 8px; }
+.preview[data-shadow='SUBTLE'] .previewStats > div, .preview[data-shadow='SUBTLE'] .previewCards > div { box-shadow: 0 7px 18px rgba(22,29,52,.04); }
+.preview[data-shadow='MEDIUM'] .previewStats > div, .preview[data-shadow='MEDIUM'] .previewCards > div { box-shadow: 0 10px 24px rgba(22,29,52,.09); }
+.preview[data-shadow='STRONG'] .previewStats > div, .preview[data-shadow='STRONG'] .previewCards > div { box-shadow: 0 14px 30px rgba(22,29,52,.14); }
+
+@media (max-width: 1050px) { .layout { grid-template-columns: 1fr; } }
+@media (max-width: 720px) { .versionRow, .fields { grid-template-columns: 1fr; } .actions { padding-bottom: 0; } .preview { min-height: 440px; } .previewSidebar { display: none; } }
