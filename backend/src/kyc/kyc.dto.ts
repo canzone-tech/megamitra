@@ -13,6 +13,12 @@ import {
 } from 'class-validator';
 import { KycSubmissionStatus } from '../generated/prisma/enums';
 
+export enum KycReviewDecision {
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED',
+  RESUBMISSION_REQUIRED = 'RESUBMISSION_REQUIRED',
+}
+
 export class CreateKycPolicyDto {
   @IsString()
   @Length(2, 50)
@@ -107,10 +113,4 @@ export class ReviewKycSubmissionDto {
   @IsString()
   @MaxLength(1000)
   reason?: string;
-}
-
-export enum KycReviewDecision {
-  APPROVED = 'APPROVED',
-  REJECTED = 'REJECTED',
-  RESUBMISSION_REQUIRED = 'RESUBMISSION_REQUIRED',
 }
