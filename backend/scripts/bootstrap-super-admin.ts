@@ -12,7 +12,6 @@ async function run() {
   const username = process.env.SUPER_ADMIN_USERNAME?.trim();
   const password = process.env.SUPER_ADMIN_PASSWORD;
   const email = process.env.SUPER_ADMIN_EMAIL?.trim().toLowerCase() || null;
-  const rotatePassword = process.env.SUPER_ADMIN_ROTATE_PASSWORD === 'true';
 
   if (!username || !password) {
     throw new Error(
@@ -54,34 +53,9 @@ async function run() {
           'Refusing to bootstrap over an existing non-SUPER_ADMIN username.',
         );
       }
-      if (!rotatePassword) {
-        console.log(
-          `MegaGoldenClub SUPER_ADMIN already exists: ${existing.username}. Set SUPER_ADMIN_ROTATE_PASSWORD=true only when an explicit password rotation is intended.`,
-        );
-        return;
-      }
-
-      const passwordHash = await passwords.hash(password);
-      await prisma.$transaction([
-        prisma.user.update({
-          where: { id: existing.id },
-          data: {
-            passwordHash,
-            status: UserStatus.ACTIVE,
-            mustChangePassword: true,
-            failedLoginAttempts: 0,
-            lockedUntil: null,
-          },
-        }),
-        prisma.authSession.updateMany({
-          where: { userId: existing.id, revokedAt: null },
-          data: {
-            revokedAt: new Date(),
-            revocationReason: 'super_admin_password_rotated',
-          },
-        }),
-      ]);
-      console.log(`MegaGoldenClub SUPER_ADMIN password rotated: ${existing.username}`);
+      console.log(
+        `MegaGoldenClub SUPER_ADMIN already exists: ${existing.username}. Bootstrap is create-only and did not change credentials.`,
+      );
       return;
     }
 
