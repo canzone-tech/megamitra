@@ -1,11 +1,5 @@
-import Link from 'next/link';
-import { OperationsDashboard } from '@/components/operations-dashboard';
+import { OwnerPortal } from '@/components/owner-portal';
 
 export default function OperationsPage() {
-  return (
-    <>
-      <Link className="mm-button mm-floating-action" href="/business-plan">Business plan</Link>
-      <OperationsDashboard />
-    </>
-  );
+  return <OwnerPortal section="dashboard" />;
 }
