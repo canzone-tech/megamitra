@@ -197,7 +197,7 @@ export class OwnerPortalController {
     return this.drawWorkflow.publishDraw(id, actor.id);
   }
 
-  @Permissions('draw.fulfill')
+  @Permissions('draw.fulfillment.manage')
   @Post('draws/:id/winners/:winnerId/claim')
   claimWinner(
     @Param('id') id: string,
@@ -207,7 +207,7 @@ export class OwnerPortalController {
     return this.drawWorkflow.claimWinner(id, winnerId, actor.id);
   }
 
-  @Permissions('draw.fulfill')
+  @Permissions('draw.fulfillment.manage')
   @Post('draws/:id/winners/:winnerId/fulfill')
   fulfillWinner(
     @Param('id') id: string,
