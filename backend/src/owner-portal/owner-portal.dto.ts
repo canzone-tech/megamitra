@@ -82,6 +82,25 @@ export class SaveSeasonPrizesDto {
   @IsArray() @ValidateNested({ each: true }) @Type(() => OwnerSeasonPrizeDto) prizes!: OwnerSeasonPrizeDto[];
 }
 
+export class PrepareOwnerDrawDto {
+  @IsInt() @Min(1) @Max(60) monthNumber!: number;
+  @IsISO8601() entryWindowStart!: string;
+  @IsISO8601() entryWindowEnd!: string;
+  @IsISO8601() drawAt!: string;
+}
+
+export class VerifyOwnerWinnerDto {
+  @IsIn(['PASS', 'FAIL']) eligibilityStatus!: 'PASS' | 'FAIL';
+  @IsIn(['PASS', 'FAIL']) identityStatus!: 'PASS' | 'FAIL';
+  @IsIn(['PASS', 'FAIL']) paymentStatus!: 'PASS' | 'FAIL';
+}
+
+export class ApproveOwnerDrawDto {
+  @IsString() @Length(1, 120) approvalReference!: string;
+  @IsOptional() @IsString() @MaxLength(1000) approvalNote?: string;
+  @IsOptional() @IsString() @MaxLength(80) authorizationCode?: string;
+}
+
 export class GenerateEpinsDto {
   @IsOptional() @IsString() seasonId?: string;
   @IsInt() @Min(1) @Max(500) quantity!: number;
