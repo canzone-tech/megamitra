@@ -25,7 +25,11 @@ replacements = [
 ]
 
 for raw in tracked:
-    if not raw or raw.startswith('backend/prisma/migrations/') or raw.startswith('.github/workflows/temporary-'):
+    if (
+        not raw
+        or raw.startswith('backend/prisma/migrations/')
+        or raw.startswith('.github/workflows/')
+    ):
         continue
     path = Path(raw)
     try:
@@ -44,7 +48,10 @@ package['name'] = 'megagoldenclub'
 root_package.write_text(json.dumps(package, indent=2) + '\n', encoding='utf-8')
 
 readme = Path('README.md')
-readme.write_text(readme.read_text(encoding='utf-8').replace('megamitra/', 'megagoldenclub/'), encoding='utf-8')
+readme.write_text(
+    readme.read_text(encoding='utf-8').replace('megamitra/', 'megagoldenclub/'),
+    encoding='utf-8',
+)
 
 
 def replace_between(path_str: str, start_marker: str, end_marker: str, replacement: str) -> None:
@@ -70,12 +77,4 @@ replace_between(
     'echo "==> Verifying shared MegaGoldenClub design token contract"\n',
     'echo "==> Verifying MegaGoldenClub branding contract"\n'
     'bash "${ROOT_DIR}/scripts/verify-branding.sh"\n\n',
-)
-
-replace_between(
-    '.github/workflows/backend-ci.yml',
-    '      - name: Verify MegaGoldenClub-only backend\n',
-    '      - name: Lint\n',
-    '      - name: Verify MegaGoldenClub branding contract\n'
-    '        run: bash ../scripts/verify-branding.sh\n\n',
 )
