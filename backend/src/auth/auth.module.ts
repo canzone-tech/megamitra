@@ -9,6 +9,7 @@ import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { PasswordService } from './password.service';
 import { SmtpMailService } from './smtp-mail.service';
+import { SuperAdminLifecycleService } from './super-admin-lifecycle.service';
 
 @Module({
   imports: [JwtModule.register({}), CaptchaModule],
@@ -19,8 +20,9 @@ import { SmtpMailService } from './smtp-mail.service';
     AuthEmailTemplateService,
     SmtpMailService,
     PasswordService,
+    SuperAdminLifecycleService,
     JwtAuthGuard,
   ],
-  exports: [PasswordService, JwtAuthGuard, AuthRecoveryService],
+  exports: [PasswordService, SuperAdminLifecycleService, JwtAuthGuard, AuthRecoveryService],
 })
 export class AuthModule {}
