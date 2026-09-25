@@ -15,7 +15,6 @@ import {
 
 type NamedPolicy = Row & { versions?: Row[] };
 type HookResponse = { configured: boolean; binding: Row | null };
-
 type ConfigData = {
   programs: NamedPolicy[];
   binaryPlans: NamedPolicy[];
@@ -38,7 +37,7 @@ const DOMAIN_DESCRIPTIONS: Record<DomainKey, string> = {
   binary: 'Set left/right matching, pair income, limits and carry-forward.',
   referral: 'Set the amount or percentage paid for a qualifying direct referral.',
   orchestration: 'Choose what should happen automatically when members join, pay, finish or receive a refund.',
-  draw: 'Set who can enter, repeat-winner rules and the prizes for each draw plan.',
+  draw: 'Set who can enter, repeat-winner rules and prizes.',
 };
 
 function text(value: unknown, fallback = '—'): string {
@@ -140,32 +139,26 @@ function draftValues(domain: DomainKey, row?: Row): DraftValues {
   const effectiveFrom = toLocalInput(row?.effectiveFrom);
   const effectiveTo = row?.effectiveTo ? toLocalInput(row.effectiveTo) : '';
   if (domain === 'program') return {
-    effectiveFrom, effectiveTo,
-    currencyCode: text(row?.currencyCode, 'INR'), registrationFee: text(row?.registrationFee, '0.00'), installmentAmount: text(row?.installmentAmount, '0.00'),
+    effectiveFrom, effectiveTo, currencyCode: text(row?.currencyCode, 'INR'), registrationFee: text(row?.registrationFee, '0.00'), installmentAmount: text(row?.installmentAmount, '0.00'),
     installmentCount: Number(row?.installmentCount ?? 18), installmentIntervalUnit: text(row?.installmentIntervalUnit, 'MONTH'), installmentIntervalCount: Number(row?.installmentIntervalCount ?? 1),
-    firstInstallmentOffsetDays: Number(row?.firstInstallmentOffsetDays ?? 0), gracePeriodDays: Number(row?.gracePeriodDays ?? 0),
-    maxActiveEnrollmentsPerUser: row?.maxActiveEnrollmentsPerUser ?? '', partialPaymentsAllowed: bool(row?.partialPaymentsAllowed), overpaymentsAllowed: bool(row?.overpaymentsAllowed),
-    eligibilityRules: objectValue(row?.eligibilityRules),
+    firstInstallmentOffsetDays: Number(row?.firstInstallmentOffsetDays ?? 0), gracePeriodDays: Number(row?.gracePeriodDays ?? 0), maxActiveEnrollmentsPerUser: row?.maxActiveEnrollmentsPerUser ?? '',
+    partialPaymentsAllowed: bool(row?.partialPaymentsAllowed), overpaymentsAllowed: bool(row?.overpaymentsAllowed), eligibilityRules: objectValue(row?.eligibilityRules),
   };
   if (domain === 'binary') return {
-    effectiveFrom, effectiveTo,
-    qualifyingUnit: text(row?.qualifyingUnit, '1.0000'), leftVolumePerPair: text(row?.leftVolumePerPair, '1.0000'), rightVolumePerPair: text(row?.rightVolumePerPair, '1.0000'),
-    pairPayoutAmount: text(row?.pairPayoutAmount, '0.00'), currencyCode: text(row?.currencyCode, 'INR'), settlementTimezone: text(row?.settlementTimezone, 'Asia/Kolkata'),
-    capOverflowMode: text(row?.capOverflowMode, 'CARRY'), dailyPairCap: row?.dailyPairCap ?? '', monthlyPairCap: row?.monthlyPairCap ?? '',
-    carryForwardEnabled: row ? bool(row.carryForwardEnabled) : true, carryForwardExpiryDays: row?.carryForwardExpiryDays ?? '',
+    effectiveFrom, effectiveTo, qualifyingUnit: text(row?.qualifyingUnit, '1.0000'), leftVolumePerPair: text(row?.leftVolumePerPair, '1.0000'), rightVolumePerPair: text(row?.rightVolumePerPair, '1.0000'),
+    pairPayoutAmount: text(row?.pairPayoutAmount, '0.00'), currencyCode: text(row?.currencyCode, 'INR'), settlementTimezone: text(row?.settlementTimezone, 'Asia/Kolkata'), capOverflowMode: text(row?.capOverflowMode, 'CARRY'),
+    dailyPairCap: row?.dailyPairCap ?? '', monthlyPairCap: row?.monthlyPairCap ?? '', carryForwardEnabled: row ? bool(row.carryForwardEnabled) : true, carryForwardExpiryDays: row?.carryForwardExpiryDays ?? '',
     qualificationRules: objectValue(row?.qualificationRules), settlementRules: objectValue(row?.settlementRules),
   };
   if (domain === 'referral') return {
-    effectiveFrom, effectiveTo,
-    rewardMode: text(row?.rewardMode, 'FIXED'), fixedAmount: text(row?.fixedAmount, '0.00'), percentageRate: text(row?.percentageRate, '0.0000'),
+    effectiveFrom, effectiveTo, rewardMode: text(row?.rewardMode, 'FIXED'), fixedAmount: text(row?.fixedAmount, '0.00'), percentageRate: text(row?.percentageRate, '0.0000'),
     currencyCode: text(row?.currencyCode, 'INR'), roundingMode: text(row?.roundingMode, 'HALF_UP'), minimumRewardAmount: row?.minimumRewardAmount ?? '', maximumRewardAmount: row?.maximumRewardAmount ?? '',
     eligibilityRules: objectValue(row?.eligibilityRules),
   };
   if (domain === 'draw') {
     const rawTiers = Array.isArray(row?.prizeTiers) ? row.prizeTiers : [];
     return {
-      programVersionId: text(row?.programVersionId, ''), effectiveFrom, effectiveTo,
-      entryMode: text(row?.entryMode, 'ONE_PER_USER'), priorWinnerMode: text(row?.priorWinnerMode, 'DISALLOW_WITHIN_POLICY'),
+      programVersionId: text(row?.programVersionId, ''), effectiveFrom, effectiveTo, entryMode: text(row?.entryMode, 'ONE_PER_USER'), priorWinnerMode: text(row?.priorWinnerMode, 'DISALLOW_WITHIN_POLICY'),
       allowMultipleWinsPerDraw: bool(row?.allowMultipleWinsPerDraw), insufficientEntrantsMode: text(row?.insufficientEntrantsMode, 'DRAW_AVAILABLE'),
       prizeTiers: rawTiers.length ? rawTiers : [{ code: 'PRIZE_1', name: 'Prize 1', winnerCount: 1, prizeKind: 'ITEM', prizeDefinition: {} }],
     };
@@ -173,8 +166,7 @@ function draftValues(domain: DomainKey, row?: Row): DraftValues {
   return {
     programVersionId: text(row?.programVersionId, ''), triggerType: text(row?.triggerType, 'PAYMENT_CONFIRMED'), effectiveFrom, effectiveTo,
     binaryPlanVersionId: text(row?.binaryPlanVersionId, ''), binaryUnitsPerEvent: Number(row?.binaryUnitsPerEvent ?? 0), referralHookEnabled: bool(row?.referralHookEnabled),
-    referralPolicyVersionId: text(row?.referralPolicyVersionId, ''), referralBasisMode: text(row?.referralBasisMode, 'PAYMENT_AMOUNT'),
-    drawEligibilityHookEnabled: bool(row?.drawEligibilityHookEnabled), eligibilityRules: objectValue(row?.eligibilityRules),
+    referralPolicyVersionId: text(row?.referralPolicyVersionId, ''), referralBasisMode: text(row?.referralBasisMode, 'PAYMENT_AMOUNT'), drawEligibilityHookEnabled: bool(row?.drawEligibilityHookEnabled), eligibilityRules: objectValue(row?.eligibilityRules),
   };
 }
 
@@ -182,25 +174,21 @@ function normalizeDraft(domain: DomainKey, value: DraftValues): Record<string, u
   const effectiveFrom = toIso(value.effectiveFrom);
   const effectiveTo = optionalIso(value.effectiveTo);
   if (domain === 'program') return {
-    effectiveFrom, ...(effectiveTo ? { effectiveTo } : {}), currencyCode: text(value.currencyCode, 'INR').toUpperCase(),
-    registrationFee: text(value.registrationFee, '0.00'), installmentAmount: text(value.installmentAmount, '0.00'), installmentCount: Number(value.installmentCount ?? 0),
-    installmentIntervalUnit: text(value.installmentIntervalUnit, 'MONTH'), installmentIntervalCount: Number(value.installmentIntervalCount ?? 1),
+    effectiveFrom, ...(effectiveTo ? { effectiveTo } : {}), currencyCode: text(value.currencyCode, 'INR').toUpperCase(), registrationFee: text(value.registrationFee, '0.00'), installmentAmount: text(value.installmentAmount, '0.00'),
+    installmentCount: Number(value.installmentCount ?? 0), installmentIntervalUnit: text(value.installmentIntervalUnit, 'MONTH'), installmentIntervalCount: Number(value.installmentIntervalCount ?? 1),
     firstInstallmentOffsetDays: Number(value.firstInstallmentOffsetDays ?? 0), gracePeriodDays: Number(value.gracePeriodDays ?? 0),
-    ...(optionalInt(value.maxActiveEnrollmentsPerUser) ? { maxActiveEnrollmentsPerUser: optionalInt(value.maxActiveEnrollmentsPerUser) } : {}),
-    partialPaymentsAllowed: bool(value.partialPaymentsAllowed), overpaymentsAllowed: bool(value.overpaymentsAllowed), eligibilityRules: objectValue(value.eligibilityRules),
+    ...(optionalInt(value.maxActiveEnrollmentsPerUser) ? { maxActiveEnrollmentsPerUser: optionalInt(value.maxActiveEnrollmentsPerUser) } : {}), partialPaymentsAllowed: bool(value.partialPaymentsAllowed), overpaymentsAllowed: bool(value.overpaymentsAllowed), eligibilityRules: objectValue(value.eligibilityRules),
   };
   if (domain === 'binary') return {
     effectiveFrom, ...(effectiveTo ? { effectiveTo } : {}), qualifyingUnit: text(value.qualifyingUnit, '1.0000'), leftVolumePerPair: text(value.leftVolumePerPair, '1.0000'), rightVolumePerPair: text(value.rightVolumePerPair, '1.0000'),
-    pairPayoutAmount: text(value.pairPayoutAmount, '0.00'), currencyCode: text(value.currencyCode, 'INR').toUpperCase(), settlementTimezone: text(value.settlementTimezone, 'Asia/Kolkata'),
-    capOverflowMode: text(value.capOverflowMode, 'CARRY'), ...(optionalInt(value.dailyPairCap) !== undefined ? { dailyPairCap: optionalInt(value.dailyPairCap) } : {}),
-    ...(optionalInt(value.monthlyPairCap) !== undefined ? { monthlyPairCap: optionalInt(value.monthlyPairCap) } : {}), carryForwardEnabled: bool(value.carryForwardEnabled),
-    ...(optionalInt(value.carryForwardExpiryDays) ? { carryForwardExpiryDays: optionalInt(value.carryForwardExpiryDays) } : {}), qualificationRules: objectValue(value.qualificationRules), settlementRules: objectValue(value.settlementRules),
+    pairPayoutAmount: text(value.pairPayoutAmount, '0.00'), currencyCode: text(value.currencyCode, 'INR').toUpperCase(), settlementTimezone: text(value.settlementTimezone, 'Asia/Kolkata'), capOverflowMode: text(value.capOverflowMode, 'CARRY'),
+    ...(optionalInt(value.dailyPairCap) !== undefined ? { dailyPairCap: optionalInt(value.dailyPairCap) } : {}), ...(optionalInt(value.monthlyPairCap) !== undefined ? { monthlyPairCap: optionalInt(value.monthlyPairCap) } : {}),
+    carryForwardEnabled: bool(value.carryForwardEnabled), ...(optionalInt(value.carryForwardExpiryDays) ? { carryForwardExpiryDays: optionalInt(value.carryForwardExpiryDays) } : {}), qualificationRules: objectValue(value.qualificationRules), settlementRules: objectValue(value.settlementRules),
   };
   if (domain === 'referral') {
     const rewardMode = text(value.rewardMode, 'FIXED');
     return {
-      effectiveFrom, ...(effectiveTo ? { effectiveTo } : {}), rewardMode,
-      ...(rewardMode === 'PERCENTAGE' ? { percentageRate: text(value.percentageRate, '0.0000') } : { fixedAmount: text(value.fixedAmount, '0.00') }),
+      effectiveFrom, ...(effectiveTo ? { effectiveTo } : {}), rewardMode, ...(rewardMode === 'PERCENTAGE' ? { percentageRate: text(value.percentageRate, '0.0000') } : { fixedAmount: text(value.fixedAmount, '0.00') }),
       currencyCode: text(value.currencyCode, 'INR').toUpperCase(), roundingMode: text(value.roundingMode, 'HALF_UP'),
       ...(value.minimumRewardAmount !== '' && value.minimumRewardAmount !== undefined ? { minimumRewardAmount: text(value.minimumRewardAmount) } : {}),
       ...(value.maximumRewardAmount !== '' && value.maximumRewardAmount !== undefined ? { maximumRewardAmount: text(value.maximumRewardAmount) } : {}), eligibilityRules: objectValue(value.eligibilityRules),
@@ -210,15 +198,12 @@ function normalizeDraft(domain: DomainKey, value: DraftValues): Record<string, u
     const tiers = Array.isArray(value.prizeTiers) ? value.prizeTiers : [];
     if (!tiers.length) throw new Error('Add at least one lucky-draw prize.');
     return {
-      programVersionId: text(value.programVersionId, ''), effectiveFrom, ...(effectiveTo ? { effectiveTo } : {}), entryMode: text(value.entryMode, 'ONE_PER_USER'),
-      priorWinnerMode: text(value.priorWinnerMode, 'DISALLOW_WITHIN_POLICY'), allowMultipleWinsPerDraw: bool(value.allowMultipleWinsPerDraw), insufficientEntrantsMode: text(value.insufficientEntrantsMode, 'DRAW_AVAILABLE'),
-      prizeTiers: tiers.map((tierValue, index) => {
+      programVersionId: text(value.programVersionId, ''), effectiveFrom, ...(effectiveTo ? { effectiveTo } : {}), entryMode: text(value.entryMode, 'ONE_PER_USER'), priorWinnerMode: text(value.priorWinnerMode, 'DISALLOW_WITHIN_POLICY'),
+      allowMultipleWinsPerDraw: bool(value.allowMultipleWinsPerDraw), insufficientEntrantsMode: text(value.insufficientEntrantsMode, 'DRAW_AVAILABLE'), prizeTiers: tiers.map((tierValue, index) => {
         const tier = tierValue && typeof tierValue === 'object' ? tierValue as Row : {};
         const kind = text(tier.prizeKind, 'ITEM');
-        return {
-          code: text(tier.code, internalCode(text(tier.name, `Prize ${index + 1}`), String(index + 1))), name: text(tier.name, `Prize ${index + 1}`), winnerCount: Math.max(1, Number(tier.winnerCount ?? 1)), prizeKind: kind,
-          ...(kind === 'CASH' ? { cashAmount: text(tier.cashAmount, '0.00'), currencyCode: text(tier.currencyCode, 'INR').toUpperCase() } : {}), prizeDefinition: objectValue(tier.prizeDefinition),
-        };
+        return { code: text(tier.code, internalCode(text(tier.name, `Prize ${index + 1}`), String(index + 1))), name: text(tier.name, `Prize ${index + 1}`), winnerCount: Math.max(1, Number(tier.winnerCount ?? 1)), prizeKind: kind,
+          ...(kind === 'CASH' ? { cashAmount: text(tier.cashAmount, '0.00'), currencyCode: text(tier.currencyCode, 'INR').toUpperCase() } : {}), prizeDefinition: objectValue(tier.prizeDefinition) };
       }),
     };
   }
@@ -285,11 +270,6 @@ export function BusinessPlanConfig() {
   const selectedOrchestration = useMemo(() => data?.orchestration.find((item) => String(item.id) === selectedOrchestrationId), [data, selectedOrchestrationId]);
   const versions = domain === 'orchestration' ? (selectedOrchestration ? [selectedOrchestration] : []) : selectedParent?.versions ?? [];
 
-  useEffect(() => {
-    const source = domain === 'orchestration' ? selectedOrchestration : latestVersion(selectedParent);
-    setDraft(draftValues(domain, source));
-  }, [domain, selectedOrchestration, selectedParent]);
-
   const formOptions = useMemo<BusinessPlanFormOptions>(() => ({
     programVersions: publishedOptions(data?.programs ?? []), binaryVersions: publishedOptions(data?.binaryPlans ?? []), referralVersions: publishedOptions(data?.referrals ?? []),
   }), [data]);
@@ -305,7 +285,12 @@ export function BusinessPlanConfig() {
       if (reason instanceof ApiClientError && reason.status !== 404) setError(reason.message);
     }
   }, []);
-  useEffect(() => { if (domain === 'orchestration') void refreshHook(selectedOrchestrationId); }, [domain, refreshHook, selectedOrchestrationId]);
+
+  useEffect(() => {
+    if (domain !== 'orchestration') return;
+    const timer = window.setTimeout(() => void refreshHook(selectedOrchestrationId), 0);
+    return () => window.clearTimeout(timer);
+  }, [domain, refreshHook, selectedOrchestrationId]);
 
   async function runAction(action: () => Promise<void>, successMessage: string) {
     setBusy(true); setError(''); setMessage('');
@@ -314,14 +299,32 @@ export function BusinessPlanConfig() {
     finally { setBusy(false); }
   }
 
+  function selectParent(id: string) {
+    setSelectedParentId(id);
+    const selected = namedItems.find((item) => String(item.id) === id);
+    setDraft(draftValues(domain, latestVersion(selected)));
+  }
+
+  function selectAutomaticRule(id: string) {
+    setSelectedOrchestrationId(id);
+    const selected = data?.orchestration.find((item) => String(item.id) === id);
+    setDraft(draftValues('orchestration', selected));
+    setHook(null); setHookPolicyVersionId('');
+  }
+
   function switchDomain(next: DomainKey) {
     setDomain(next); setError(''); setMessage(''); setHook(null); setHookPolicyVersionId('');
-    if (!data) return;
-    if (next === 'program') setSelectedParentId(String(data.programs[0]?.id ?? ''));
-    if (next === 'binary') setSelectedParentId(String(data.binaryPlans[0]?.id ?? ''));
-    if (next === 'referral') setSelectedParentId(String(data.referrals[0]?.id ?? ''));
-    if (next === 'draw') setSelectedParentId(String(data.draws[0]?.id ?? ''));
-    if (next === 'orchestration') setSelectedOrchestrationId(String(data.orchestration[0]?.id ?? ''));
+    if (!data) { setDraft(draftValues(next)); return; }
+    if (next === 'orchestration') {
+      const selected = data.orchestration[0];
+      setSelectedOrchestrationId(String(selected?.id ?? ''));
+      setDraft(draftValues(next, selected));
+      return;
+    }
+    const items = next === 'program' ? data.programs : next === 'binary' ? data.binaryPlans : next === 'referral' ? data.referrals : data.draws;
+    const selected = items[0];
+    setSelectedParentId(String(selected?.id ?? ''));
+    setDraft(draftValues(next, latestVersion(selected)));
   }
 
   async function createShell(event: React.FormEvent) {
@@ -331,8 +334,8 @@ export function BusinessPlanConfig() {
     const path = domain === 'program' ? '/api/backend/admin/programs' : domain === 'binary' ? '/api/backend/admin/binary-plans' : domain === 'referral' ? '/api/backend/admin/referral-reward-policies' : '/api/backend/admin/lucky-draw-policies';
     await runAction(async () => {
       const created = await apiJson<Row>(path, { method: 'POST', body: JSON.stringify({ code: internalCode(shellName, suffix), name: shellName.trim(), ...(shellDescription.trim() ? { description: shellDescription.trim() } : {}) }) });
-      setSelectedParentId(String(created.id)); setShellName(''); setShellDescription('');
-    }, `${DOMAIN_LABELS[domain]} created. Now review the settings below and save a draft.`);
+      setSelectedParentId(String(created.id)); setShellName(''); setShellDescription(''); setDraft(draftValues(domain));
+    }, `${DOMAIN_LABELS[domain]} created. Review the settings below and save a draft.`);
   }
 
   async function createDraft(event: React.FormEvent) {
@@ -404,7 +407,7 @@ export function BusinessPlanConfig() {
           <section className="mm-card">
             <div className="mm-card-head"><div><h2>{DOMAIN_LABELS[domain]}</h2><p className="mm-note">{DOMAIN_DESCRIPTIONS[domain]}</p></div><span className="mm-chip">Draft first → publish when ready</span></div>
             <div className="mm-card-body">
-              {domain !== 'orchestration' ? <label className="mm-field"><span>Choose saved plan</span><select className="mm-input" value={selectedParentId} onChange={(event) => setSelectedParentId(event.target.value)}><option value="">Choose plan</option>{namedItems.map((item) => <option value={String(item.id)} key={String(item.id)}>{text(item.name)}</option>)}</select></label> : <label className="mm-field"><span>Choose saved automatic rule</span><select className="mm-input" value={selectedOrchestrationId} onChange={(event) => { setSelectedOrchestrationId(event.target.value); setHook(null); setHookPolicyVersionId(''); }}><option value="">Choose rule</option>{data.orchestration.map((item) => <option value={String(item.id)} key={String(item.id)}>{triggerLabel(item.triggerType)} · {lifecycleLabel(item.lifecycle).toLowerCase()}</option>)}</select></label>}
+              {domain !== 'orchestration' ? <label className="mm-field"><span>Choose saved plan</span><select className="mm-input" value={selectedParentId} onChange={(event) => selectParent(event.target.value)}><option value="">Choose plan</option>{namedItems.map((item) => <option value={String(item.id)} key={String(item.id)}>{text(item.name)}</option>)}</select></label> : <label className="mm-field"><span>Choose saved automatic rule</span><select className="mm-input" value={selectedOrchestrationId} onChange={(event) => selectAutomaticRule(event.target.value)}><option value="">Choose rule</option>{data.orchestration.map((item) => <option value={String(item.id)} key={String(item.id)}>{triggerLabel(item.triggerType)} · {lifecycleLabel(item.lifecycle).toLowerCase()}</option>)}</select></label>}
               <div className="mm-list" style={{ marginTop: 16 }}>{versions.length ? versions.map((version) => <div className="mm-list-row" key={String(version.id)}><div><strong>{lifecycleLabel(version.lifecycle)}</strong><br /><span>{versionSummary(domain, version)}</span><br /><span>From {date(version.effectiveFrom)}{version.effectiveTo ? ` until ${date(version.effectiveTo)}` : ''}</span></div><div className="mm-config-actions"><span className={`mm-chip ${lifecycleTone(version.lifecycle)}`}>{lifecycleLabel(version.lifecycle)}</span>{version.lifecycle === 'DRAFT' ? <button className="mm-button" disabled={busy} type="button" onClick={() => void changeLifecycle(version, 'publish')}>Make live</button> : null}{version.lifecycle === 'PUBLISHED' ? <button className="mm-button secondary" disabled={busy} type="button" onClick={() => void changeLifecycle(version, 'retire')}>Stop using</button> : null}</div></div>) : <div className="mm-empty">No saved settings yet.</div>}</div>
             </div>
           </section>
