@@ -87,6 +87,7 @@ export class PrepareOwnerDrawDto {
   @IsISO8601() entryWindowStart!: string;
   @IsISO8601() entryWindowEnd!: string;
   @IsISO8601() drawAt!: string;
+  @IsInt() @Min(0) @Max(36500) claimWindowDays!: number;
 }
 
 export class VerifyOwnerWinnerDto {
@@ -99,6 +100,11 @@ export class ApproveOwnerDrawDto {
   @IsString() @Length(1, 120) approvalReference!: string;
   @IsOptional() @IsString() @MaxLength(1000) approvalNote?: string;
   @IsOptional() @IsString() @MaxLength(80) authorizationCode?: string;
+}
+
+export class FulfillOwnerWinnerDto {
+  @IsOptional() @IsString() @MaxLength(191) externalReference?: string;
+  @IsOptional() @IsString() @MaxLength(1000) note?: string;
 }
 
 export class GenerateEpinsDto {
