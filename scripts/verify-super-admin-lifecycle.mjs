@@ -49,8 +49,19 @@ for (const required of [
 if (!/bootstrapCreateOnly[\s\S]*?if \(existing\)[\s\S]*?return \{ status: 'already_exists'/.test(lifecycle)) {
   failures.push('super-admin-lifecycle.service.ts: existing SUPER_ADMIN must return without mutation');
 }
+
 const breakGlassBody = lifecycle.split('async breakGlassReset')[1] ?? '';
-if (/data:\s*\{[\s\S]{0,300}\bstatus\s*:/.test(breakGlassBody)) failures.push('super-admin-lifecycle.service.ts: break-glass reset must not change account status');
+const userUpdateStart = breakGlassBody.indexOf('await tx.user.update({');
+const sessionUpdateStart = breakGlassBody.indexOf('await tx.authSession.updateMany({');
+if (userUpdateStart < 0 || sessionUpdateStart <= userUpdateStart) {
+  failures.push('super-admin-lifecycle.service.ts: break-glass user/session update structure missing');
+} else {
+  const userUpdateBlock = breakGlassBody.slice(userUpdateStart, sessionUpdateStart);
+  if (/\bstatus\s*:/.test(userUpdateBlock)) {
+    failures.push('super-admin-lifecycle.service.ts: break-glass reset must not change account status');
+  }
+}
+
 if (!authModule.includes('SuperAdminLifecycleService')) failures.push('auth.module.ts: lifecycle service must be registered and exported');
 
 if (failures.length) {
