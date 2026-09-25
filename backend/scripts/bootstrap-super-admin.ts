@@ -1,4 +1,3 @@
-import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../src/app.module';
 import { PasswordService } from '../src/auth/password.service';
@@ -15,7 +14,7 @@ async function run() {
 
   if (!username || !password) {
     throw new Error(
-      'Set SUPER_ADMIN_USERNAME and SUPER_ADMIN_PASSWORD before bootstrapping.',
+      'Set SUPER_ADMIN_USERNAME and SUPER_ADMIN_PASSWORD in the invoking environment before bootstrapping.',
     );
   }
 
