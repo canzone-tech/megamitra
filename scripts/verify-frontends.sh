@@ -184,7 +184,6 @@ smoke_frontends() {
   MEMBER_PID=""
   ADMIN_LOG=""
   MEMBER_LOG=""
-LEGACY_UI_BRAND='Mega''Mitra'
 }
 
 echo "==> Verifying MegaGoldenClub branding contract"
