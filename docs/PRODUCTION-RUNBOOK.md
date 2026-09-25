@@ -4,7 +4,7 @@ This runbook covers deployment and recovery controls after business milestone 00
 
 ## Release gate
 
-A release candidate must be built from the intended commit on `dev/local-foundation` and must have green backend and frontend CI. On the deployment host, run from `backend/`:
+A release candidate must be built from the intended commit on `dev/local-foundation` and must have green backend and frontend CI. On the deployment host, run from the repository root:
 
 ```bash
 npm run verify
@@ -55,13 +55,15 @@ Run scheduled backup jobs only after checking available disk space and monitorin
 
 Restore is destructive. Stop application traffic first and use an isolated host for drills whenever possible.
 
+From `backend/`:
+
 ```bash
 MEGAMITRA_RESTORE_CONFIRM=YES npm run restore:data -- /absolute/path/to/backup
 ```
 
 The restore command verifies checksums, restores MySQL and MongoDB, clears Redis to prevent stale non-authoritative state, and runs `prisma migrate status`.
 
-After restore, run:
+After restore, return to the repository root and run:
 
 ```bash
 npm run verify
@@ -78,7 +80,7 @@ Do not reopen traffic until verification passes and critical balances, policy ve
 5. Run `npx prisma migrate deploy` once from the release artifact.
 6. Start/restart API, admin and member/public applications.
 7. Wait for `/health/ready` to return HTTP 200 with MySQL, Redis and MongoDB `up`.
-8. Run `npm run uat:smoke` against the deployed API. Supply `UAT_ADMIN_TOKEN` and `UAT_MEMBER_TOKEN` when authenticated smoke is required.
+8. Run `npm run uat:smoke` from `backend/` against the deployed API. Supply `UAT_ADMIN_TOKEN` and `UAT_MEMBER_TOKEN` when authenticated smoke is required.
 9. Complete the stateful checks in `docs/UAT-CHECKLIST.md` before production sign-off.
 
 ## Rollback
