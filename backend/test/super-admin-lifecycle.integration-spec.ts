@@ -23,6 +23,18 @@ describe('MegaGoldenClub SUPER_ADMIN lifecycle integration', () => {
   }
 
   beforeAll(async () => {
+    const contract = execFileSync(
+      'node',
+      ['../scripts/verify-super-admin-lifecycle.mjs'],
+      {
+        cwd: process.cwd(),
+        env: process.env,
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'pipe'],
+      },
+    );
+    expect(contract).toContain('MegaGoldenClub SUPER_ADMIN lifecycle verification: PASS');
+
     app = await NestFactory.createApplicationContext(AppModule, { logger: false });
     prisma = app.get(PrismaService);
     passwords = app.get(PasswordService);
@@ -125,7 +137,7 @@ describe('MegaGoldenClub SUPER_ADMIN lifecycle integration', () => {
       expect(revokedSession.revokedAt).not.toBeNull();
       expect(revokedSession.revocationReason).toBe('break_glass_password_reset');
       expect(audit.actorUserId).toBeNull();
-      expect(audit.metadata).toMatchObject({
+      expect(audit.metadata as Record<string, unknown>).toMatchObject({
         operation: 'break_glass_super_admin_password_reset',
         username,
         reason,
