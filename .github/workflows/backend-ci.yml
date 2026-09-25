@@ -42,7 +42,7 @@ jobs:
         ports:
           - 3306:3306
         options: >-
-          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot_test_password"
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot_password"
           --health-interval=10s
           --health-timeout=5s
           --health-retries=10
@@ -147,16 +147,49 @@ jobs:
         run: |
           test -f dist/main.js
           LOG_FILE="$(mktemp -t megagoldenclub-api-ci.XXXXXX.log)"
-          npm run start:prod >"${LOG_FILE}" 2>&1 &
-          API_PID=$!
-          cleanup() {
-            if kill -0 "${API_PID}" 2>/dev/null; then
-              kill "${API_PID}" 2>/dev/null || true
-              wait "${API_PID}" 2>/dev/null || true
+          API_PID=""
+
+          assert_port_available() {
+            node -e '
+              const net = require("node:net");
+              const port = Number(process.argv[1]);
+              const server = net.createServer();
+              server.once("error", () => process.exit(1));
+              server.listen({ host: "127.0.0.1", port, exclusive: true }, () => {
+                server.close((error) => process.exit(error ? 1 : 0));
+              });
+            ' 3100
+          }
+
+          terminate_api() {
+            if [[ -z "${API_PID}" ]]; then
+              return 0
             fi
+            kill -TERM -- "-${API_PID}" 2>/dev/null || true
+            for _ in $(seq 1 20); do
+              if ! kill -0 -- "-${API_PID}" 2>/dev/null; then
+                break
+              fi
+              sleep 0.1
+            done
+            kill -KILL -- "-${API_PID}" 2>/dev/null || true
+            wait "${API_PID}" 2>/dev/null || true
+            API_PID=""
+          }
+
+          cleanup() {
+            terminate_api
             rm -f "${LOG_FILE}"
           }
           trap cleanup EXIT INT TERM
+
+          if ! assert_port_available; then
+            echo 'Port 3100 is already in use before compiled API verification'
+            exit 1
+          fi
+
+          setsid npm run start:prod >"${LOG_FILE}" 2>&1 &
+          API_PID=$!
 
           READY=""
           for _ in $(seq 1 30); do
@@ -181,3 +214,10 @@ jobs:
             exit 1
           fi
           printf '%s\n' "${READY}"
+
+          cleanup
+          trap - EXIT INT TERM
+          if ! assert_port_available; then
+            echo 'Compiled API cleanup left port 3100 in use'
+            exit 1
+          fi
