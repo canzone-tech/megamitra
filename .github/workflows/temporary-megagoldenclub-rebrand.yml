@@ -1,0 +1,35 @@
+name: Temporary MegaGoldenClub Rebrand Runner
+
+on:
+  push:
+    branches:
+      - dev/local-foundation
+    paths:
+      - '.github/workflows/temporary-megagoldenclub-rebrand.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply rebrand
+        run: |
+          set -euo pipefail
+          python3 .github/scripts/rebrand_megagoldenclub.py
+          chmod +x scripts/verify-branding.sh
+          bash -n scripts/verify-branding.sh
+          bash -n scripts/verify-frontends.sh
+          bash -n backend/scripts/*.sh
+          git diff --check
+          git status --short
+      - name: Commit rebrand
+        run: |
+          set -euo pipefail
+          git config user.name 'canzone-tech'
+          git config user.email 'canzone-tech@users.noreply.github.com'
+          git add -A
+          git commit -m 'refactor: rebrand platform to MegaGoldenClub'
+          git push origin HEAD:dev/local-foundation
