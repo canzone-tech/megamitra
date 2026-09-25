@@ -35,13 +35,13 @@ if (/prisma\.|passwords\./.test(breakGlass)) failures.push('reset-super-admin-pa
 
 for (const required of [
   'bootstrapCreateOnly',
-  'prisma.user.create',
-  'userRole.create',
+  'tx.user.create',
+  'tx.userRole.create',
   'already_exists',
   'breakGlassReset',
   'mustChangePassword: true',
   "revocationReason: 'break_glass_password_reset'",
-  'auditLog.create',
+  'tx.auditLog.create',
   "operation: 'break_glass_super_admin_password_reset'",
 ]) {
   if (!lifecycle.includes(required)) failures.push(`super-admin-lifecycle.service.ts: required lifecycle invariant missing: ${required}`);
