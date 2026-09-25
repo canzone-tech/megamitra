@@ -9,6 +9,7 @@ import {
   CreateOwnerNotificationDto,
   CreateOwnerSeasonDto,
   CreateSupportTicketDto,
+  FulfillOwnerWinnerDto,
   GenerateEpinsDto,
   GenerateOwnerAuthCodeDto,
   OwnerSeasonStatusDto,
@@ -22,12 +23,16 @@ import {
   UpdateSupportTicketDto,
   VerifyOwnerWinnerDto,
 } from './owner-portal.dto';
+import { OwnerPortalDrawWorkflowService } from './owner-portal-draw-workflow.service';
 import { AssignOwnerPlacementDto } from './owner-portal-placement.dto';
 import { OwnerPortalService } from './owner-portal.service';
 
 @Controller('admin/owner-portal')
 export class OwnerPortalController {
-  constructor(private readonly portal: OwnerPortalService) {}
+  constructor(
+    private readonly portal: OwnerPortalService,
+    private readonly drawWorkflow: OwnerPortalDrawWorkflowService,
+  ) {}
 
   @Permissions('operations.read')
   @Get('dashboard')
@@ -150,7 +155,7 @@ export class OwnerPortalController {
     @Body() dto: PrepareOwnerDrawDto,
     @CurrentUser() actor: AuthUser,
   ) {
-    return this.portal.prepareDraw(id, dto, actor.id);
+    return this.drawWorkflow.prepareDraw(id, dto, actor.id);
   }
 
   @Permissions('draw.execution.manage')
@@ -189,7 +194,28 @@ export class OwnerPortalController {
   @Permissions('draw.execution.manage')
   @Post('draws/:id/publish')
   publishDraw(@Param('id') id: string, @CurrentUser() actor: AuthUser) {
-    return this.portal.publishDraw(id, actor.id);
+    return this.drawWorkflow.publishDraw(id, actor.id);
+  }
+
+  @Permissions('draw.fulfill')
+  @Post('draws/:id/winners/:winnerId/claim')
+  claimWinner(
+    @Param('id') id: string,
+    @Param('winnerId') winnerId: string,
+    @CurrentUser() actor: AuthUser,
+  ) {
+    return this.drawWorkflow.claimWinner(id, winnerId, actor.id);
+  }
+
+  @Permissions('draw.fulfill')
+  @Post('draws/:id/winners/:winnerId/fulfill')
+  fulfillWinner(
+    @Param('id') id: string,
+    @Param('winnerId') winnerId: string,
+    @Body() dto: FulfillOwnerWinnerDto,
+    @CurrentUser() actor: AuthUser,
+  ) {
+    return this.drawWorkflow.fulfillWinner(id, winnerId, dto, actor.id);
   }
 
   @Permissions('users.manage')
