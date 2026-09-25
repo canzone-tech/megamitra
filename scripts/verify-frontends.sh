@@ -32,8 +32,13 @@ verify_app() {
   local name="$1"
   local dir="$2"
 
+  if [[ ! -f "${dir}/package-lock.json" ]]; then
+    echo "ERROR: missing deterministic dependency lockfile: ${dir}/package-lock.json"
+    exit 1
+  fi
+
   echo "==> Installing exact ${name} dependencies"
-  npm --prefix "${dir}" install --no-package-lock --include=dev
+  npm --prefix "${dir}" ci --include=dev --no-audit --no-fund
 
   echo "==> Linting ${name}"
   npm --prefix "${dir}" run lint
