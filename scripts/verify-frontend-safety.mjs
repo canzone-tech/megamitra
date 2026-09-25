@@ -16,6 +16,9 @@ const forbiddenCopy = [
   /\bMitra\b/i,
   /\bHttpOnly\b/i,
   /\bsession tokens?\b/i,
+  /\bJWT\b/i,
+  /\b(?:access|refresh) tokens?\b/i,
+  /\bbearer tokens?\b/i,
   /verified by (?:the )?(?:MegaGoldenClub )?API/i,
   /canonical .*security flow/i,
 ];
