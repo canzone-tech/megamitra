@@ -7,6 +7,7 @@ import { ProgramModule } from '../program/program.module';
 import { ReferralRewardModule } from '../referral-reward/referral-reward.module';
 import { UsersModule } from '../users/users.module';
 import { OwnerPortalController } from './owner-portal.controller';
+import { OwnerPortalDrawWorkflowService } from './owner-portal-draw-workflow.service';
 import { OwnerPortalService } from './owner-portal.service';
 
 @Module({
@@ -20,7 +21,7 @@ import { OwnerPortalService } from './owner-portal.service';
     LedgerModule,
   ],
   controllers: [OwnerPortalController],
-  providers: [OwnerPortalService],
+  providers: [OwnerPortalService, OwnerPortalDrawWorkflowService],
   exports: [OwnerPortalService],
 })
 export class OwnerPortalModule {}
