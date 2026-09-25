@@ -44,8 +44,8 @@ const fallbackTemplate: Template = {
   topbarVisible: true, topbarSticky: true, topbarStyle: 'GLASS', topbarDensity: 'COMFORTABLE', contentWidth: 'WIDE', mobileNavigation: 'BOTTOM',
 };
 const fallbackCms: Cms = {
-  dashboardEyebrow: 'My MegaMitra',
-  dashboardSubtitle: 'Program progress, binary settlement, wallet, referrals, payouts and rewards from your authenticated MegaMitra records.',
+  dashboardEyebrow: 'My MegaGoldenClub',
+  dashboardSubtitle: 'Program progress, binary settlement, wallet, referrals, payouts and rewards from your authenticated MegaGoldenClub records.',
   binarySectionTitle: 'Binary performance', programSectionTitle: 'Program progress', walletSectionTitle: 'Wallet ledger', rewardsSectionTitle: 'Rewards & referrals',
 };
 const tabs: Array<{ kind: Kind; label: string }> = [
@@ -203,7 +203,7 @@ export function PresentationConfig() {
         <aside className="mm-card">
           <div className="mm-card-head"><h2>Live member preview</h2><span className="mm-chip">Draft-safe</span></div>
           <div className="mm-card-body"><div className={styles.preview} style={previewStyle} data-sidebar-position={template.sidebarPosition} data-sidebar-width={template.sidebarWidth} data-sidebar-style={template.sidebarStyle} data-nav-style={template.navigationStyle} data-topbar-style={template.topbarStyle} data-topbar-density={template.topbarDensity} data-radius={theme.radius} data-density={theme.density} data-shadow={theme.shadow}>
-            {template.sidebarVisible ? <div className={styles.previewSidebar}><strong>MegaMitra</strong><span>Dashboard</span><span>Products</span><span>Withdrawals</span><span>KYC</span></div> : null}
+            {template.sidebarVisible ? <div className={styles.previewSidebar}><strong>MegaGoldenClub</strong><span>Dashboard</span><span>Products</span><span>Withdrawals</span><span>KYC</span></div> : null}
             <div className={styles.previewMain}>{template.topbarVisible ? <div className={styles.previewTopbar}><strong>{cms.dashboardEyebrow}</strong><span>{template.topbarSticky ? 'Sticky' : 'Static'} topbar</span></div> : null}<div className={styles.previewBody}><div className={styles.previewHero}><small>{cms.dashboardEyebrow}</small><strong>Hello, Member</strong><span>{cms.dashboardSubtitle}</span></div><div className={styles.previewStats}><div><small>Wallet</small><strong>₹ —</strong></div><div><small>Pairs</small><strong>—</strong></div><div><small>Rewards</small><strong>—</strong></div></div><div className={styles.previewCards}><div><strong>{cms.binarySectionTitle}</strong><span>Authoritative member data</span></div><div><strong>{cms.programSectionTitle}</strong><span>Versioned program state</span></div></div></div></div>
           </div><p className="mm-note" style={{ marginTop: 12 }}>Preview uses presentation-only placeholders. Real member values continue to come from authoritative APIs.</p></div>
         </aside>

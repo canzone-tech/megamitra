@@ -1,4 +1,4 @@
-# MegaMitra Backend
+# MegaGoldenClub Backend
 
 Planned NestJS + TypeScript REST API.
 

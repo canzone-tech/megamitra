@@ -1,6 +1,6 @@
-# MegaMitra
+# MegaGoldenClub
 
-MegaMitra is a configurable consumer rewards and binary-network platform with a shared template-based design system across the public website, member portal, and administration console.
+MegaGoldenClub is a configurable consumer rewards and binary-network platform with a shared template-based design system across the public website, member portal, and administration console.
 
 ## Architecture status
 
@@ -24,13 +24,13 @@ The repository is being bootstrapped from a clean initial state. The following p
 2. **Configuration over hard-coding** — commercial values such as registration fee, monthly amount, program duration, pair payout, referral reward and daily caps are versioned configuration.
 3. **Historical reproducibility** — every earning, reward and eligibility decision records the policy/version applied at that time.
 4. **Financial integrity** — payments, commissions, payouts and wallet movements are represented through auditable relational records and ledger entries in MySQL.
-5. **One design system** — flyer-derived MegaMitra branding is implemented through reusable theme tokens, components and page templates across the full project.
+5. **One design system** — flyer-derived MegaGoldenClub branding is implemented through reusable theme tokens, components and page templates across the full project.
 6. **Template-based UI** — templates and presentation content remain separate from business logic.
 
 ## Planned repository layout
 
 ```text
-megamitra/
+megagoldenclub/
 ├── frontend/       # public website + member portal
 ├── admin/          # administration console
 ├── backend/        # NestJS REST API and business engines

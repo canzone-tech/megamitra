@@ -44,8 +44,8 @@ export class JwtAuthGuard implements CanActivate {
     try {
       payload = await this.jwt.verifyAsync<JwtPayload>(token, {
         secret: this.config.getOrThrow<string>('JWT_ACCESS_SECRET'),
-        issuer: 'megamitra-api',
-        audience: 'megamitra-clients',
+        issuer: 'megagoldenclub-api',
+        audience: 'megagoldenclub-clients',
       });
     } catch {
       throw new UnauthorizedException('Invalid or expired access token');

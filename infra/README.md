@@ -1,4 +1,4 @@
-# MegaMitra Infrastructure
+# MegaGoldenClub Infrastructure
 
 Infrastructure and deployment configuration for Ubuntu 24.04 LTS.
 

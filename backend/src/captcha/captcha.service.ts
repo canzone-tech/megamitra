@@ -46,7 +46,7 @@ export class CaptchaService {
   }
 
   private key(id: string): string {
-    return `megamitra:captcha:v1:${id}`;
+    return `megagoldenclub:captcha:v1:${id}`;
   }
 
   private digest(value: string): string {

@@ -78,9 +78,9 @@ export const DEFAULT_TEMPLATE: TemplateDocument = {
 };
 
 export const DEFAULT_CMS: CmsDocument = {
-  dashboardEyebrow: 'My MegaMitra',
+  dashboardEyebrow: 'My MegaGoldenClub',
   dashboardSubtitle:
-    'Program progress, binary settlement, wallet, referrals, payouts and rewards from your authenticated MegaMitra records.',
+    'Program progress, binary settlement, wallet, referrals, payouts and rewards from your authenticated MegaGoldenClub records.',
   binarySectionTitle: 'Binary performance',
   programSectionTitle: 'Program progress',
   walletSectionTitle: 'Wallet ledger',

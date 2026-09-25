@@ -18,9 +18,9 @@ export default function MemberLoginPage() {
         <div className="mm-login-form">
           <p className="mm-eyebrow">Member portal</p>
           <h2 className="mm-title" style={{ fontSize: 34 }}>Welcome back</h2>
-          <p className="mm-subtitle" style={{ marginBottom: 26 }}>Credentials are verified by MegaMitra API and session tokens remain in HttpOnly cookies.</p>
+          <p className="mm-subtitle" style={{ marginBottom: 26 }}>Credentials are verified by MegaGoldenClub API and session tokens remain in HttpOnly cookies.</p>
           <LoginForm />
-          <p style={{ marginTop: 24, fontSize: 13, color: 'var(--mm-ink-500)' }}><Link href="/">← Back to MegaMitra Rewards</Link></p>
+          <p style={{ marginTop: 24, fontSize: 13, color: 'var(--mm-ink-500)' }}><Link href="/">← Back to MegaGoldenClub Rewards</Link></p>
         </div>
       </section>
     </main>

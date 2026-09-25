@@ -1,4 +1,4 @@
-# MegaMitra Production Runbook
+# MegaGoldenClub Production Runbook
 
 This runbook covers deployment and recovery controls after business milestone 0024. It does not introduce or redefine business rules.
 
@@ -58,7 +58,7 @@ Restore is destructive. Stop application traffic first and use an isolated host 
 From `backend/`:
 
 ```bash
-MEGAMITRA_RESTORE_CONFIRM=YES npm run restore:data -- /absolute/path/to/backup
+MEGAGOLDENCLUB_RESTORE_CONFIRM=YES npm run restore:data -- /absolute/path/to/backup
 ```
 
 The restore command verifies checksums, restores MySQL and MongoDB, clears Redis to prevent stale non-authoritative state, and runs `prisma migrate status`.

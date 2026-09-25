@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-BASE_URL="${MEGAMITRA_UAT_BASE_URL:-http://127.0.0.1:${PORT:-3100}}"
-HEADERS_FILE="$(mktemp -t megamitra-uat-headers.XXXXXX)"
-BODY_FILE="$(mktemp -t megamitra-uat-body.XXXXXX)"
+BASE_URL="${MEGAGOLDENCLUB_UAT_BASE_URL:-http://127.0.0.1:${PORT:-3100}}"
+HEADERS_FILE="$(mktemp -t megagoldenclub-uat-headers.XXXXXX)"
+BODY_FILE="$(mktemp -t megagoldenclub-uat-body.XXXXXX)"
 
 cleanup() {
   rm -f "${HEADERS_FILE}" "${BODY_FILE}"
@@ -70,4 +70,4 @@ else
   printf '%s\n' "==> UAT member token not supplied; authenticated member smoke skipped"
 fi
 
-printf '%s\n' "MegaMitra UAT smoke: PASS"
+printf '%s\n' "MegaGoldenClub UAT smoke: PASS"

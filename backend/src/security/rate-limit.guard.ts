@@ -67,7 +67,7 @@ export class RateLimitGuard implements CanActivate {
     const identity = request.ip || request.socket.remoteAddress || 'unknown';
     const identityHash = createHash('sha256').update(identity).digest('hex');
     const routeHash = createHash('sha256').update(path).digest('hex').slice(0, 16);
-    const key = `megamitra:rate:${rule.bucket}:${routeHash}:${identityHash}`;
+    const key = `megagoldenclub:rate:${rule.bucket}:${routeHash}:${identityHash}`;
 
     const result = (await this.redis
       .getClient()

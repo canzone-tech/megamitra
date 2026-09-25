@@ -21,7 +21,7 @@ export default function AdminLoginPage() {
           <p className="mm-eyebrow">Secure access</p>
           <h2 style={{ fontSize: 30, margin: '0 0 8px', letterSpacing: '-.04em' }}>Admin sign in</h2>
           <p className="mm-subtitle" style={{ marginBottom: 26 }}>
-            MegaMitra administrator credentials are verified by the API. Tokens stay in HttpOnly cookies in this web app.
+            MegaGoldenClub administrator credentials are verified by the API. Tokens stay in HttpOnly cookies in this web app.
           </p>
           <LoginForm />
         </div>

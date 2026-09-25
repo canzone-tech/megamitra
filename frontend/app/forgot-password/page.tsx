@@ -6,7 +6,7 @@ export default function ForgotPasswordPage() {
     <AuthPageShell
       eyebrow="Account recovery"
       title="Forgot your password?"
-      description="Enter the email attached to your MegaMitra account. The response is intentionally the same whether or not an account matches."
+      description="Enter the email attached to your MegaGoldenClub account. The response is intentionally the same whether or not an account matches."
     >
       <ForgotPasswordForm />
     </AuthPageShell>

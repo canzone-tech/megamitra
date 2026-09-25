@@ -1,4 +1,4 @@
-# MegaMitra UAT Checklist
+# MegaGoldenClub UAT Checklist
 
 Use this checklist against a release candidate after automated verification is green. Record tester, environment, release commit, date/time and evidence for each completed scenario. Use test accounts and non-production provider references unless the release procedure explicitly authorizes production validation.
 

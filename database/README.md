@@ -1,4 +1,4 @@
-# MegaMitra Database
+# MegaGoldenClub Database
 
 Database documentation, relational schema notes, migration/baseline guidance and data-integrity decisions belong here.
 

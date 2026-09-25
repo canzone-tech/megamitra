@@ -174,7 +174,7 @@ export function MemberKyc() {
           <div>
             <p className="mm-eyebrow">Identity verification</p>
             <h1 className="mm-title">KYC</h1>
-            <p className="mm-subtitle">Submit the fields and document references required by the currently published MegaMitra KYC policy. Every submission and review decision remains auditable.</p>
+            <p className="mm-subtitle">Submit the fields and document references required by the currently published MegaGoldenClub KYC policy. Every submission and review decision remains auditable.</p>
           </div>
           <button className="mm-button blue" type="button" disabled={loading} onClick={() => void load()}>{loading ? 'Refreshing…' : 'Refresh'}</button>
         </div>

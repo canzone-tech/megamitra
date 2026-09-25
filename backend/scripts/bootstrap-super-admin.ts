@@ -56,7 +56,7 @@ async function run() {
       }
       if (!rotatePassword) {
         console.log(
-          `MegaMitra SUPER_ADMIN already exists: ${existing.username}. Set SUPER_ADMIN_ROTATE_PASSWORD=true only when an explicit password rotation is intended.`,
+          `MegaGoldenClub SUPER_ADMIN already exists: ${existing.username}. Set SUPER_ADMIN_ROTATE_PASSWORD=true only when an explicit password rotation is intended.`,
         );
         return;
       }
@@ -81,7 +81,7 @@ async function run() {
           },
         }),
       ]);
-      console.log(`MegaMitra SUPER_ADMIN password rotated: ${existing.username}`);
+      console.log(`MegaGoldenClub SUPER_ADMIN password rotated: ${existing.username}`);
       return;
     }
 
@@ -111,7 +111,7 @@ async function run() {
         }
         return created;
       });
-      console.log(`MegaMitra SUPER_ADMIN ready: ${user.username}`);
+      console.log(`MegaGoldenClub SUPER_ADMIN ready: ${user.username}`);
     } catch (error) {
       if ((error as { code?: string }).code === 'P2002') {
         throw new Error(

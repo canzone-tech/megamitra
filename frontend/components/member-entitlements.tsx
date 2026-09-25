@@ -101,7 +101,7 @@ export function MemberEntitlements() {
 
       <main className="mm-member-main">
         <div className="mm-member-hero">
-          <div><p className="mm-eyebrow">Consumer rewards</p><h1 className="mm-title">My product benefits</h1><p className="mm-subtitle">Entitlements are generated from published MegaMitra rules and your verified program state. Historical grants keep the product and eligibility snapshot used when they were created.</p></div>
+          <div><p className="mm-eyebrow">Consumer rewards</p><h1 className="mm-title">My product benefits</h1><p className="mm-subtitle">Entitlements are generated from published MegaGoldenClub rules and your verified program state. Historical grants keep the product and eligibility snapshot used when they were created.</p></div>
           <button className="mm-button blue" type="button" disabled={loading} onClick={() => void load()}>{loading ? 'Refreshing…' : 'Refresh'}</button>
         </div>
 

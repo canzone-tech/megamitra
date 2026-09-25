@@ -13,7 +13,7 @@ import {
   UserStatus,
 } from '../src/generated/prisma/enums';
 
-describe('MegaMitra withdrawal foundation integration', () => {
+describe('MegaGoldenClub withdrawal foundation integration', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let passwords: PasswordService;

@@ -11,7 +11,7 @@ import {
   UserStatus,
 } from '../src/generated/prisma/enums';
 
-describe('MegaMitra binary business-domain integration', () => {
+describe('MegaGoldenClub binary business-domain integration', () => {
   let app: Awaited<ReturnType<typeof NestFactory.create>>;
   let prisma: PrismaService;
   let passwords: PasswordService;

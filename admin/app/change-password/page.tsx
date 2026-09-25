@@ -35,7 +35,7 @@ export default function ChangePasswordPage() {
         <div className="mm-login-form" style={{ maxWidth: 620, width: '100%', margin: '0 auto' }}>
           <p className="mm-eyebrow">Account security</p>
           <h1 className="mm-title" style={{ fontSize: 38 }}>Change required password</h1>
-          <p className="mm-subtitle" style={{ marginBottom: 26 }}>Set a new password before continuing to MegaMitra administration.</p>
+          <p className="mm-subtitle" style={{ marginBottom: 26 }}>Set a new password before continuing to MegaGoldenClub administration.</p>
           <form onSubmit={submit}>
             <div className="mm-field"><label htmlFor="currentPassword">Current password</label><input className="mm-input" id="currentPassword" type="password" autoComplete="current-password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} required /></div>
             <div className="mm-field"><label htmlFor="newPassword">New password</label><input className="mm-input" id="newPassword" type="password" autoComplete="new-password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} required /></div>

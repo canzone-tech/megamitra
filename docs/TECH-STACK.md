@@ -1,4 +1,4 @@
-# MegaMitra — Technology & Data Architecture Lock
+# MegaGoldenClub — Technology & Data Architecture Lock
 
 ## Locked technology stack
 

@@ -1,8 +1,8 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 
-const MEMBER_ACCESS_COOKIE = 'megamitra_member_access';
-const MEMBER_REFRESH_COOKIE = 'megamitra_member_refresh';
+const MEMBER_ACCESS_COOKIE = 'megagoldenclub_member_access';
+const MEMBER_REFRESH_COOKIE = 'megagoldenclub_member_refresh';
 
 export default function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;

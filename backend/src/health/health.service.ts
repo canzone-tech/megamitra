@@ -15,7 +15,7 @@ export class HealthService {
   live() {
     return {
       status: 'ok',
-      service: 'megamitra-api',
+      service: 'megagoldenclub-api',
       uptimeSeconds: Math.floor(process.uptime()),
       timestamp: new Date().toISOString(),
     };
@@ -36,7 +36,7 @@ export class HealthService {
 
     return {
       status: ready ? 'ok' : 'degraded',
-      service: 'megamitra-api',
+      service: 'megagoldenclub-api',
       services: {
         mysql: mysqlUp ? 'up' : 'down',
         redis: redisUp ? 'up' : 'down',

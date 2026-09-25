@@ -8,7 +8,7 @@ import { PrismaService } from '../src/database/prisma.service';
 import { UserStatus } from '../src/generated/prisma/enums';
 import { DEFAULT_TEMPLATE, DEFAULT_THEME } from '../src/presentation/presentation-schema';
 
-describe('MegaMitra presentation configuration integration', () => {
+describe('MegaGoldenClub presentation configuration integration', () => {
   let app: Awaited<ReturnType<typeof NestFactory.create>>;
   let prisma: PrismaService;
   let passwords: PasswordService;

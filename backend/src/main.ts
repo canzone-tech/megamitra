@@ -8,7 +8,7 @@ async function bootstrap() {
 
   const port = Number(process.env.PORT ?? 3100);
   await app.listen(port);
-  console.log(`MegaMitra API listening on http://localhost:${port}`);
+  console.log(`MegaGoldenClub API listening on http://localhost:${port}`);
 }
 
 void bootstrap();

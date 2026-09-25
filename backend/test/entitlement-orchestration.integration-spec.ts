@@ -15,7 +15,7 @@ import {
   UserStatus,
 } from '../src/generated/prisma/enums';
 
-describe('MegaMitra automatic entitlement orchestration integration', () => {
+describe('MegaGoldenClub automatic entitlement orchestration integration', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let passwords: PasswordService;

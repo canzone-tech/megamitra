@@ -12,7 +12,7 @@ import {
   UserStatus,
 } from '../src/generated/prisma/enums';
 
-describe('MegaMitra lucky draw prize fulfillment integration', () => {
+describe('MegaGoldenClub lucky draw prize fulfillment integration', () => {
   let app: Awaited<ReturnType<typeof NestFactory.create>>;
   let prisma: PrismaService;
   let passwords: PasswordService;

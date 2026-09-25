@@ -36,8 +36,8 @@ const defaults: PresentationRuntime = {
     mobileNavigation: 'BOTTOM',
   } },
   cms: { source: 'DEFAULT', versionId: null, version: null, content: {
-    dashboardEyebrow: 'My MegaMitra',
-    dashboardSubtitle: 'Program progress, binary settlement, wallet, referrals, payouts and rewards from your authenticated MegaMitra records.',
+    dashboardEyebrow: 'My MegaGoldenClub',
+    dashboardSubtitle: 'Program progress, binary settlement, wallet, referrals, payouts and rewards from your authenticated MegaGoldenClub records.',
     binarySectionTitle: 'Binary performance', programSectionTitle: 'Program progress', walletSectionTitle: 'Wallet ledger',
     rewardsSectionTitle: 'Rewards & referrals',
   } },

@@ -194,9 +194,9 @@ export function MemberDashboard() {
       <main className="mm-member-main">
         <div className="mm-member-hero">
           <div>
-            <p className="mm-eyebrow">My MegaMitra</p>
+            <p className="mm-eyebrow">My MegaGoldenClub</p>
             <h1 className="mm-title">{data ? `Hello, ${displayName}` : 'Member dashboard'}</h1>
-            <p className="mm-subtitle">Program progress, binary settlement, wallet, referrals, payouts and rewards from your authenticated MegaMitra records.</p>
+            <p className="mm-subtitle">Program progress, binary settlement, wallet, referrals, payouts and rewards from your authenticated MegaGoldenClub records.</p>
             <span className="mm-portal-pill">Authoritative account view</span>
           </div>
           <button className="mm-button blue" type="button" disabled={loading} onClick={() => void load()}>
@@ -312,7 +312,7 @@ export function MemberDashboard() {
               </section>
             </div>
           </>
-        ) : loading ? <div className="mm-card mm-empty">Loading your MegaMitra dashboard…</div> : null}
+        ) : loading ? <div className="mm-card mm-empty">Loading your MegaGoldenClub dashboard…</div> : null}
       </main>
     </div>
   );

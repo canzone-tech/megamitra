@@ -17,7 +17,7 @@ import {
   UserStatus,
 } from '../src/generated/prisma/enums';
 
-describe('MegaMitra program event orchestration integration', () => {
+describe('MegaGoldenClub program event orchestration integration', () => {
   let app: Awaited<ReturnType<typeof NestFactory.create>>;
   let prisma: PrismaService;
   let passwords: PasswordService;

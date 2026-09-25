@@ -38,7 +38,7 @@ export const envValidationSchema = Joi.object({
   RATE_LIMIT_RECOVERY_MAX: Joi.number().integer().min(1).max(10000).default(10),
   RATE_LIMIT_RECOVERY_WINDOW_MS: Joi.number().integer().min(1000).max(3600000).default(900000),
 
-  MEGAMITRA_PUBLIC_URL: Joi.string().uri({ scheme: ['http', 'https'] }).default('http://127.0.0.1:3102'),
+  MEGAGOLDENCLUB_PUBLIC_URL: Joi.string().uri({ scheme: ['http', 'https'] }).default('http://127.0.0.1:3102'),
   SMTP_HOST: Joi.string().allow('').default(''),
   SMTP_PORT: Joi.number().port().default(587),
   SMTP_SECURE: Joi.boolean().default(false),
@@ -46,6 +46,6 @@ export const envValidationSchema = Joi.object({
   SMTP_USERNAME: Joi.string().allow('').default(''),
   SMTP_PASSWORD: Joi.string().allow('').default(''),
   SMTP_FROM_EMAIL: Joi.string().email().allow('').default(''),
-  SMTP_FROM_NAME: Joi.string().max(120).default('MegaMitra'),
+  SMTP_FROM_NAME: Joi.string().max(120).default('MegaGoldenClub'),
   SMTP_TIMEOUT_MS: Joi.number().integer().min(1000).max(60000).default(10000),
 }).unknown(true);

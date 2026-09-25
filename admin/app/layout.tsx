@@ -4,8 +4,8 @@ import './globals.css';
 import './auth-actions.css';
 
 export const metadata: Metadata = {
-  title: 'MegaMitra Admin',
-  description: 'MegaMitra operations and policy administration',
+  title: 'MegaGoldenClub Admin',
+  description: 'MegaGoldenClub operations and policy administration',
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

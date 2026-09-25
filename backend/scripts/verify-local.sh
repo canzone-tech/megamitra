@@ -17,7 +17,7 @@ fi
 echo "==> Validating operational shell scripts"
 bash -n scripts/*.sh
 
-echo "==> Starting MegaMitra data services"
+echo "==> Starting MegaGoldenClub data services"
 docker compose --env-file "${ROOT_DIR}/.env" -f "${ROOT_DIR}/docker-compose.yml" up -d
 
 echo "==> Verifying MongoDB presentation store"
@@ -45,18 +45,12 @@ echo "==> Validating and generating Prisma client"
 npm run prisma:validate
 npm run prisma:generate
 
-echo "==> Applying pending MegaMitra migrations"
+echo "==> Applying pending MegaGoldenClub migrations"
 npx prisma migrate deploy
 npx prisma migrate status
 
-echo "==> Checking MegaMitra-only branding"
-# Exclude this verifier itself because the forbidden-brand regex is defined below.
-if grep -RniE 'FixTradeZone|fixtradezone|fix trade zone' src prisma scripts test package.json \
-  --exclude-dir=generated \
-  --exclude=verify-local.sh; then
-  echo "ERROR: foreign project branding found"
-  exit 1
-fi
+echo "==> Checking MegaGoldenClub branding contract"
+bash "${ROOT_DIR}/scripts/verify-branding.sh"
 
 echo "==> Lint"
 npm run lint
@@ -86,7 +80,7 @@ bash "${ROOT_DIR}/scripts/verify-frontends.sh"
 
 PORT_VALUE="$(grep -E '^PORT=' .env | tail -n1 | cut -d= -f2- || true)"
 PORT_VALUE="${PORT_VALUE:-3100}"
-LOG_FILE="$(mktemp -t megamitra-api.XXXXXX.log)"
+LOG_FILE="$(mktemp -t megagoldenclub-api.XXXXXX.log)"
 API_PID=""
 
 cleanup() {
@@ -105,12 +99,12 @@ API_PID=$!
 HEALTH=""
 for _ in $(seq 1 30); do
   if ! kill -0 "${API_PID}" 2>/dev/null; then
-    echo "ERROR: MegaMitra API exited during startup"
+    echo "ERROR: MegaGoldenClub API exited during startup"
     cat "${LOG_FILE}"
     exit 1
   fi
   HEALTH="$(curl -fsS "http://127.0.0.1:${PORT_VALUE}/health/ready" 2>/dev/null || true)"
-  if [[ "${HEALTH}" == *'"service":"megamitra-api"'* ]] && \
+  if [[ "${HEALTH}" == *'"service":"megagoldenclub-api"'* ]] && \
      [[ "${HEALTH}" == *'"mysql":"up"'* ]] && \
      [[ "${HEALTH}" == *'"redis":"up"'* ]] && \
      [[ "${HEALTH}" == *'"mongodb":"up"'* ]]; then
@@ -119,12 +113,12 @@ for _ in $(seq 1 30); do
   sleep 1
 done
 
-if [[ "${HEALTH}" != *'"service":"megamitra-api"'* ]]; then
-  echo "ERROR: MegaMitra readiness endpoint did not become ready"
+if [[ "${HEALTH}" != *'"service":"megagoldenclub-api"'* ]]; then
+  echo "ERROR: MegaGoldenClub readiness endpoint did not become ready"
   cat "${LOG_FILE}"
   exit 1
 fi
 
 printf '%s\n' "${HEALTH}"
-MEGAMITRA_UAT_BASE_URL="http://127.0.0.1:${PORT_VALUE}" ./scripts/uat-smoke.sh
-echo "MegaMitra local backend verification: PASS"
+MEGAGOLDENCLUB_UAT_BASE_URL="http://127.0.0.1:${PORT_VALUE}" ./scripts/uat-smoke.sh
+echo "MegaGoldenClub local backend verification: PASS"

@@ -17,7 +17,7 @@ export function AdminAuthPageShell({
         <div className="mm-login-art">
           <div className="mm-brand"><span className="mm-brand-mark">M</span><div>Mega<span className="mm-brand-accent">Mitra</span><div className="mm-brand-subtitle">Admin security</div></div></div>
           <h1 style={{ marginTop: 34 }}>Secure access, auditable recovery.</h1>
-          <p style={{ lineHeight: 1.7, opacity: .82 }}>Recovery and verification requests use one-time expiring tokens. The completion link opens the canonical MegaMitra public security flow.</p>
+          <p style={{ lineHeight: 1.7, opacity: .82 }}>Recovery and verification requests use one-time expiring tokens. The completion link opens the canonical MegaGoldenClub public security flow.</p>
         </div>
         <div className="mm-login-form">
           <p className="mm-eyebrow">{eyebrow}</p>

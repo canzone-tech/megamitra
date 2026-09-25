@@ -1,5 +1,5 @@
 {
-  "name": "@megamitra/design-tokens",
+  "name": "@megagoldenclub/design-tokens",
   "version": "0.1.0",
   "private": true,
   "sideEffects": ["*.css"],

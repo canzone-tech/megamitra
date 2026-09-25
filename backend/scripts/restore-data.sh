@@ -7,11 +7,11 @@ ENV_FILE="${ROOT_DIR}/.env"
 BACKUP_DIR="${1:-}"
 
 if [[ -z "${BACKUP_DIR}" ]]; then
-  echo "Usage: MEGAMITRA_RESTORE_CONFIRM=YES ./scripts/restore-data.sh /path/to/backup"
+  echo "Usage: MEGAGOLDENCLUB_RESTORE_CONFIRM=YES ./scripts/restore-data.sh /path/to/backup"
   exit 1
 fi
-if [[ "${MEGAMITRA_RESTORE_CONFIRM:-}" != "YES" ]]; then
-  echo "ERROR: restore is destructive. Re-run with MEGAMITRA_RESTORE_CONFIRM=YES"
+if [[ "${MEGAGOLDENCLUB_RESTORE_CONFIRM:-}" != "YES" ]]; then
+  echo "ERROR: restore is destructive. Re-run with MEGAGOLDENCLUB_RESTORE_CONFIRM=YES"
   exit 1
 fi
 if [[ ! -f "${ENV_FILE}" ]]; then
@@ -53,4 +53,4 @@ printf '%s\n' "==> Verifying schema state"
 cd "${BACKEND_DIR}"
 npx prisma migrate status
 
-printf '%s\n' "MegaMitra restore completed. Run npm run verify before reopening traffic."
+printf '%s\n' "MegaGoldenClub restore completed. Run npm run verify before reopening traffic."

@@ -1,7 +1,7 @@
 import { cookies } from 'next/headers';
 
-export const MEMBER_ACCESS_COOKIE = 'megamitra_member_access';
-export const MEMBER_REFRESH_COOKIE = 'megamitra_member_refresh';
+export const MEMBER_ACCESS_COOKIE = 'megagoldenclub_member_access';
+export const MEMBER_REFRESH_COOKIE = 'megagoldenclub_member_refresh';
 
 export type SessionUser = {
   id: string;
@@ -22,7 +22,7 @@ type TokenBundle = {
 };
 
 export function apiBaseUrl(): string {
-  return (process.env.MEGAMITRA_API_URL ?? 'http://127.0.0.1:3100').replace(/\/$/, '');
+  return (process.env.MEGAGOLDENCLUB_API_URL ?? 'http://127.0.0.1:3100').replace(/\/$/, '');
 }
 
 function cookieOptions(maxAge: number) {

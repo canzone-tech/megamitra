@@ -6,7 +6,7 @@ export default function AdminForgotPasswordPage() {
     <AdminAuthPageShell
       eyebrow="Account recovery"
       title="Forgot your password?"
-      description="Enter the account email. MegaMitra intentionally returns the same response whether or not an eligible account matches."
+      description="Enter the account email. MegaGoldenClub intentionally returns the same response whether or not an eligible account matches."
     >
       <AdminForgotPasswordForm />
     </AdminAuthPageShell>

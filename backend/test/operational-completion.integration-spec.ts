@@ -6,7 +6,7 @@ import { configureApp } from '../src/bootstrap/configure-app';
 import { PrismaService } from '../src/database/prisma.service';
 import { UserStatus } from '../src/generated/prisma/enums';
 
-describe('MegaMitra operational completion integration', () => {
+describe('MegaGoldenClub operational completion integration', () => {
   let app: Awaited<ReturnType<typeof NestFactory.create>>;
   let prisma: PrismaService;
   let passwords: PasswordService;

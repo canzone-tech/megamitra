@@ -23,7 +23,7 @@ cleanup_smoke() {
 verify_token_copy() {
   local target="$1"
   if ! cmp -s "${ROOT_DIR}/packages/design-tokens/tokens.css" "${target}"; then
-    echo "ERROR: MegaMitra design token copy drifted from canonical tokens.css: ${target}"
+    echo "ERROR: MegaGoldenClub design token copy drifted from canonical tokens.css: ${target}"
     exit 1
   fi
 }
@@ -101,8 +101,8 @@ expect_security_headers() {
 
 smoke_frontends() {
   echo "==> Smoke-testing production Next.js routes"
-  ADMIN_LOG="$(mktemp -t megamitra-admin.XXXXXX.log)"
-  MEMBER_LOG="$(mktemp -t megamitra-member.XXXXXX.log)"
+  ADMIN_LOG="$(mktemp -t megagoldenclub-admin.XXXXXX.log)"
+  MEMBER_LOG="$(mktemp -t megagoldenclub-member.XXXXXX.log)"
   trap cleanup_smoke EXIT INT TERM
 
   setsid npm --prefix "${ROOT_DIR}/admin" run start >"${ADMIN_LOG}" 2>&1 &
@@ -147,19 +147,15 @@ smoke_frontends() {
   MEMBER_LOG=""
 }
 
-FORBIDDEN_REGEX='Fix''TradeZone|fix''tradezone|fix trade zone'
-if grep -RniE "${FORBIDDEN_REGEX}" "${ROOT_DIR}/admin" "${ROOT_DIR}/frontend" "${ROOT_DIR}/packages" \
-  --exclude-dir=node_modules --exclude-dir=.next; then
-  echo "ERROR: foreign project branding found in frontend foundation"
-  exit 1
-fi
+echo "==> Verifying MegaGoldenClub branding contract"
+bash "${ROOT_DIR}/scripts/verify-branding.sh"
 
-echo "==> Verifying shared MegaMitra design token contract"
+echo "==> Verifying shared MegaGoldenClub design token contract"
 verify_token_copy "${ROOT_DIR}/admin/app/tokens.css"
 verify_token_copy "${ROOT_DIR}/frontend/app/tokens.css"
 
-verify_app "MegaMitra admin" "${ROOT_DIR}/admin"
-verify_app "MegaMitra public/member web" "${ROOT_DIR}/frontend"
+verify_app "MegaGoldenClub admin" "${ROOT_DIR}/admin"
+verify_app "MegaGoldenClub public/member web" "${ROOT_DIR}/frontend"
 smoke_frontends
 
-echo "MegaMitra frontend verification: PASS"
+echo "MegaGoldenClub frontend verification: PASS"

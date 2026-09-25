@@ -260,8 +260,8 @@ export class AuthService {
     try {
       payload = await this.jwt.verifyAsync<JwtPayload>(dto.refreshToken, {
         secret: this.config.getOrThrow<string>('JWT_REFRESH_SECRET'),
-        issuer: 'megamitra-api',
-        audience: 'megamitra-clients',
+        issuer: 'megagoldenclub-api',
+        audience: 'megagoldenclub-clients',
       });
     } catch {
       throw new UnauthorizedException('Invalid or expired refresh token');
@@ -564,8 +564,8 @@ export class AuthService {
       { sub: userId, sid: sessionId, typ: 'access' },
       {
         secret: this.config.getOrThrow<string>('JWT_ACCESS_SECRET'),
-        issuer: 'megamitra-api',
-        audience: 'megamitra-clients',
+        issuer: 'megagoldenclub-api',
+        audience: 'megagoldenclub-clients',
         expiresIn: ttl,
       },
     );
@@ -580,8 +580,8 @@ export class AuthService {
       { sub: userId, sid: sessionId, typ: 'refresh' },
       {
         secret: this.config.getOrThrow<string>('JWT_REFRESH_SECRET'),
-        issuer: 'megamitra-api',
-        audience: 'megamitra-clients',
+        issuer: 'megagoldenclub-api',
+        audience: 'megagoldenclub-clients',
         expiresIn: ttl,
       },
     );

@@ -17,7 +17,7 @@ import {
   UserStatus,
 } from '../src/generated/prisma/enums';
 
-describe('MegaMitra referral handoff and refund reconciliation integration', () => {
+describe('MegaGoldenClub referral handoff and refund reconciliation integration', () => {
   let app: Awaited<ReturnType<typeof NestFactory.create>>;
   let prisma: PrismaService;
   let passwords: PasswordService;

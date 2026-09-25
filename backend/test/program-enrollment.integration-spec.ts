@@ -6,7 +6,7 @@ import { configureApp } from '../src/bootstrap/configure-app';
 import { PrismaService } from '../src/database/prisma.service';
 import { ProgramIntervalUnit, UserStatus } from '../src/generated/prisma/enums';
 
-describe('MegaMitra program enrollment and payment integration', () => {
+describe('MegaGoldenClub program enrollment and payment integration', () => {
   let app: Awaited<ReturnType<typeof NestFactory.create>>;
   let prisma: PrismaService;
   let passwords: PasswordService;

@@ -38,7 +38,7 @@ export class SmtpMailService {
   }
 
   publicAppUrl(): string {
-    return (this.config.get<string>('MEGAMITRA_PUBLIC_URL') ?? 'http://127.0.0.1:3102').replace(/\/$/, '');
+    return (this.config.get<string>('MEGAGOLDENCLUB_PUBLIC_URL') ?? 'http://127.0.0.1:3102').replace(/\/$/, '');
   }
 
   async sendAuthEmail(
@@ -62,7 +62,7 @@ export class SmtpMailService {
     const username = this.config.get<string>('SMTP_USERNAME')?.trim() ?? '';
     const password = this.config.get<string>('SMTP_PASSWORD') ?? '';
     const fromEmail = this.cleanAddress(this.config.getOrThrow<string>('SMTP_FROM_EMAIL'));
-    const fromName = this.cleanHeader(this.config.get<string>('SMTP_FROM_NAME') ?? 'MegaMitra');
+    const fromName = this.cleanHeader(this.config.get<string>('SMTP_FROM_NAME') ?? 'MegaGoldenClub');
     const recipient = this.cleanAddress(to);
     const timeoutMs = Number(this.config.get<number>('SMTP_TIMEOUT_MS') ?? 10000);
 
@@ -138,7 +138,7 @@ export class SmtpMailService {
     message: RenderedAuthEmail,
   ): string {
     const subject = this.encodeHeader(this.cleanHeader(message.subject));
-    const messageId = `<${randomUUID()}@megamitra.local>`;
+    const messageId = `<${randomUUID()}@megagoldenclub.local>`;
     const headers = [
       `Date: ${new Date().toUTCString()}`,
       `Message-ID: ${messageId}`,
@@ -158,7 +158,7 @@ export class SmtpMailService {
       ].join('\r\n');
     }
 
-    const boundary = `megamitra-${randomUUID()}`;
+    const boundary = `megagoldenclub-${randomUUID()}`;
     return [
       ...headers,
       `Content-Type: multipart/alternative; boundary="${boundary}"`,
@@ -263,7 +263,7 @@ export class SmtpMailService {
   }
 
   private cleanEhloHost(value: string): string {
-    return value.replace(/[^a-zA-Z0-9.-]/g, '-') || 'megamitra.local';
+    return value.replace(/[^a-zA-Z0-9.-]/g, '-') || 'megagoldenclub.local';
   }
 
   private encodeHeader(value: string): string {

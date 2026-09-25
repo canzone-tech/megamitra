@@ -50,5 +50,5 @@ EOF
 )
 chmod 600 "${TARGET}"/*
 
-printf '%s\n' "MegaMitra backup created: ${TARGET}"
+printf '%s\n' "MegaGoldenClub backup created: ${TARGET}"
 printf '%s\n' "Encrypt and copy this directory to protected off-host storage before considering the backup complete."

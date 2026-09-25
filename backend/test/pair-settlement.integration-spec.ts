@@ -10,7 +10,7 @@ import {
   UserStatus,
 } from '../src/generated/prisma/enums';
 
-describe('MegaMitra explicit binary pair matching and ledger integration', () => {
+describe('MegaGoldenClub explicit binary pair matching and ledger integration', () => {
   let app: Awaited<ReturnType<typeof NestFactory.create>>;
   let prisma: PrismaService;
   let passwords: PasswordService;

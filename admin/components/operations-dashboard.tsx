@@ -305,7 +305,7 @@ export function OperationsDashboard() {
 
       <main className="mm-page">
         <div className="mm-hero-row">
-          <div><p className="mm-eyebrow">Authoritative exception handling</p><h1 className="mm-title">Operations control room</h1><p className="mm-subtitle">Refund effects, payout exceptions, product and prize fulfillment, reconciliation and audit history are surfaced from existing MegaMitra domain records. Actions call the same audited backend workflows used by the underlying modules.</p></div>
+          <div><p className="mm-eyebrow">Authoritative exception handling</p><h1 className="mm-title">Operations control room</h1><p className="mm-subtitle">Refund effects, payout exceptions, product and prize fulfillment, reconciliation and audit history are surfaced from existing MegaGoldenClub domain records. Actions call the same audited backend workflows used by the underlying modules.</p></div>
           <button className="mm-button" type="button" disabled={loading || busy} onClick={() => void load()}>{loading ? 'Refreshing…' : 'Refresh queues'}</button>
         </div>
 
@@ -361,7 +361,7 @@ export function OperationsDashboard() {
               </QueueCard>
             </div>
           </>
-        ) : loading ? <div className="mm-card mm-empty">Loading MegaMitra operations…</div> : null}
+        ) : loading ? <div className="mm-card mm-empty">Loading MegaGoldenClub operations…</div> : null}
       </main>
     </div>
   );

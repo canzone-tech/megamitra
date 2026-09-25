@@ -1,8 +1,8 @@
-# MegaMitra — Configurable Binary Business Architecture
+# MegaGoldenClub — Configurable Binary Business Architecture
 
 ## Product model
 
-MegaMitra combines:
+MegaGoldenClub combines:
 
 1. a consumer/rewards program with installments, products, draws, prizes and fulfilment; and
 2. a configurable binary-network compensation layer for eligible members/partners.

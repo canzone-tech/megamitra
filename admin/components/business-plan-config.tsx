@@ -484,7 +484,7 @@ export function BusinessPlanConfig() {
               <section className="mm-card"><div className="mm-card-head"><h2>Consumer product entitlement rules</h2><span className="mm-chip">{data.entitlements.length} policies</span></div><div className="mm-card-body"><p className="mm-note">Product catalog, non-winner eligibility, claim windows and fulfillment already have a dedicated control surface.</p><Link className="mm-button" href="/entitlements">Open entitlement control</Link></div></section>
             </div>
           </div>
-        ) : loading ? <div className="mm-card mm-empty">Loading MegaMitra business configuration…</div> : null}
+        ) : loading ? <div className="mm-card mm-empty">Loading MegaGoldenClub business configuration…</div> : null}
       </main>
     </div>
   );

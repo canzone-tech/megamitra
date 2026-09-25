@@ -45,7 +45,7 @@ type RegistrationConfigSnapshot = {
   allowMultipleAccountsPerMobile: boolean;
 };
 
-describe('MegaMitra auth integration', () => {
+describe('MegaGoldenClub auth integration', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let baseUrl: string;

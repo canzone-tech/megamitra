@@ -14,7 +14,7 @@ type ExtensionSnapshot = {
   emailChangeEnabled: number | boolean;
 };
 
-describe('MegaMitra auth recovery and email verification integration', () => {
+describe('MegaGoldenClub auth recovery and email verification integration', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let passwords: PasswordService;

@@ -7,7 +7,7 @@ import { configureApp } from '../src/bootstrap/configure-app';
 import { PrismaService } from '../src/database/prisma.service';
 import { UserStatus } from '../src/generated/prisma/enums';
 
-describe('MegaMitra KYC foundation integration', () => {
+describe('MegaGoldenClub KYC foundation integration', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let passwords: PasswordService;

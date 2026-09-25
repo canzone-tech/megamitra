@@ -1,8 +1,8 @@
-# MegaMitra — Shared Template & Design System Lock
+# MegaGoldenClub — Shared Template & Design System Lock
 
 ## Design source
 
-The supplied MegaMitra flyer is the visual reference for the initial brand direction. The product UI should translate that identity into a professional software design system rather than literally reproduce poster layouts.
+The supplied MegaGoldenClub flyer is the visual reference for the initial brand direction. The product UI should translate that identity into a professional software design system rather than literally reproduce poster layouts.
 
 ## Brand direction
 
@@ -146,7 +146,7 @@ The same brand system may use different density profiles:
 - Public/reward marketing screens: more expressive, promotional and visual
 - Member/admin operational screens: cleaner, denser and data-focused
 
-Both remain recognizably MegaMitra and use the same token/component foundation.
+Both remain recognizably MegaGoldenClub and use the same token/component foundation.
 
 ## Responsive rule
 

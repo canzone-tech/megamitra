@@ -536,7 +536,7 @@ export class AuthRecoveryService {
     windowMinutes: number,
     maxRequests: number,
   ): Promise<boolean> {
-    const key = `megamitra:auth-rate:v1:${category}:${this.hash(identity.toLowerCase())}`;
+    const key = `megagoldenclub:auth-rate:v1:${category}:${this.hash(identity.toLowerCase())}`;
     const client = this.redis.getClient();
     const count = await client.incr(key);
     if (count === 1) await client.expire(key, windowMinutes * 60);

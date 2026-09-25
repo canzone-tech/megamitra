@@ -2,7 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../src/app.module';
 import { configureApp } from '../src/bootstrap/configure-app';
 
-describe('MegaMitra production hardening integration', () => {
+describe('MegaGoldenClub production hardening integration', () => {
   let app: Awaited<ReturnType<typeof NestFactory.create>>;
   let baseUrl = '';
 
@@ -25,7 +25,7 @@ describe('MegaMitra production hardening integration', () => {
 
     expect(response.status).toBe(200);
     expect(body.status).toBe('ok');
-    expect(body.service).toBe('megamitra-api');
+    expect(body.service).toBe('megagoldenclub-api');
     expect(response.headers.get('x-request-id')).toBe('hardening-live-check');
     expect(response.headers.get('x-content-type-options')).toBe('nosniff');
     expect(response.headers.get('x-frame-options')).toBe('DENY');
