@@ -97,8 +97,8 @@ jobs:
           cache: npm
           cache-dependency-path: backend/package-lock.json
 
-      - name: Verify root handoff contract
-        run: node -e "const p=require('../package.json'); if (p.scripts?.verify !== 'npm --prefix backend run verify') process.exit(1)"
+      - name: Verify root handoff and brand contract
+        run: node -e "const p=require('../package.json'); if (p.name !== 'megagoldenclub' || p.scripts?.verify !== 'npm --prefix backend run verify') process.exit(1)"
 
       - name: Install exact dependencies
         run: npm ci
