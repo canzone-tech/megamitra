@@ -1,4 +1,3 @@
-import 'dotenv/config';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../src/app.module';
 import { PasswordService } from '../src/auth/password.service';
@@ -15,7 +14,7 @@ async function run() {
 
   if (!username || !password || !reason) {
     throw new Error(
-      'Set BREAK_GLASS_SUPER_ADMIN_USERNAME, BREAK_GLASS_SUPER_ADMIN_PASSWORD, and BREAK_GLASS_REASON for an emergency reset.',
+      'Set BREAK_GLASS_SUPER_ADMIN_USERNAME, BREAK_GLASS_SUPER_ADMIN_PASSWORD, and BREAK_GLASS_REASON in the invoking environment for an emergency reset.',
     );
   }
   if (confirmation !== CONFIRMATION) {
