@@ -22,6 +22,33 @@ Rate limiting is Redis-coordinated and non-authoritative. Production defaults ma
 
 SMTP and external payout/payment/fulfilment provider credentials remain provider-specific deployment inputs. Do not enable a provider integration until that provider is selected, configured and UAT-approved.
 
+## SUPER_ADMIN lifecycle
+
+`SUPER_ADMIN` is a normal persisted user with the `SUPER_ADMIN` role. MySQL stores the user record and password hash; environment files are not the credential source of truth.
+
+First-install bootstrap is create-only. Supply bootstrap credentials only in the invoking process environment and remove them from shell history/automation secret context after use. Do not add them to `.env` or commit them:
+
+```bash
+SUPER_ADMIN_USERNAME='founder' \
+SUPER_ADMIN_EMAIL='founder@example.com' \
+SUPER_ADMIN_PASSWORD='<one-time-strong-password>' \
+npm --prefix backend run super-admin:bootstrap
+```
+
+If the username already belongs to a `SUPER_ADMIN`, bootstrap exits without changing its password, status or sessions. Normal password changes and account recovery must use the application flows.
+
+If normal recovery is impossible, use the explicit break-glass reset. The command requires an authorization phrase and incident reason, rejects a reset to the current password, preserves account status, revokes active sessions, invalidates outstanding auth-action tokens, forces password change at next login and writes an audit record:
+
+```bash
+BREAK_GLASS_SUPER_ADMIN_USERNAME='founder' \
+BREAK_GLASS_SUPER_ADMIN_PASSWORD='<temporary-strong-password>' \
+BREAK_GLASS_REASON='INC-1234 recovery approved by on-call lead' \
+BREAK_GLASS_CONFIRM='RESET_SUPER_ADMIN_PASSWORD' \
+npm --prefix backend run super-admin:reset-break-glass
+```
+
+Treat break-glass use as an incident action. Record the operator, approval and ticket outside the application as required by the operating organization. Never place the temporary password in tickets, chat, logs or source control.
+
 ## Health and observability
 
 Use `GET /health/live` for process liveness. It intentionally does not depend on databases.
