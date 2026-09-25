@@ -1,0 +1,25 @@
+name: Temporary Brand Audit
+
+on:
+  push:
+    branches:
+      - dev/local-foundation
+    paths:
+      - '.github/workflows/temporary-brand-audit.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Audit legacy brand occurrences
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '=== Exact MegaMitra occurrences outside immutable migrations ==='
+          git grep -n 'MegaMitra' -- ':!backend/prisma/migrations/**' || true
+          echo '=== Case-insensitive megamitra occurrences outside immutable migrations ==='
+          git grep -ni 'megamitra' -- ':!backend/prisma/migrations/**' || true
