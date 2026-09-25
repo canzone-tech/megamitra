@@ -22,7 +22,7 @@
     "backup:data": "./scripts/backup-data.sh",
     "restore:data": "./scripts/restore-data.sh",
     "uat:smoke": "./scripts/uat-smoke.sh",
-    "verify": "./scripts/verify-local.sh"
+    "verify": "node ../scripts/verify-super-admin-lifecycle.mjs && ./scripts/verify-local.sh"
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
