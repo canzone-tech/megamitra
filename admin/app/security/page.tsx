@@ -10,7 +10,7 @@ export default function AdminSecurityPage() {
       </header>
       <main className="mm-page">
         <div className="mm-hero-row">
-          <div><p className="mm-eyebrow">Account security</p><h1 className="mm-title">Change your admin email</h1><p className="mm-subtitle">Enter your current password and confirm the new email address. For your security, you'll be signed out after the change.</p></div>
+          <div><p className="mm-eyebrow">Account security</p><h1 className="mm-title">Change your admin email</h1><p className="mm-subtitle">Enter your current password and confirm the new email address. For your security, you will be signed out after the change.</p></div>
         </div>
         <section className="mm-card" style={{ maxWidth: 640 }}>
           <div className="mm-card-head"><h2>Change account email</h2><span className="mm-chip warning">Re-verification required</span></div>

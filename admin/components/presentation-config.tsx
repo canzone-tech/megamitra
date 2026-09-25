@@ -182,7 +182,7 @@ export function PresentationConfig() {
       <nav className={styles.topActions}><Link className="mm-button secondary" href="/operations">Operations</Link><Link className="mm-button secondary" href="/business-plan">Business plan</Link></nav>
     </header>
     <main className="mm-page">
-      <div className="mm-hero-row"><div><p className="mm-eyebrow">Portal appearance</p><h1 className="mm-title">Presentation studio</h1><p className="mm-subtitle">Manage the member portal's colors, layout and wording. Preview changes as drafts, then publish when they are ready.</p></div><button className="mm-button" type="button" disabled={loading || busy} onClick={() => void load()}>{loading ? 'Loading…' : 'Refresh'}</button></div>
+      <div className="mm-hero-row"><div><p className="mm-eyebrow">Portal appearance</p><h1 className="mm-title">Presentation studio</h1><p className="mm-subtitle">Manage member portal colors, layout and wording. Preview changes as drafts, then publish when they are ready.</p></div><button className="mm-button" type="button" disabled={loading || busy} onClick={() => void load()}>{loading ? 'Loading…' : 'Refresh'}</button></div>
       {error ? <div className="mm-error" role="alert">{error}</div> : null}
       {message ? <div className="mm-success" role="status">{message}</div> : null}
       <div className="mm-tabs" role="tablist">{tabs.map(({ kind, label }) => <button className={`mm-tab ${tab === kind ? 'active' : ''}`} type="button" key={kind} onClick={() => setTab(kind)}>{label}</button>)}</div>
