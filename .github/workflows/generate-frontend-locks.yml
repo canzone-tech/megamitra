@@ -1,0 +1,45 @@
+name: Generate frontend lockfiles
+
+on:
+  push:
+    branches:
+      - dev/local-foundation
+    paths:
+      - '.github/workflows/generate-frontend-locks.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  generate-lockfiles:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Generate admin lockfile
+        run: npm --prefix admin install --package-lock-only --ignore-scripts --no-audit --no-fund
+
+      - name: Generate member lockfile
+        run: npm --prefix frontend install --package-lock-only --ignore-scripts --no-audit --no-fund
+
+      - name: Validate clean installs
+        run: |
+          npm --prefix admin ci --ignore-scripts --no-audit --no-fund
+          npm --prefix frontend ci --ignore-scripts --no-audit --no-fund
+
+      - name: Upload lockfiles
+        uses: actions/upload-artifact@v4
+        with:
+          name: megamitra-frontend-lockfiles
+          path: |
+            admin/package-lock.json
+            frontend/package-lock.json
+          if-no-files-found: error
+          retention-days: 1
