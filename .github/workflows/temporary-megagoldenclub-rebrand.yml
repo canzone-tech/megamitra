@@ -33,3 +33,5 @@ jobs:
           git add -A
           git commit -m 'refactor: rebrand platform to MegaGoldenClub'
           git push origin HEAD:dev/local-foundation
+
+# retry after excluding workflow files from the generated rebrand commit
