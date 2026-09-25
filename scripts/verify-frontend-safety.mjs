@@ -28,7 +28,7 @@ for (const file of files) {
   }
   for (const match of source.matchAll(/<form\b[^>]*>/g)) {
     const tag = match[0];
-    if (/\bonSubmit=/.test(tag) && !/\bmethod=/.test(tag)) {
+    if (/\bonSubmit=/.test(tag) && !/\bmethod=["']post["']/i.test(tag)) {
       const line = source.slice(0, match.index).split('\n').length;
       failures.push(`${file}:${line}: interactive form must declare method="post" to prevent native GET fallback`);
     }
