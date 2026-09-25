@@ -1,0 +1,43 @@
+name: Production UI Hardening V2
+
+on:
+  push:
+    branches:
+      - dev/local-foundation
+    paths:
+      - .github/workflows/production-ui-hardening-v2.yml
+
+permissions:
+  contents: write
+
+jobs:
+  harden-ui:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: dev/local-foundation
+          fetch-depth: 0
+
+      - name: Apply production UI hardening
+        run: node scripts/apply-production-ui-hardening.cjs
+
+      - name: Verify transformed source
+        run: |
+          node scripts/verify-frontend-safety.mjs
+          bash scripts/verify-branding.sh
+          git diff --check
+
+      - name: Commit hardened UI
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add admin frontend backend/src/presentation/presentation-schema.ts scripts/verify-branding.sh scripts/verify-frontends.sh scripts/verify-frontend-safety.mjs
+          if git diff --cached --quiet; then
+            echo "No UI hardening changes to commit"
+            exit 0
+          fi
+          git commit -m "fix: harden production client experience [ui-hardening]"
+          git push origin HEAD:dev/local-foundation
