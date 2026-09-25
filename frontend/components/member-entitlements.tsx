@@ -95,13 +95,13 @@ export function MemberEntitlements() {
   return (
     <div className="mm-member-shell">
       <header className="mm-site-header">
-        <Link className="mm-brand" href="/member"><span className="mm-brand-mark">M</span><span>Mega<span className="mm-brand-accent">Mitra</span></span></Link>
+        <Link className="mm-brand" href="/member"><span className="mm-brand-mark">M</span><span>Mega<span className="mm-brand-accent">GoldenClub</span></span></Link>
         <nav className="mm-nav"><Link className="mm-button light" href="/member/entitlements">Products</Link><Link className="mm-button light" href="/member/withdrawals">Withdrawals</Link><Link className="mm-button light" href="/member/kyc">KYC</Link><Link className="mm-button light" href="/member/security">Security</Link><button className="mm-button" type="button" onClick={() => void logout()}>Sign out</button></nav>
       </header>
 
       <main className="mm-member-main">
         <div className="mm-member-hero">
-          <div><p className="mm-eyebrow">Consumer rewards</p><h1 className="mm-title">My product benefits</h1><p className="mm-subtitle">Entitlements are generated from published MegaGoldenClub rules and your verified program state. Historical grants keep the product and eligibility snapshot used when they were created.</p></div>
+          <div><p className="mm-eyebrow">Member benefits</p><h1 className="mm-title">My product benefits</h1><p className="mm-subtitle">See the product benefits available to you, claim eligible benefits and follow fulfillment status here.</p></div>
           <button className="mm-button blue" type="button" disabled={loading} onClick={() => void load()}>{loading ? 'Refreshing…' : 'Refresh'}</button>
         </div>
 
@@ -118,13 +118,13 @@ export function MemberEntitlements() {
             </section>
 
             <section className="mm-card" style={{ marginTop: 20 }}>
-              <div className="mm-card-head"><h2>Entitlement history</h2><span className="mm-chip">{data.items.length} recorded</span></div>
+              <div className="mm-card-head"><h2>Benefit history</h2><span className="mm-chip">{data.items.length} recorded</span></div>
               <div className="mm-card-body">
                 {data.items.length ? <div className="mm-list">{data.items.map((row) => {
                   const snapshot = row.productSnapshot && typeof row.productSnapshot === 'object' ? row.productSnapshot as Row : {};
                   const id = String(row.id);
                   return <div className="mm-list-row" key={id} style={{ alignItems: 'flex-start' }}><div><strong>{text(row.productName ?? snapshot.name)}</strong><br /><span>{text(row.programName)} · Qty {text(row.quantity)}</span><br /><span>Granted {date(row.grantedAt)}{row.claimDeadline ? ` · Claim by ${date(row.claimDeadline)}` : ''}</span><br /><span>{money(row.nominalValue ?? snapshot.nominalValue, row.currencyCode ?? snapshot.currencyCode)}</span></div><div style={{ textAlign: 'right' }}><span className="mm-chip">{text(row.status)}</span>{row.status === 'GRANTED' ? <div style={{ marginTop: 10 }}><button className="mm-button blue" type="button" disabled={busyId === id} onClick={() => void claim(id)}>{busyId === id ? 'Claiming…' : 'Claim benefit'}</button></div> : null}</div></div>;
-                })}</div> : <div className="mm-empty">No product entitlements have been generated for your account yet.</div>}
+                })}</div> : <div className="mm-empty">No product benefits are available for your account yet.</div>}
               </div>
             </section>
           </>

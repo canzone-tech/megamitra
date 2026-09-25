@@ -37,8 +37,8 @@ const defaults: PresentationRuntime = {
   } },
   cms: { source: 'DEFAULT', versionId: null, version: null, content: {
     dashboardEyebrow: 'My MegaGoldenClub',
-    dashboardSubtitle: 'Program progress, binary settlement, wallet, referrals, payouts and rewards from your authenticated MegaGoldenClub records.',
-    binarySectionTitle: 'Binary performance', programSectionTitle: 'Program progress', walletSectionTitle: 'Wallet ledger',
+    dashboardSubtitle: 'See your program progress, wallet, referrals, binary rewards, withdrawals and lucky draw activity.',
+    binarySectionTitle: 'Binary performance', programSectionTitle: 'Program progress', walletSectionTitle: 'Wallet activity',
     rewardsSectionTitle: 'Rewards & referrals',
   } },
 };

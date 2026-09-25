@@ -17,11 +17,11 @@ export function AuthPageShell({
         <div className="mm-login-art">
           <Link className="mm-brand" href="/" style={{ color: 'white' }}>
             <span className="mm-brand-mark">M</span>
-            <span>Mega<span style={{ color: '#ffd66e' }}>Mitra</span></span>
+            <span>Mega<span style={{ color: '#ffd66e' }}>GoldenClub</span></span>
           </Link>
-          <h1>Secure account access, without shortcuts.</h1>
+          <h1>Keep your account secure.</h1>
           <p style={{ margin: 0, maxWidth: 420, lineHeight: 1.75, opacity: .84 }}>
-            Recovery and verification actions use expiring one-time links. Password resets and verified email changes revoke older sessions automatically.
+            Reset your password, verify your email or confirm an email change using the secure link sent to you.
           </p>
         </div>
         <div className="mm-login-form">

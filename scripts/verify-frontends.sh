@@ -6,6 +6,7 @@ ADMIN_PID=""
 MEMBER_PID=""
 ADMIN_LOG=""
 MEMBER_LOG=""
+LEGACY_UI_BRAND='Mega''Mitra'
 
 cleanup_smoke() {
   if [[ -n "${ADMIN_PID}" ]] && kill -0 "${ADMIN_PID}" 2>/dev/null; then
@@ -99,6 +100,32 @@ expect_security_headers() {
   fi
 }
 
+expect_body_text() {
+  local url="$1"
+  local text="$2"
+  if ! curl -fsS "${url}" | grep -Fq -- "${text}"; then
+    echo "ERROR: expected rendered text not found on ${url}: ${text}"
+    exit 1
+  fi
+}
+
+expect_body_absent() {
+  local url="$1"
+  local text="$2"
+  if curl -fsS "${url}" | grep -Fiq -- "${text}"; then
+    echo "ERROR: forbidden rendered text found on ${url}: ${text}"
+    exit 1
+  fi
+}
+
+expect_post_form() {
+  local url="$1"
+  if ! curl -fsS "${url}" | grep -Eq '<form[^>]*method="post"'; then
+    echo "ERROR: rendered auth form does not declare method=post on ${url}"
+    exit 1
+  fi
+}
+
 smoke_frontends() {
   echo "==> Smoke-testing production Next.js routes"
   ADMIN_LOG="$(mktemp -t megagoldenclub-admin.XXXXXX.log)"
@@ -114,6 +141,18 @@ smoke_frontends() {
   wait_for_url "http://127.0.0.1:3102/" "${MEMBER_PID}" "${MEMBER_LOG}"
   expect_security_headers "http://127.0.0.1:3101/login"
   expect_security_headers "http://127.0.0.1:3102/"
+
+  expect_body_text "http://127.0.0.1:3101/login" "MegaGoldenClub"
+  expect_body_absent "http://127.0.0.1:3101/login" "${LEGACY_UI_BRAND}"
+  expect_body_absent "http://127.0.0.1:3101/login" "HttpOnly"
+  expect_body_absent "http://127.0.0.1:3101/login" "verified by the API"
+  expect_post_form "http://127.0.0.1:3101/login"
+  expect_body_text "http://127.0.0.1:3102/login" "MegaGoldenClub"
+  expect_body_absent "http://127.0.0.1:3102/login" "${LEGACY_UI_BRAND}"
+  expect_body_absent "http://127.0.0.1:3102/login" "HttpOnly"
+  expect_post_form "http://127.0.0.1:3102/login"
+  expect_body_text "http://127.0.0.1:3102/" "MegaGoldenClub"
+  expect_body_absent "http://127.0.0.1:3102/" "${LEGACY_UI_BRAND}"
 
   expect_status 307 "http://127.0.0.1:3101/operations"
   expect_status 307 "http://127.0.0.1:3101/business-plan"
@@ -145,10 +184,13 @@ smoke_frontends() {
   MEMBER_PID=""
   ADMIN_LOG=""
   MEMBER_LOG=""
+LEGACY_UI_BRAND='Mega''Mitra'
 }
 
 echo "==> Verifying MegaGoldenClub branding contract"
 bash "${ROOT_DIR}/scripts/verify-branding.sh"
+echo "==> Verifying frontend privacy and native-form safety"
+node "${ROOT_DIR}/scripts/verify-frontend-safety.mjs"
 
 echo "==> Verifying shared MegaGoldenClub design token contract"
 verify_token_copy "${ROOT_DIR}/admin/app/tokens.css"

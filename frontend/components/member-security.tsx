@@ -37,12 +37,12 @@ export function MemberSecurity() {
   return (
     <div className="mm-member-shell">
       <header className="mm-site-header">
-        <Link className="mm-brand" href="/member"><span className="mm-brand-mark">M</span><span>Mega<span className="mm-brand-accent">Mitra</span></span></Link>
+        <Link className="mm-brand" href="/member"><span className="mm-brand-mark">M</span><span>Mega<span className="mm-brand-accent">GoldenClub</span></span></Link>
         <nav className="mm-nav"><Link className="mm-button light" href="/member">Dashboard</Link><Link className="mm-button light" href="/">Public site</Link></nav>
       </header>
       <main className="mm-member-main">
         <div className="mm-member-hero">
-          <div><p className="mm-eyebrow">Account security</p><h1 className="mm-title">Identity & email</h1><p className="mm-subtitle">Email changes require your current password plus confirmation from the new address. Successful changes revoke existing sessions.</p></div>
+          <div><p className="mm-eyebrow">Account security</p><h1 className="mm-title">Identity & email</h1><p className="mm-subtitle">To change your email, enter your current password and confirm the new address. For your security, you'll be signed out after the change.</p></div>
         </div>
         {error ? <div className="mm-error" role="alert">{error}</div> : null}
         <div className="mm-wide-grid">

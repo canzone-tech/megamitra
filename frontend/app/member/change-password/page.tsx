@@ -36,7 +36,7 @@ export default function MemberChangePasswordPage() {
           <p className="mm-eyebrow">Account security</p>
           <h1 className="mm-title">Choose a new password</h1>
           <p className="mm-subtitle" style={{ marginBottom: 26 }}>Your account requires a password change before the member dashboard can be used.</p>
-          <form onSubmit={submit}>
+          <form method="post" onSubmit={submit}>
             <div className="mm-field"><label htmlFor="currentPassword">Current password</label><input className="mm-input" id="currentPassword" type="password" autoComplete="current-password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} required /></div>
             <div className="mm-field"><label htmlFor="newPassword">New password</label><input className="mm-input" id="newPassword" type="password" autoComplete="new-password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} required /></div>
             {error ? <div className="mm-error" role="alert">{error}</div> : null}

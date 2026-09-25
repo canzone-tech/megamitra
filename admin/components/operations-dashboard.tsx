@@ -293,7 +293,7 @@ export function OperationsDashboard() {
   return (
     <div className="mm-admin-shell">
       <header className="mm-topbar">
-        <div className="mm-brand"><span className="mm-brand-mark">M</span><div><div>Mega<span className="mm-brand-accent">Mitra</span></div><div className="mm-brand-subtitle">Operational completion</div></div></div>
+        <div className="mm-brand"><span className="mm-brand-mark">M</span><div><div>Mega<span className="mm-brand-accent">GoldenClub</span></div><div className="mm-brand-subtitle">Operational completion</div></div></div>
         <nav style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <Link className="mm-button secondary" href="/business-plan">Business plan</Link>
           <Link className="mm-button secondary" href="/entitlements">Entitlements</Link>
@@ -305,7 +305,7 @@ export function OperationsDashboard() {
 
       <main className="mm-page">
         <div className="mm-hero-row">
-          <div><p className="mm-eyebrow">Authoritative exception handling</p><h1 className="mm-title">Operations control room</h1><p className="mm-subtitle">Refund effects, payout exceptions, product and prize fulfillment, reconciliation and audit history are surfaced from existing MegaGoldenClub domain records. Actions call the same audited backend workflows used by the underlying modules.</p></div>
+          <div><p className="mm-eyebrow">Daily operations</p><h1 className="mm-title">Operations overview</h1><p className="mm-subtitle">Review refunds, payouts, product benefits, prize fulfillment and items that need attention in one place.</p></div>
           <button className="mm-button" type="button" disabled={loading || busy} onClick={() => void load()}>{loading ? 'Refreshing…' : 'Refresh queues'}</button>
         </div>
 

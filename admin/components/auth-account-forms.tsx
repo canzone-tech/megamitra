@@ -34,7 +34,7 @@ export function AdminForgotPasswordForm() {
   }
 
   return (
-    <form onSubmit={submit}>
+    <form method="post" onSubmit={submit}>
       <div className="mm-field"><label htmlFor="admin-recovery-email">Account email</label><input className="mm-input" id="admin-recovery-email" type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required /></div>
       <ResultMessage result={result} />
       <button className="mm-button" type="submit" disabled={busy}>{busy ? 'Submitting…' : 'Send reset link'}</button>
@@ -65,7 +65,7 @@ export function AdminVerificationRequestForm() {
   }
 
   return (
-    <form onSubmit={submit}>
+    <form method="post" onSubmit={submit}>
       <div className="mm-field"><label htmlFor="admin-verification-email">Account email</label><input className="mm-input" id="admin-verification-email" type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required /></div>
       <ResultMessage result={result} />
       <button className="mm-button" type="submit" disabled={busy}>{busy ? 'Submitting…' : 'Send verification link'}</button>
@@ -98,7 +98,7 @@ export function AdminEmailChangeForm() {
   }
 
   return (
-    <form onSubmit={submit}>
+    <form method="post" onSubmit={submit}>
       <div className="mm-field"><label htmlFor="admin-new-email">New email</label><input className="mm-input" id="admin-new-email" type="email" autoComplete="email" value={newEmail} onChange={(event) => setNewEmail(event.target.value)} required /></div>
       <div className="mm-field"><label htmlFor="admin-current-password">Current password</label><input className="mm-input" id="admin-current-password" type="password" autoComplete="current-password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} required /></div>
       <ResultMessage result={result} />

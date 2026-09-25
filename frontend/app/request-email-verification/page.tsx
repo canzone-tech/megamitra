@@ -6,7 +6,7 @@ export default function RequestEmailVerificationPage() {
     <AuthPageShell
       eyebrow="Email verification"
       title="Need a new verification link?"
-      description="Enter the account email. For privacy, MegaGoldenClub returns the same response whether or not an eligible account matches."
+      description="Enter the email linked to your account. If verification is available, we'll send a new link."
     >
       <RequestEmailVerificationForm />
     </AuthPageShell>

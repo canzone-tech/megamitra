@@ -11,7 +11,7 @@ export default async function ConfirmEmailChangePage({
     <AuthPageShell
       eyebrow="Account security"
       title="Confirm your new email"
-      description="The new address becomes verified only after this one-time confirmation. Existing sessions are revoked after the change."
+      description="Confirm your new email address. For your security, you'll need to sign in again after the change."
     >
       <ConfirmEmailChangeForm token={token} />
     </AuthPageShell>

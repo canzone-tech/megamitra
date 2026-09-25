@@ -7,21 +7,21 @@ export default function AdminLoginPage() {
         <div className="mm-login-art">
           <div className="mm-brand">
             <span className="mm-brand-mark">M</span>
-            <span>Mega<span className="mm-brand-accent">Mitra</span></span>
+            <span>Mega<span className="mm-brand-accent">GoldenClub</span></span>
           </div>
-          <p className="mm-eyebrow" style={{ color: '#ffd978', marginTop: 38 }}>Operations console</p>
+          <p className="mm-eyebrow" style={{ color: '#ffd978', marginTop: 38 }}>Administration</p>
           <h1 id="admin-login-title" style={{ fontSize: 'clamp(34px, 5vw, 54px)', margin: 0, letterSpacing: '-.05em' }}>
-            Run the program from verified facts.
+            Manage MegaGoldenClub with confidence.
           </h1>
           <p style={{ maxWidth: 430, lineHeight: 1.7, opacity: .82 }}>
-            Policies, money movement, qualifications, draw operations and prize fulfillment stay auditable and separated by design.
+            Review members, programs, rewards, payouts and daily operations from one secure workspace.
           </p>
         </div>
         <div className="mm-login-form">
-          <p className="mm-eyebrow">Secure access</p>
-          <h2 style={{ fontSize: 30, margin: '0 0 8px', letterSpacing: '-.04em' }}>Admin sign in</h2>
+          <p className="mm-eyebrow">Admin access</p>
+          <h2 style={{ fontSize: 30, margin: '0 0 8px', letterSpacing: '-.04em' }}>Sign in to continue</h2>
           <p className="mm-subtitle" style={{ marginBottom: 26 }}>
-            MegaGoldenClub administrator credentials are verified by the API. Tokens stay in HttpOnly cookies in this web app.
+            Use your MegaGoldenClub administrator account to access the management console.
           </p>
           <LoginForm />
         </div>

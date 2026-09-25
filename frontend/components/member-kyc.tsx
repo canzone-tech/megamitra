@@ -160,7 +160,7 @@ export function MemberKyc() {
       <header className="mm-site-header">
         <Link className="mm-brand" href="/member">
           <span className="mm-brand-mark">M</span>
-          <span>Mega<span className="mm-brand-accent">Mitra</span></span>
+          <span>Mega<span className="mm-brand-accent">GoldenClub</span></span>
         </Link>
         <nav className="mm-nav">
           <Link className="mm-button light" href="/member">Dashboard</Link>
@@ -174,7 +174,7 @@ export function MemberKyc() {
           <div>
             <p className="mm-eyebrow">Identity verification</p>
             <h1 className="mm-title">KYC</h1>
-            <p className="mm-subtitle">Submit the fields and document references required by the currently published MegaGoldenClub KYC policy. Every submission and review decision remains auditable.</p>
+            <p className="mm-subtitle">Complete the requested details and document references to submit your KYC for review.</p>
           </div>
           <button className="mm-button blue" type="button" disabled={loading} onClick={() => void load()}>{loading ? 'Refreshing…' : 'Refresh'}</button>
         </div>
@@ -198,10 +198,10 @@ export function MemberKyc() {
             </section>
 
             <section className="mm-card">
-              <div className="mm-card-head"><h2>{canSubmit ? 'Submit KYC' : 'Submission locked'}</h2><span className="mm-chip">Versioned requirements</span></div>
+              <div className="mm-card-head"><h2>{canSubmit ? 'Submit KYC' : 'Submission locked'}</h2><span className="mm-chip">Current requirements</span></div>
               <div className="mm-card-body">
-                {!state.currentPolicy ? <div className="mm-empty">No active published default KYC policy is available.</div> : canSubmit ? (
-                  <form onSubmit={submit}>
+                {!state.currentPolicy ? <div className="mm-empty">KYC submission is not available right now.</div> : canSubmit ? (
+                  <form method="post" onSubmit={submit}>
                     {requiredFields.map((field) => (
                       <div className="mm-field" key={field}>
                         <label htmlFor={`kyc-field-${field}`}>{label(field)}</label>
@@ -211,7 +211,7 @@ export function MemberKyc() {
                     {requiredDocuments.map((type) => (
                       <div className="mm-field" key={type}>
                         <label htmlFor={`kyc-document-${type}`}>{label(type)} document reference</label>
-                        <input className="mm-input" id={`kyc-document-${type}`} value={documentRefs[type] ?? ''} onChange={(event) => setDocumentRefs((current) => ({ ...current, [type]: event.target.value }))} placeholder="Reference returned by configured document storage" required />
+                        <input className="mm-input" id={`kyc-document-${type}`} value={documentRefs[type] ?? ''} onChange={(event) => setDocumentRefs((current) => ({ ...current, [type]: event.target.value }))} placeholder="Enter the reference for this document" required />
                       </div>
                     ))}
                     <button className="mm-button blue" type="submit" disabled={busy}>{busy ? 'Submitting…' : 'Submit for review'}</button>

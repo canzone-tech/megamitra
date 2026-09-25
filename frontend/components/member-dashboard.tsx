@@ -179,7 +179,7 @@ export function MemberDashboard() {
       <header className="mm-site-header">
         <Link className="mm-brand" href="/member">
           <span className="mm-brand-mark">M</span>
-          <span>Mega<span className="mm-brand-accent">Mitra</span></span>
+          <span>Mega<span className="mm-brand-accent">GoldenClub</span></span>
         </Link>
         <nav className="mm-nav" aria-label="Member navigation">
           <Link className="mm-button light" href="/member/entitlements">Products</Link>
@@ -196,8 +196,8 @@ export function MemberDashboard() {
           <div>
             <p className="mm-eyebrow">My MegaGoldenClub</p>
             <h1 className="mm-title">{data ? `Hello, ${displayName}` : 'Member dashboard'}</h1>
-            <p className="mm-subtitle">Program progress, binary settlement, wallet, referrals, payouts and rewards from your authenticated MegaGoldenClub records.</p>
-            <span className="mm-portal-pill">Authoritative account view</span>
+            <p className="mm-subtitle">See your program progress, wallet, referrals, binary rewards, withdrawals and lucky draw activity.</p>
+            <span className="mm-portal-pill">Your account overview</span>
           </div>
           <button className="mm-button blue" type="button" disabled={loading} onClick={() => void load()}>
             {loading ? 'Refreshing…' : 'Refresh'}
@@ -212,7 +212,7 @@ export function MemberDashboard() {
               <article className="mm-card mm-stat">
                 <div className="mm-stat-label">Wallet balance</div>
                 <div className="mm-stat-value">{primaryWallet ? money(primaryWallet.balance, primaryWallet.currencyCode) : '—'}</div>
-                <span className="mm-metric-detail">Immutable ledger balance</span>
+                <span className="mm-metric-detail">Current account balance</span>
               </article>
               <article className="mm-card mm-stat">
                 <div className="mm-stat-label">Outstanding dues</div>
@@ -235,13 +235,13 @@ export function MemberDashboard() {
               <section className="mm-card">
                 <div className="mm-card-head">
                   <h2>Binary performance</h2>
-                  <span className="mm-chip">Published plan context</span>
+                  <span className="mm-chip">Your current plan</span>
                 </div>
                 <div className="mm-card-body">
                   <div className="mm-portal-metrics">
-                    <div className="mm-portal-metric"><span>Left available</span><strong>{leftAvailableUnits} unit{leftAvailableUnits === 1 ? '' : 's'}</strong><small>{qualifyingUnit ? `${text(leftAvailableUnits * qualifyingUnit)} qualified volume` : 'Current qualifying queue'}</small></div>
-                    <div className="mm-portal-metric"><span>Right available</span><strong>{rightAvailableUnits} unit{rightAvailableUnits === 1 ? '' : 's'}</strong><small>{qualifyingUnit ? `${text(rightAvailableUnits * qualifyingUnit)} qualified volume` : 'Current qualifying queue'}</small></div>
-                    <div className="mm-portal-metric"><span>Latest matched / paid</span><strong>{text(latestSettlement.pairCountCalculated ?? 0)} / {text(latestSettlement.pairCountPayable ?? 0)}</strong><small>{latestSettlement.settlementLocalDate ? `Settlement ${text(latestSettlement.settlementLocalDate)}` : 'No settlement recorded yet'}</small></div>
+                    <div className="mm-portal-metric"><span>Left available</span><strong>{leftAvailableUnits} unit{leftAvailableUnits === 1 ? '' : 's'}</strong><small>{qualifyingUnit ? `${text(leftAvailableUnits * qualifyingUnit)} qualified volume` : 'Current available units'}</small></div>
+                    <div className="mm-portal-metric"><span>Right available</span><strong>{rightAvailableUnits} unit{rightAvailableUnits === 1 ? '' : 's'}</strong><small>{qualifyingUnit ? `${text(rightAvailableUnits * qualifyingUnit)} qualified volume` : 'Current available units'}</small></div>
+                    <div className="mm-portal-metric"><span>Latest matched / paid</span><strong>{text(latestSettlement.pairCountCalculated ?? 0)} / {text(latestSettlement.pairCountPayable ?? 0)}</strong><small>{latestSettlement.settlementLocalDate ? `Settlement ${text(latestSettlement.settlementLocalDate)}` : 'No binary payout recorded yet'}</small></div>
                     <div className="mm-portal-metric"><span>Latest earnings</span><strong>{money(latestSettlement.payoutAmount, latestSettlement.currencyCode ?? binaryContext.currencyCode)}</strong><small>{dailyEarningCap === null ? 'No daily pair cap configured' : `Daily cap ${money(dailyEarningCap, binaryContext.currencyCode)}`}</small></div>
                     <div className="mm-portal-metric"><span>Carry forward · left</span><strong>{text(latestSettlement.leftUnitsCarryAfter ?? leftAvailableUnits)}</strong><small>{Boolean(binaryContext.carryForwardEnabled) ? 'Carry-forward enabled' : 'Current available units'}</small></div>
                     <div className="mm-portal-metric"><span>Carry forward · right</span><strong>{text(latestSettlement.rightUnitsCarryAfter ?? rightAvailableUnits)}</strong><small>{dailyPairCap === null ? 'Daily pair cap: unlimited' : `Daily pair cap: ${dailyPairCap}`}</small></div>

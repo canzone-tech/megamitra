@@ -154,13 +154,13 @@ export function KycAdmin() {
   return (
     <div className="mm-admin-shell">
       <header className="mm-topbar">
-        <Link className="mm-brand" href="/operations"><span className="mm-brand-mark">M</span><div><div>Mega<span className="mm-brand-accent">Mitra</span></div><div className="mm-brand-subtitle">Admin KYC</div></div></Link>
+        <Link className="mm-brand" href="/operations"><span className="mm-brand-mark">M</span><div><div>Mega<span className="mm-brand-accent">GoldenClub</span></div><div className="mm-brand-subtitle">Admin KYC</div></div></Link>
         <nav style={{ display: 'flex', gap: 8 }}><Link className="mm-button secondary" href="/operations">Operations</Link><Link className="mm-button secondary" href="/security">Security</Link></nav>
       </header>
 
       <main className="mm-page">
         <div className="mm-hero-row">
-          <div><p className="mm-eyebrow">Identity controls</p><h1 className="mm-title">KYC review & policy</h1><p className="mm-subtitle">Review member submissions against immutable published requirement versions. Decisions and policy lifecycle actions are audited.</p></div>
+          <div><p className="mm-eyebrow">Member verification</p><h1 className="mm-title">KYC review & policy</h1><p className="mm-subtitle">Review member KYC submissions, update requirements and manage approval decisions from one workspace.</p></div>
           <button className="mm-button" type="button" disabled={loading} onClick={() => void load()}>{loading ? 'Refreshing…' : 'Refresh'}</button>
         </div>
         {error ? <div className="mm-error" role="alert">{error}</div> : null}
@@ -221,7 +221,7 @@ export function KycAdmin() {
 
         {defaultPolicy ? <section className="mm-card" style={{ marginTop: 20 }}>
           <div className="mm-card-head"><h2>Create next draft</h2><span className="mm-chip">{defaultPolicy.code}</span></div>
-          <div className="mm-card-body"><form onSubmit={createDraft}>
+          <div className="mm-card-body"><form method="post" onSubmit={createDraft}>
             <div className="mm-field"><label htmlFor="kyc-effective-from">Effective from</label><input className="mm-input" id="kyc-effective-from" type="datetime-local" value={effectiveFrom} onChange={(event) => setEffectiveFrom(event.target.value)} /></div>
             <div className="mm-field"><label htmlFor="kyc-required-fields">Required fields (comma separated)</label><input className="mm-input" id="kyc-required-fields" value={requiredFields} onChange={(event) => setRequiredFields(event.target.value)} required /></div>
             <div className="mm-field"><label htmlFor="kyc-required-documents">Required document types (comma separated)</label><input className="mm-input" id="kyc-required-documents" value={requiredDocuments} onChange={(event) => setRequiredDocuments(event.target.value)} /></div>

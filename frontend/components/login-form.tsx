@@ -24,7 +24,7 @@ export function LoginForm() {
       setCaptchaAnswer('');
       setError(message);
     } catch {
-      setError('CAPTCHA is required, but a challenge could not be loaded. Please try again.');
+      setError('A security check is required, but it could not be loaded. Please try again.');
     }
   }
 
@@ -45,7 +45,7 @@ export function LoginForm() {
       router.refresh();
     } catch (reason) {
       if (reason instanceof ApiClientError && /captcha/i.test(reason.message)) {
-        await requestCaptcha(captcha ? 'CAPTCHA was incorrect or expired. Please solve the new challenge.' : 'CAPTCHA verification is enabled. Please solve the challenge and sign in again.');
+        await requestCaptcha(captcha ? 'The security check was incorrect or expired. Please try the new challenge.' : 'Please complete the security check and sign in again.');
       } else {
         setError(reason instanceof ApiClientError ? reason.message : 'Unable to sign in');
       }
@@ -55,7 +55,7 @@ export function LoginForm() {
   }
 
   return (
-    <form onSubmit={submit}>
+    <form method="post" onSubmit={submit}>
       <div className="mm-field">
         <label htmlFor="identifier">Username, email or mobile</label>
         <input className="mm-input" id="identifier" autoComplete="username" value={identifier} onChange={(event) => setIdentifier(event.target.value)} required />
@@ -76,7 +76,7 @@ export function LoginForm() {
         </div>
       ) : null}
       {error ? <div className="mm-error" role="alert">{error}</div> : null}
-      <button className="mm-button" type="submit" disabled={busy}>{busy ? 'Signing in…' : 'Open my dashboard'}</button>
+      <button className="mm-button" type="submit" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
     </form>
   );
 }

@@ -45,8 +45,8 @@ const fallbackTemplate: Template = {
 };
 const fallbackCms: Cms = {
   dashboardEyebrow: 'My MegaGoldenClub',
-  dashboardSubtitle: 'Program progress, binary settlement, wallet, referrals, payouts and rewards from your authenticated MegaGoldenClub records.',
-  binarySectionTitle: 'Binary performance', programSectionTitle: 'Program progress', walletSectionTitle: 'Wallet ledger', rewardsSectionTitle: 'Rewards & referrals',
+  dashboardSubtitle: 'See your program progress, wallet, referrals, binary rewards, withdrawals and lucky draw activity.',
+  binarySectionTitle: 'Binary performance', programSectionTitle: 'Program progress', walletSectionTitle: 'Wallet activity', rewardsSectionTitle: 'Rewards & referrals',
 };
 const tabs: Array<{ kind: Kind; label: string }> = [
   { kind: 'THEME', label: 'Colors & geometry' }, { kind: 'TEMPLATE', label: 'Sidebar & topbar' }, { kind: 'CMS', label: 'Portal copy' },
@@ -160,7 +160,7 @@ export function PresentationConfig() {
     try {
       await saveDraft(kind, false);
       await apiJson(`/api/backend/admin/presentation/versions/${editor.selected.id}/publish`, { method: 'POST' });
-      setMessage(`${editor.definition.name} published. Member runtime will use this immutable version.`);
+      setMessage(`${editor.definition.name} published. The member portal will now use this published version.`);
       await load();
     } catch (reason) { setError(reason instanceof ApiClientError ? reason.message : 'Unable to publish version'); }
     finally { setBusy(false); }
@@ -178,27 +178,27 @@ export function PresentationConfig() {
 
   return <div className="mm-admin-shell">
     <header className="mm-topbar">
-      <div className="mm-brand"><span className="mm-brand-mark">M</span><div><div>Mega<span className="mm-brand-accent">Mitra</span></div><div className="mm-brand-subtitle">Presentation studio</div></div></div>
+      <div className="mm-brand"><span className="mm-brand-mark">M</span><div><div>Mega<span className="mm-brand-accent">GoldenClub</span></div><div className="mm-brand-subtitle">Presentation studio</div></div></div>
       <nav className={styles.topActions}><Link className="mm-button secondary" href="/operations">Operations</Link><Link className="mm-button secondary" href="/business-plan">Business plan</Link></nav>
     </header>
     <main className="mm-page">
-      <div className="mm-hero-row"><div><p className="mm-eyebrow">Theme & template governance</p><h1 className="mm-title">Presentation studio</h1><p className="mm-subtitle">Configure member-portal appearance without changing financial or business truth. Drafts are editable; published versions are immutable and audited.</p></div><button className="mm-button" type="button" disabled={loading || busy} onClick={() => void load()}>{loading ? 'Loading…' : 'Refresh'}</button></div>
+      <div className="mm-hero-row"><div><p className="mm-eyebrow">Portal appearance</p><h1 className="mm-title">Presentation studio</h1><p className="mm-subtitle">Manage the member portal's colors, layout and wording. Preview changes as drafts, then publish when they are ready.</p></div><button className="mm-button" type="button" disabled={loading || busy} onClick={() => void load()}>{loading ? 'Loading…' : 'Refresh'}</button></div>
       {error ? <div className="mm-error" role="alert">{error}</div> : null}
       {message ? <div className="mm-success" role="status">{message}</div> : null}
       <div className="mm-tabs" role="tablist">{tabs.map(({ kind, label }) => <button className={`mm-tab ${tab === kind ? 'active' : ''}`} type="button" key={kind} onClick={() => setTab(kind)}>{label}</button>)}</div>
       <div className={styles.layout}>
         <section className="mm-card">
-          <div className="mm-card-head"><div><h2>{active?.definition.name ?? tabs.find((item) => item.kind === tab)?.label}</h2><p className="mm-note">{active?.definition.description ?? 'Loading configuration definition…'}</p></div>{active?.selected ? <span className={`mm-chip ${active.selected.lifecycle === 'DRAFT' ? 'warning' : active.selected.lifecycle === 'PUBLISHED' ? 'success' : ''}`}>{versionLabel(active.selected)}</span> : <span className="mm-chip">Compiled default</span>}</div>
+          <div className="mm-card-head"><div><h2>{active?.definition.name ?? tabs.find((item) => item.kind === tab)?.label}</h2><p className="mm-note">{active?.definition.description ?? 'Loading configuration definition…'}</p></div>{active?.selected ? <span className={`mm-chip ${active.selected.lifecycle === 'DRAFT' ? 'warning' : active.selected.lifecycle === 'PUBLISHED' ? 'success' : ''}`}>{versionLabel(active.selected)}</span> : <span className="mm-chip">Default design</span>}</div>
           <div className="mm-card-body">{active ? <>
             <div className={styles.versionRow}>
-              <label className="mm-field"><span>Inspect version</span><select className="mm-input" value={active.selected?.id ?? ''} onChange={(event) => void selectVersion(tab, event.target.value)} disabled={busy || !active.versions.length}><option value="">Compiled default</option>{active.versions.map((version) => <option key={version.id} value={version.id}>{versionLabel(version)}</option>)}</select></label>
+              <label className="mm-field"><span>Inspect version</span><select className="mm-input" value={active.selected?.id ?? ''} onChange={(event) => void selectVersion(tab, event.target.value)} disabled={busy || !active.versions.length}><option value="">Default design</option>{active.versions.map((version) => <option key={version.id} value={version.id}>{versionLabel(version)}</option>)}</select></label>
               <div className={styles.actions}>{!editable ? <button className="mm-button" type="button" disabled={busy} onClick={() => void createDraft(tab)}>Create draft</button> : <><button className="mm-button secondary" type="button" disabled={busy} onClick={() => void save(tab)}>Save draft</button><button className="mm-button" type="button" disabled={busy} onClick={() => void publish(tab)}>Publish</button></>}{active.selected?.lifecycle === 'PUBLISHED' ? <button className="mm-button secondary" type="button" disabled={busy} onClick={() => void retire(tab)}>Retire</button> : null}</div>
             </div>
             {tab === 'THEME' ? <ThemeFields value={theme} disabled={!editable || busy} onChange={updateTheme} /> : null}
             {tab === 'TEMPLATE' ? <TemplateFields value={template} disabled={!editable || busy} onChange={updateTemplate} /> : null}
             {tab === 'CMS' ? <CmsFields value={cms} disabled={!editable || busy} onChange={updateCms} /> : null}
             {!editable ? <p className="mm-note" style={{ marginTop: 16 }}>Published and retired versions are read-only. Create a draft to change these values.</p> : null}
-          </> : <div className="mm-empty">Loading presentation definitions…</div>}</div>
+          </> : <div className="mm-empty">Loading design settings…</div>}</div>
         </section>
         <aside className="mm-card">
           <div className="mm-card-head"><h2>Live member preview</h2><span className="mm-chip">Draft-safe</span></div>

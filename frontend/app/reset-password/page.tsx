@@ -11,7 +11,7 @@ export default async function ResetPasswordPage({
     <AuthPageShell
       eyebrow="Account recovery"
       title="Set a new password"
-      description="A successful reset revokes every existing session and invalidates other outstanding account-action links."
+      description="Choose a strong new password. After the reset, sign in again with your new password."
     >
       <ResetPasswordForm token={token} />
     </AuthPageShell>

@@ -15,9 +15,9 @@ export function AdminAuthPageShell({
     <main className="mm-login-wrap">
       <section className="mm-login-card">
         <div className="mm-login-art">
-          <div className="mm-brand"><span className="mm-brand-mark">M</span><div>Mega<span className="mm-brand-accent">Mitra</span><div className="mm-brand-subtitle">Admin security</div></div></div>
-          <h1 style={{ marginTop: 34 }}>Secure access, auditable recovery.</h1>
-          <p style={{ lineHeight: 1.7, opacity: .82 }}>Recovery and verification requests use one-time expiring tokens. The completion link opens the canonical MegaGoldenClub public security flow.</p>
+          <div className="mm-brand"><span className="mm-brand-mark">M</span><div>Mega<span className="mm-brand-accent">GoldenClub</span><div className="mm-brand-subtitle">Admin security</div></div></div>
+          <h1 style={{ marginTop: 34 }}>Keep your account secure.</h1>
+          <p style={{ lineHeight: 1.7, opacity: .82 }}>Reset your password or verify your email using the secure link sent to your registered email address.</p>
         </div>
         <div className="mm-login-form">
           <p className="mm-eyebrow">{eyebrow}</p>

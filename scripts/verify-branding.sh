@@ -28,4 +28,15 @@ if git grep -niE "${FOREIGN_BRAND_REGEX}" -- ':!backend/prisma/migrations/**'; t
   exit 1
 fi
 
+if git grep -ni 'Mitra' -- admin/app admin/components frontend/app frontend/components; then
+  echo "ERROR: legacy product branding found in client-facing UI"
+  exit 1
+fi
+
+UI_TECH_COPY_REGEX='HttpOnly|session tokens?|verified by (the )?(MegaGoldenClub )?API|canonical .*security flow'
+if git grep -niE "${UI_TECH_COPY_REGEX}" -- admin/app admin/components frontend/app frontend/components; then
+  echo "ERROR: engineering-only authentication copy found in client-facing UI"
+  exit 1
+fi
+
 echo "MegaGoldenClub branding verification: PASS"

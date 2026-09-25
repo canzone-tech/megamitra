@@ -222,13 +222,13 @@ export function MemberWithdrawals() {
   return (
     <div className="mm-member-shell">
       <header className="mm-site-header">
-        <Link className="mm-brand" href="/member"><span className="mm-brand-mark">M</span><span>Mega<span className="mm-brand-accent">Mitra</span></span></Link>
+        <Link className="mm-brand" href="/member"><span className="mm-brand-mark">M</span><span>Mega<span className="mm-brand-accent">GoldenClub</span></span></Link>
         <nav className="mm-nav"><Link className="mm-button light" href="/member">Dashboard</Link><Link className="mm-button light" href="/member/kyc">KYC</Link><Link className="mm-button light" href="/member/security">Security</Link><Link className="mm-button light" href="/">Public site</Link></nav>
       </header>
 
       <main className="mm-member-main">
         <div className="mm-member-hero">
-          <div><p className="mm-eyebrow">Wallet payout</p><h1 className="mm-title">Withdrawals</h1><p className="mm-subtitle">Requests reserve your available wallet balance while they are reviewed. The settled ledger changes only after a payout is confirmed.</p></div>
+          <div><p className="mm-eyebrow">Wallet payout</p><h1 className="mm-title">Withdrawals</h1><p className="mm-subtitle">When you submit a withdrawal, the requested amount is held while it is reviewed. Your balance updates when the payout is completed.</p></div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'end' }}><div className="mm-field" style={{ margin: 0 }}><label htmlFor="withdrawal-currency">Currency</label><input className="mm-input" id="withdrawal-currency" maxLength={3} value={currencyCode} onChange={(event) => setCurrencyCode(event.target.value.toUpperCase())} /></div><button className="mm-button blue" type="button" disabled={loading} onClick={() => void load()}>{loading ? 'Refreshing…' : 'Refresh'}</button></div>
         </div>
 
@@ -238,7 +238,7 @@ export function MemberWithdrawals() {
         {data ? (
           <>
             <section className="mm-dashboard-grid">
-              <article className="mm-card mm-stat"><div className="mm-stat-label">Ledger balance</div><div className="mm-stat-value">{money(data.wallet.balance, data.currencyCode)}</div></article>
+              <article className="mm-card mm-stat"><div className="mm-stat-label">Wallet balance</div><div className="mm-stat-value">{money(data.wallet.balance, data.currencyCode)}</div></article>
               <article className="mm-card mm-stat"><div className="mm-stat-label">Reserved</div><div className="mm-stat-value">{money(data.wallet.reservedAmount, data.currencyCode)}</div></article>
               <article className="mm-card mm-stat"><div className="mm-stat-label">Available</div><div className="mm-stat-value">{money(data.wallet.availableBalance, data.currencyCode)}</div></article>
               <article className="mm-card mm-stat"><div className="mm-stat-label">KYC</div><div className="mm-stat-value" style={{ fontSize: 22 }}>{data.kycStatus.replaceAll('_', ' ')}</div></article>
@@ -246,7 +246,7 @@ export function MemberWithdrawals() {
 
             <div className="mm-wide-grid">
               <section className="mm-card">
-                <div className="mm-card-head"><h2>Active policy</h2><span className={`mm-chip ${kycReady ? 'success' : 'warning'}`}>{data.policy?.policyCode ?? 'Unavailable'}</span></div>
+                <div className="mm-card-head"><h2>Withdrawal limits & fees</h2><span className={`mm-chip ${kycReady ? 'success' : 'warning'}`}>{data.policy?.policyCode ?? 'Unavailable'}</span></div>
                 <div className="mm-card-body">
                   {data.policy ? <div className="mm-list">
                     <div className="mm-list-row"><span>Amount range</span><strong>{money(data.policy.minAmount, data.currencyCode)} – {money(data.policy.maxAmount, data.currencyCode)}</strong></div>
@@ -258,10 +258,10 @@ export function MemberWithdrawals() {
               </section>
 
               <section className="mm-card">
-                <div className="mm-card-head"><h2>Request withdrawal</h2><span className="mm-chip">Reserved until finalized</span></div>
+                <div className="mm-card-head"><h2>Request withdrawal</h2><span className="mm-chip">Held while processing</span></div>
                 <div className="mm-card-body">
-                  {!data.policy ? <div className="mm-empty">A published policy is required before withdrawals can be requested.</div> : !kycReady ? <div className="mm-empty">This policy requires approved KYC. Complete KYC before requesting a withdrawal.</div> : !activeDestinations.length ? <div className="mm-empty">Add an active payout destination first.</div> : (
-                    <form onSubmit={createRequest}>
+                  {!data.policy ? <div className="mm-empty">Withdrawals are not available for this currency right now.</div> : !kycReady ? <div className="mm-empty">This policy requires approved KYC. Complete KYC before requesting a withdrawal.</div> : !activeDestinations.length ? <div className="mm-empty">Add an active payout destination first.</div> : (
+                    <form method="post" onSubmit={createRequest}>
                       <div className="mm-field"><label htmlFor="withdrawal-destination">Destination</label><select className="mm-input" id="withdrawal-destination" value={selectedDestination} onChange={(event) => setSelectedDestination(event.target.value)} required>{activeDestinations.map((destination) => <option key={destination.id} value={destination.id}>{destination.label} · {destination.type.replaceAll('_', ' ')}</option>)}</select></div>
                       <div className="mm-field"><label htmlFor="withdrawal-amount">Amount ({data.currencyCode})</label><input className="mm-input" id="withdrawal-amount" type="number" min={Number(data.policy.minAmount)} max={Number(data.policy.maxAmount)} step="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} required /></div>
                       <button className="mm-button blue" type="submit" disabled={busy}>{busy ? 'Submitting…' : 'Submit withdrawal'}</button>
@@ -273,12 +273,12 @@ export function MemberWithdrawals() {
 
             <div className="mm-wide-grid">
               <section className="mm-card">
-                <div className="mm-card-head"><h2>Payout destinations</h2><span className="mm-chip">Provider-neutral references</span></div>
+                <div className="mm-card-head"><h2>Payout destinations</h2><span className="mm-chip">Saved destinations</span></div>
                 <div className="mm-card-body">
-                  <form onSubmit={createDestination}>
+                  <form method="post" onSubmit={createDestination}>
                     <div className="mm-field"><label htmlFor="destination-type">Type</label><select className="mm-input" id="destination-type" value={destinationType} onChange={(event) => setDestinationType(event.target.value)}><option value="UPI">UPI</option><option value="BANK_REFERENCE">Bank reference</option><option value="OTHER">Other</option></select></div>
                     <div className="mm-field"><label htmlFor="destination-label">Label</label><input className="mm-input" id="destination-label" value={destinationLabel} onChange={(event) => setDestinationLabel(event.target.value)} placeholder="Primary payout" required /></div>
-                    <div className="mm-field"><label htmlFor="destination-reference">Destination reference</label><input className="mm-input" id="destination-reference" value={destinationReference} onChange={(event) => setDestinationReference(event.target.value)} placeholder="UPI ID or provider beneficiary reference" required /></div>
+                    <div className="mm-field"><label htmlFor="destination-reference">UPI ID / account reference</label><input className="mm-input" id="destination-reference" value={destinationReference} onChange={(event) => setDestinationReference(event.target.value)} placeholder="Enter the payout reference for this destination" required /></div>
                     <button className="mm-button" type="submit" disabled={busy}>{busy ? 'Saving…' : 'Add destination'}</button>
                   </form>
                   <div className="mm-list" style={{ marginTop: 16 }}>{data.destinations.map((destination) => <div className="mm-list-row" key={destination.id}><div><strong>{destination.label}</strong><br /><span>{destination.type.replaceAll('_', ' ')} · {destination.reference}</span></div><div style={{ textAlign: 'right' }}><span className={`mm-chip ${destination.status === 'ACTIVE' ? 'success' : ''}`}>{destination.status}</span>{destination.status === 'ACTIVE' ? <button className="mm-button light" style={{ marginLeft: 8 }} type="button" disabled={busy} onClick={() => void deactivateDestination(destination.id)}>Deactivate</button> : null}</div></div>)}</div>

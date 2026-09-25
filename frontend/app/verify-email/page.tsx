@@ -11,7 +11,7 @@ export default async function VerifyEmailPage({
     <AuthPageShell
       eyebrow="Email verification"
       title="Verify your email"
-      description="Confirm the address attached to your account using the one-time link that was sent to you."
+      description="Confirm your email address using the link we sent you."
     >
       <VerifyEmailForm token={token} />
     </AuthPageShell>

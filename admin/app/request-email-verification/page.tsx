@@ -6,7 +6,7 @@ export default function AdminVerificationRequestPage() {
     <AdminAuthPageShell
       eyebrow="Email verification"
       title="Need a verification link?"
-      description="Enter the account email. The response does not disclose whether an eligible account exists."
+      description="Enter the email linked to your administrator account. If verification is available, we'll send a new link."
     >
       <AdminVerificationRequestForm />
     </AdminAuthPageShell>

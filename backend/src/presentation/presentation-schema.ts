@@ -80,10 +80,10 @@ export const DEFAULT_TEMPLATE: TemplateDocument = {
 export const DEFAULT_CMS: CmsDocument = {
   dashboardEyebrow: 'My MegaGoldenClub',
   dashboardSubtitle:
-    'Program progress, binary settlement, wallet, referrals, payouts and rewards from your authenticated MegaGoldenClub records.',
+    'See your program progress, wallet, referrals, binary rewards, withdrawals and lucky draw activity.',
   binarySectionTitle: 'Binary performance',
   programSectionTitle: 'Program progress',
-  walletSectionTitle: 'Wallet ledger',
+  walletSectionTitle: 'Wallet activity',
   rewardsSectionTitle: 'Rewards & referrals',
 };
 

@@ -34,7 +34,7 @@ export function ForgotPasswordForm() {
   }
 
   return (
-    <form onSubmit={submit}>
+    <form method="post" onSubmit={submit}>
       <div className="mm-field">
         <label htmlFor="recovery-email">Account email</label>
         <input className="mm-input" id="recovery-email" type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
@@ -71,7 +71,7 @@ export function RequestEmailVerificationForm() {
   }
 
   return (
-    <form onSubmit={submit}>
+    <form method="post" onSubmit={submit}>
       <div className="mm-field">
         <label htmlFor="verification-email">Account email</label>
         <input className="mm-input" id="verification-email" type="email" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
@@ -102,7 +102,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
         method: 'POST',
         body: JSON.stringify({ token, newPassword: password }),
       });
-      setResult({ tone: 'success', message: 'Password reset completed. All previous sessions were revoked.' });
+      setResult({ tone: 'success', message: 'Password updated. Please sign in again with your new password.' });
       window.setTimeout(() => router.replace('/login'), 900);
     } catch (reason) {
       setResult({ tone: 'error', message: reason instanceof ApiClientError ? reason.message : 'Unable to reset password' });
@@ -111,9 +111,9 @@ export function ResetPasswordForm({ token }: { token: string }) {
     }
   }
 
-  if (!token) return <div className="mm-error">This password reset link is missing its secure token.</div>;
+  if (!token) return <div className="mm-error">This password reset link is incomplete. Please request a new reset link.</div>;
   return (
-    <form onSubmit={submit}>
+    <form method="post" onSubmit={submit}>
       <div className="mm-field"><label htmlFor="new-password">New password</label><input className="mm-input" id="new-password" type="password" autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} required /></div>
       <div className="mm-field"><label htmlFor="confirm-password">Confirm new password</label><input className="mm-input" id="confirm-password" type="password" autoComplete="new-password" value={confirm} onChange={(event) => setConfirm(event.target.value)} required /></div>
       {result ? <div className={result.tone === 'success' ? 'mm-success' : 'mm-error'} role="status">{result.message}</div> : null}
@@ -128,7 +128,7 @@ export function VerifyEmailForm({ token }: { token: string }) {
 
   async function verify() {
     if (!token) {
-      setResult({ tone: 'error', message: 'This verification link is missing its secure token.' });
+      setResult({ tone: 'error', message: 'This verification link is incomplete. Please request a new link.' });
       return;
     }
     setBusy(true);
@@ -160,7 +160,7 @@ export function ConfirmEmailChangeForm({ token }: { token: string }) {
 
   async function confirmChange() {
     if (!token) {
-      setResult({ tone: 'error', message: 'This email-change link is missing its secure token.' });
+      setResult({ tone: 'error', message: 'This email-change link is incomplete. Please request a new email change.' });
       return;
     }
     setBusy(true);
@@ -170,7 +170,7 @@ export function ConfirmEmailChangeForm({ token }: { token: string }) {
         method: 'POST',
         body: JSON.stringify({ token }),
       });
-      setResult({ tone: 'success', message: 'Email changed and verified. Existing sessions were revoked; please sign in again.' });
+      setResult({ tone: 'success', message: 'Email updated successfully. Please sign in again.' });
     } catch (reason) {
       setResult({ tone: 'error', message: reason instanceof ApiClientError ? reason.message : 'Unable to confirm email change' });
     } finally {
@@ -211,7 +211,7 @@ export function EmailChangeRequestForm() {
   }
 
   return (
-    <form onSubmit={submit}>
+    <form method="post" onSubmit={submit}>
       <div className="mm-field"><label htmlFor="new-email">New email</label><input className="mm-input" id="new-email" type="email" autoComplete="email" value={newEmail} onChange={(event) => setNewEmail(event.target.value)} required /></div>
       <div className="mm-field"><label htmlFor="email-change-password">Current password</label><input className="mm-input" id="email-change-password" type="password" autoComplete="current-password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} required /></div>
       {result ? <div className={result.tone === 'success' ? 'mm-success' : 'mm-error'} role="status">{result.message}</div> : null}
