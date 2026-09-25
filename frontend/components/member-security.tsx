@@ -42,7 +42,7 @@ export function MemberSecurity() {
       </header>
       <main className="mm-member-main">
         <div className="mm-member-hero">
-          <div><p className="mm-eyebrow">Account security</p><h1 className="mm-title">Identity & email</h1><p className="mm-subtitle">To change your email, enter your current password and confirm the new address. For your security, you'll be signed out after the change.</p></div>
+          <div><p className="mm-eyebrow">Account security</p><h1 className="mm-title">Identity & email</h1><p className="mm-subtitle">To change your email, enter your current password and confirm the new address. For your security, you will be signed out after the change.</p></div>
         </div>
         {error ? <div className="mm-error" role="alert">{error}</div> : null}
         <div className="mm-wide-grid">
