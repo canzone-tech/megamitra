@@ -17,8 +17,6 @@ CREATE TABLE `owner_seasons` (
   `binaryPlanVersionId` CHAR(36) NULL,
   `referralPolicyId` CHAR(36) NULL,
   `referralPolicyVersionId` CHAR(36) NULL,
-  `drawPolicyId` CHAR(36) NULL,
-  `drawPolicyVersionId` CHAR(36) NULL,
   `createdByUserId` CHAR(36) NULL,
   `reviewedByUserId` CHAR(36) NULL,
   `activatedByUserId` CHAR(36) NULL,
@@ -49,6 +47,30 @@ CREATE TABLE `owner_season_prizes` (
   UNIQUE INDEX `owner_season_prizes_month_code_key` (`seasonId`, `monthNumber`, `prizeCode`),
   INDEX `owner_season_prizes_season_month_idx` (`seasonId`, `monthNumber`),
   CONSTRAINT `owner_season_prizes_seasonId_fkey` FOREIGN KEY (`seasonId`) REFERENCES `owner_seasons` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+CREATE TABLE `owner_draw_runs` (
+  `id` CHAR(36) NOT NULL,
+  `seasonId` CHAR(36) NOT NULL,
+  `monthNumber` INT UNSIGNED NOT NULL,
+  `policyId` CHAR(36) NOT NULL,
+  `policyVersionId` CHAR(36) NOT NULL,
+  `drawId` CHAR(36) NOT NULL,
+  `status` VARCHAR(30) NOT NULL DEFAULT 'SCHEDULED',
+  `eligibilityLockedAt` DATETIME(3) NULL,
+  `verifiedAt` DATETIME(3) NULL,
+  `approvedAt` DATETIME(3) NULL,
+  `publishedAt` DATETIME(3) NULL,
+  `approvalReference` VARCHAR(120) NULL,
+  `approvalNote` VARCHAR(1000) NULL,
+  `createdByUserId` CHAR(36) NULL,
+  `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+  `updatedAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3) ON UPDATE CURRENT_TIMESTAMP(3),
+  PRIMARY KEY (`id`),
+  UNIQUE INDEX `owner_draw_runs_season_month_key` (`seasonId`, `monthNumber`),
+  UNIQUE INDEX `owner_draw_runs_drawId_key` (`drawId`),
+  INDEX `owner_draw_runs_status_idx` (`status`, `createdAt`),
+  CONSTRAINT `owner_draw_runs_seasonId_fkey` FOREIGN KEY (`seasonId`) REFERENCES `owner_seasons` (`id`) ON DELETE CASCADE ON UPDATE CASCADE
 ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 CREATE TABLE `member_profiles` (
