@@ -16,6 +16,7 @@ import { KycModule } from './kyc/kyc.module';
 import { LedgerModule } from './ledger/ledger.module';
 import { LuckyDrawModule } from './lucky-draw/lucky-draw.module';
 import { OperationalReadModule } from './operations/operational-read.module';
+import { OwnerPortalModule } from './owner-portal/owner-portal.module';
 import { PlatformConfigModule } from './platform-config/platform-config.module';
 import { PresentationModule } from './presentation/presentation.module';
 import { ProgramModule } from './program/program.module';
@@ -58,6 +59,7 @@ import { WithdrawalModule } from './withdrawal/withdrawal.module';
     LuckyDrawModule,
     OperationalReadModule,
     LedgerModule,
+    OwnerPortalModule,
     HealthModule,
   ],
 })
