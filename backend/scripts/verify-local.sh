@@ -83,17 +83,48 @@ PORT_VALUE="${PORT_VALUE:-3100}"
 LOG_FILE="$(mktemp -t megagoldenclub-api.XXXXXX.log)"
 API_PID=""
 
-cleanup() {
-  if [[ -n "${API_PID}" ]] && kill -0 "${API_PID}" 2>/dev/null; then
-    kill "${API_PID}" 2>/dev/null || true
-    wait "${API_PID}" 2>/dev/null || true
+assert_port_available() {
+  node -e '
+    const net = require("node:net");
+    const port = Number(process.argv[1]);
+    const server = net.createServer();
+    server.once("error", () => process.exit(1));
+    server.listen({ host: "127.0.0.1", port, exclusive: true }, () => {
+      server.close((error) => process.exit(error ? 1 : 0));
+    });
+  ' "${PORT_VALUE}"
+}
+
+terminate_api() {
+  if [[ -z "${API_PID}" ]]; then
+    return 0
   fi
+
+  kill -TERM -- "-${API_PID}" 2>/dev/null || true
+  for _ in $(seq 1 20); do
+    if ! kill -0 -- "-${API_PID}" 2>/dev/null; then
+      break
+    fi
+    sleep 0.1
+  done
+  kill -KILL -- "-${API_PID}" 2>/dev/null || true
+  wait "${API_PID}" 2>/dev/null || true
+  API_PID=""
+}
+
+cleanup() {
+  terminate_api
   rm -f "${LOG_FILE}"
 }
 trap cleanup EXIT INT TERM
 
+if ! assert_port_available; then
+  echo "ERROR: port ${PORT_VALUE} is already in use before compiled API verification"
+  exit 1
+fi
+
 echo "==> Booting compiled API on port ${PORT_VALUE}"
-npm run start:prod >"${LOG_FILE}" 2>&1 &
+setsid npm run start:prod >"${LOG_FILE}" 2>&1 &
 API_PID=$!
 
 HEALTH=""
@@ -121,4 +152,13 @@ fi
 
 printf '%s\n' "${HEALTH}"
 MEGAGOLDENCLUB_UAT_BASE_URL="http://127.0.0.1:${PORT_VALUE}" ./scripts/uat-smoke.sh
+
+echo "==> Verifying compiled API cleanup"
+cleanup
+trap - EXIT INT TERM
+if ! assert_port_available; then
+  echo "ERROR: verification left port ${PORT_VALUE} in use"
+  exit 1
+fi
+
 echo "MegaGoldenClub local backend verification: PASS"
