@@ -1,0 +1,8 @@
+{
+  "name": "megamitra",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "verify": "npm --prefix backend run verify"
+  }
+}
