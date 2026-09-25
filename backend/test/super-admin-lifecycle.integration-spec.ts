@@ -1,5 +1,6 @@
 import type { INestApplicationContext } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { execFileSync } from 'node:child_process';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { AppModule } from '../src/app.module';
 import { PasswordService } from '../src/auth/password.service';
@@ -15,6 +16,14 @@ describe('MegaGoldenClub SUPER_ADMIN lifecycle integration', () => {
   const createdUserIds: string[] = [];
 
   beforeAll(async () => {
+    const contract = execFileSync('node', ['../scripts/verify-super-admin-lifecycle.mjs'], {
+      cwd: process.cwd(),
+      env: process.env,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    expect(contract).toContain('MegaGoldenClub SUPER_ADMIN lifecycle verification: PASS');
+
     app = await NestFactory.createApplicationContext(AppModule, { logger: false });
     prisma = app.get(PrismaService);
     passwords = app.get(PasswordService);
