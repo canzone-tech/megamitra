@@ -19,7 +19,5 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          echo '=== Exact MegaMitra occurrences outside immutable migrations ==='
-          git grep -n 'MegaMitra' -- ':!backend/prisma/migrations/**' || true
-          echo '=== Case-insensitive megamitra occurrences outside immutable migrations ==='
-          git grep -ni 'megamitra' -- ':!backend/prisma/migrations/**' || true
+          echo '=== Exact legacy brand occurrences in immutable migrations ==='
+          git grep -n 'MegaMitra' -- 'backend/prisma/migrations/**' || true
