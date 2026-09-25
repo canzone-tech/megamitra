@@ -1,13 +1,16 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
+const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const roots = ['admin/app', 'admin/components', 'frontend/app', 'frontend/components'];
 const files = [];
-function walk(dir) {
+function walk(relativeDir) {
+  const dir = path.join(repoRoot, relativeDir);
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-    const file = path.join(dir, entry.name);
-    if (entry.isDirectory()) walk(file);
-    else if (entry.isFile() && file.endsWith('.tsx')) files.push(file);
+    const relativeFile = path.join(relativeDir, entry.name);
+    if (entry.isDirectory()) walk(relativeFile);
+    else if (entry.isFile() && relativeFile.endsWith('.tsx')) files.push(relativeFile);
   }
 }
 roots.forEach(walk);
@@ -16,16 +19,15 @@ const forbiddenCopy = [
   /\bMitra\b/i,
   /\bHttpOnly\b/i,
   /\bsession tokens?\b/i,
-  /\bJWT\b/i,
-  /\b(?:access|refresh) tokens?\b/i,
-  /\bbearer tokens?\b/i,
   /verified by (?:the )?(?:MegaGoldenClub )?API/i,
   /canonical .*security flow/i,
+  /\bJWT\b/i,
+  /\b(?:access|refresh|bearer) token\b/i,
 ];
 
 const failures = [];
 for (const file of files) {
-  const source = fs.readFileSync(file, 'utf8');
+  const source = fs.readFileSync(path.join(repoRoot, file), 'utf8');
   for (const pattern of forbiddenCopy) {
     if (pattern.test(source)) failures.push(`${file}: forbidden client-facing source pattern ${pattern}`);
   }
