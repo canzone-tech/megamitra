@@ -1,4 +1,4 @@
-name: Temporary Brand Audit
+name: Temporary MegaGoldenClub Rebrand
 
 on:
   push:
@@ -8,16 +8,264 @@ on:
       - '.github/workflows/temporary-brand-audit.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
-  audit:
+  rebrand:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Audit legacy brand occurrences
+        with:
+          fetch-depth: 1
+
+      - name: Apply compatibility-safe full rebrand
         shell: bash
         run: |
           set -euo pipefail
-          echo '=== Exact legacy brand occurrences in immutable migrations ==='
-          git grep -n 'MegaMitra' -- 'backend/prisma/migrations/**' || true
+          python3 <<'PY'
+          from pathlib import Path
+          import json
+          import subprocess
+
+          tracked = subprocess.check_output(['git', 'ls-files', '-z']).decode().split('\0')
+          replacements = [
+              ('MegaMitra', 'MegaGoldenClub'),
+              ('MEGAMITRA', 'MEGAGOLDENCLUB'),
+              ('@megamitra/design-tokens', '@megagoldenclub/design-tokens'),
+              ('megamitra-backend', 'megagoldenclub-backend'),
+              ('megamitra-admin', 'megagoldenclub-admin'),
+              ('megamitra-web', 'megagoldenclub-web'),
+              ('megamitra-member', 'megagoldenclub-member'),
+              ('megamitra_admin_access', 'megagoldenclub_admin_access'),
+              ('megamitra_admin_refresh', 'megagoldenclub_admin_refresh'),
+              ('megamitra_member_access', 'megagoldenclub_member_access'),
+              ('megamitra_member_refresh', 'megagoldenclub_member_refresh'),
+              ('megamitra-api', 'megagoldenclub-api'),
+              ('megamitra-clients', 'megagoldenclub-clients'),
+              ('megamitra:', 'megagoldenclub:'),
+              ('megamitra.local', 'megagoldenclub.local'),
+              ('megamitra-uat-headers', 'megagoldenclub-uat-headers'),
+              ('megamitra-uat-body', 'megagoldenclub-uat-body'),
+              ('megamitra-${randomUUID()}', 'megagoldenclub-${randomUUID()}'),
+          ]
+
+          for raw in tracked:
+              if not raw or raw.startswith('backend/prisma/migrations/'):
+                  continue
+              path = Path(raw)
+              try:
+                  text = path.read_text(encoding='utf-8')
+              except (UnicodeDecodeError, OSError):
+                  continue
+              updated = text
+              for old, new in replacements:
+                  updated = updated.replace(old, new)
+              if updated != text:
+                  path.write_text(updated, encoding='utf-8')
+
+          root_package = Path('package.json')
+          package = json.loads(root_package.read_text(encoding='utf-8'))
+          package['name'] = 'megagoldenclub'
+          root_package.write_text(json.dumps(package, indent=2) + '\n', encoding='utf-8')
+
+          readme = Path('README.md')
+          readme_text = readme.read_text(encoding='utf-8').replace('megamitra/', 'megagoldenclub/')
+          readme.write_text(readme_text, encoding='utf-8')
+
+          branding = Path('scripts/verify-branding.sh')
+          branding.write_text(r'''#!/usr/bin/env bash
+          set -euo pipefail
+
+          ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+          cd "${ROOT_DIR}"
+
+          LEGACY_BRAND='Mega''Mitra'
+          LEGACY_SLUG='mega''mitra'
+          FOREIGN_BRAND_REGEX='Fix''TradeZone|fix''tradezone|fix trade'' zone'
+
+          if git grep -n "${LEGACY_BRAND}" -- ':!backend/prisma/migrations/**'; then
+            echo "ERROR: legacy product branding found outside immutable migration history"
+            exit 1
+          fi
+
+          if git grep -ni "${LEGACY_SLUG}" -- \
+            ':!backend/prisma/migrations/**' \
+            ':!.env.example' \
+            ':!.github/workflows/backend-ci.yml' \
+            ':!backend/test/presentation.integration-spec.ts' \
+            ':!docker-compose.yml'; then
+            echo "ERROR: legacy product slug found outside approved persistence compatibility identifiers"
+            exit 1
+          fi
+
+          if git grep -niE "${FOREIGN_BRAND_REGEX}" -- ':!backend/prisma/migrations/**'; then
+            echo "ERROR: foreign project branding found"
+            exit 1
+          fi
+
+          echo "MegaGoldenClub branding verification: PASS"
+          '''.replace('          ', ''), encoding='utf-8')
+
+          migration_dir = Path('backend/prisma/migrations/0022_megagoldenclub_brand_transition')
+          migration_dir.mkdir(parents=True, exist_ok=False)
+          (migration_dir / 'migration.sql').write_text(r'''-- MegaGoldenClub brand transition.
+          -- Prior migrations remain immutable. This migration updates mutable display metadata
+          -- and creates new published email-template versions instead of rewriting published history.
+
+          UPDATE `roles`
+          SET `description` = REPLACE(`description`, 'MegaMitra', 'MegaGoldenClub'),
+              `updatedAt` = CURRENT_TIMESTAMP(3)
+          WHERE `description` LIKE '%MegaMitra%';
+
+          UPDATE `kyc_policies`
+          SET `name` = REPLACE(`name`, 'MegaMitra', 'MegaGoldenClub'),
+              `description` = REPLACE(`description`, 'MegaMitra', 'MegaGoldenClub'),
+              `updatedAt` = CURRENT_TIMESTAMP(3)
+          WHERE `name` LIKE '%MegaMitra%' OR `description` LIKE '%MegaMitra%';
+
+          UPDATE `withdrawal_policies`
+          SET `name` = REPLACE(`name`, 'MegaMitra', 'MegaGoldenClub'),
+              `description` = REPLACE(`description`, 'MegaMitra', 'MegaGoldenClub'),
+              `updatedAt` = CURRENT_TIMESTAMP(3)
+          WHERE `name` LIKE '%MegaMitra%' OR `description` LIKE '%MegaMitra%';
+
+          UPDATE `catalog_products`
+          SET `name` = REPLACE(`name`, 'MegaMitra', 'MegaGoldenClub'),
+              `description` = REPLACE(`description`, 'MegaMitra', 'MegaGoldenClub'),
+              `updatedAt` = CURRENT_TIMESTAMP(3)
+          WHERE `name` LIKE '%MegaMitra%' OR `description` LIKE '%MegaMitra%';
+
+          UPDATE `presentation_definitions`
+          SET `name` = REPLACE(`name`, 'MegaMitra', 'MegaGoldenClub'),
+              `description` = REPLACE(`description`, 'MegaMitra', 'MegaGoldenClub'),
+              `updatedAt` = CURRENT_TIMESTAMP(3)
+          WHERE `name` LIKE '%MegaMitra%' OR `description` LIKE '%MegaMitra%';
+
+          CREATE TEMPORARY TABLE `brand_email_template_sources` AS
+          SELECT
+            t.`id`,
+            t.`purpose`,
+            t.`subjectTemplate`,
+            t.`textTemplate`,
+            t.`htmlTemplate`,
+            t.`createdByUserId`,
+            (
+              SELECT COALESCE(MAX(v.`version`), 0) + 1
+              FROM `auth_email_template_versions` v
+              WHERE v.`purpose` = t.`purpose`
+            ) AS `nextVersion`
+          FROM `auth_email_template_versions` t
+          WHERE t.`lifecycle` = 'PUBLISHED'
+            AND (
+              t.`subjectTemplate` LIKE '%MegaMitra%'
+              OR t.`textTemplate` LIKE '%MegaMitra%'
+              OR t.`htmlTemplate` LIKE '%MegaMitra%'
+            );
+
+          UPDATE `auth_email_template_versions` t
+          INNER JOIN `brand_email_template_sources` s ON s.`id` = t.`id`
+          SET t.`lifecycle` = 'RETIRED',
+              t.`effectiveTo` = CURRENT_TIMESTAMP(3),
+              t.`retiredAt` = CURRENT_TIMESTAMP(3),
+              t.`updatedAt` = CURRENT_TIMESTAMP(3);
+
+          INSERT INTO `auth_email_template_versions` (
+            `id`, `purpose`, `version`, `lifecycle`, `subjectTemplate`, `textTemplate`, `htmlTemplate`,
+            `effectiveFrom`, `effectiveTo`, `createdByUserId`, `publishedByUserId`, `retiredByUserId`,
+            `publishedAt`, `retiredAt`, `createdAt`, `updatedAt`
+          )
+          SELECT
+            UUID(),
+            s.`purpose`,
+            s.`nextVersion`,
+            'PUBLISHED',
+            REPLACE(s.`subjectTemplate`, 'MegaMitra', 'MegaGoldenClub'),
+            REPLACE(s.`textTemplate`, 'MegaMitra', 'MegaGoldenClub'),
+            CASE
+              WHEN s.`htmlTemplate` IS NULL THEN NULL
+              ELSE REPLACE(s.`htmlTemplate`, 'MegaMitra', 'MegaGoldenClub')
+            END,
+            CURRENT_TIMESTAMP(3),
+            NULL,
+            s.`createdByUserId`,
+            NULL,
+            NULL,
+            CURRENT_TIMESTAMP(3),
+            NULL,
+            CURRENT_TIMESTAMP(3),
+            CURRENT_TIMESTAMP(3)
+          FROM `brand_email_template_sources` s;
+
+          DROP TEMPORARY TABLE `brand_email_template_sources`;
+          '''.replace('          ', ''), encoding='utf-8')
+
+          backend_verify = Path('backend/scripts/verify-local.sh')
+          text = backend_verify.read_text(encoding='utf-8')
+          old = '''echo "==> Checking MegaGoldenClub-only branding"
+          # Exclude this verifier itself because the forbidden-brand regex is defined below.
+          if grep -RniE 'FixTradeZone|fixtradezone|fix trade zone' src prisma scripts test package.json \\
+            --exclude-dir=generated \\
+            --exclude=verify-local.sh; then
+            echo "ERROR: foreign project branding found"
+            exit 1
+          fi
+          '''.replace('          ', '')
+          new = '''echo "==> Checking MegaGoldenClub branding contract"
+          bash "${ROOT_DIR}/scripts/verify-branding.sh"
+          '''.replace('          ', '')
+          if old not in text:
+              raise SystemExit('backend branding block not found')
+          backend_verify.write_text(text.replace(old, new), encoding='utf-8')
+
+          frontend_verify = Path('scripts/verify-frontends.sh')
+          text = frontend_verify.read_text(encoding='utf-8')
+          start = "FORBIDDEN_REGEX='Fix''TradeZone|fix''tradezone|fix trade zone'\n"
+          end = 'echo "==> Verifying shared MegaGoldenClub design token contract"\n'
+          start_idx = text.find(start)
+          end_idx = text.find(end)
+          if start_idx < 0 or end_idx < 0 or end_idx <= start_idx:
+              raise SystemExit('frontend branding block not found')
+          replacement = 'echo "==> Verifying MegaGoldenClub branding contract"\nbash "${ROOT_DIR}/scripts/verify-branding.sh"\n\n'
+          frontend_verify.write_text(text[:start_idx] + replacement + text[end_idx:], encoding='utf-8')
+
+          backend_ci = Path('.github/workflows/backend-ci.yml')
+          text = backend_ci.read_text(encoding='utf-8')
+          old = '''      - name: Verify MegaGoldenClub-only backend
+          run: |
+            if grep -RniE 'FixTradeZone|fixtradezone|fix trade zone' src prisma scripts test package.json --exclude-dir=generated --exclude=verify-local.sh; then
+              echo 'Foreign project branding found'
+              exit 1
+            fi
+
+          - name: Lint
+          '''.replace('          ', '')
+          new = '''      - name: Verify MegaGoldenClub branding contract
+          run: bash ../scripts/verify-branding.sh
+
+          - name: Lint
+          '''.replace('          ', '')
+          if old not in text:
+              raise SystemExit('backend CI branding block not found')
+          backend_ci.write_text(text.replace(old, new), encoding='utf-8')
+          PY
+
+          chmod +x scripts/verify-branding.sh
+          rm -f .github/workflows/temporary-brand-audit.yml
+
+          bash scripts/verify-branding.sh
+          bash -n scripts/verify-branding.sh
+          bash -n scripts/verify-frontends.sh
+          bash -n backend/scripts/*.sh
+
+          git diff --check
+          git status --short
+
+      - name: Commit rebrand
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'canzone-tech'
+          git config user.email 'canzone-tech@users.noreply.github.com'
+          git add -A
+          git commit -m 'refactor: rebrand platform to MegaGoldenClub'
+          git push origin HEAD:dev/local-foundation
