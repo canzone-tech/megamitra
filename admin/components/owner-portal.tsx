@@ -169,7 +169,7 @@ export function OwnerPortal({ section }: { section: Section }) {
     void fetchSection();
   }, [fetchSection]);
 
-  const act = async (work: () => Promise<unknown>, success: string, reload = true) => {
+  const act = async <T,>(work: () => Promise<T>, success: string, reload = true): Promise<T | null> => {
     setBusy(true);
     setError('');
     setNotice('');
