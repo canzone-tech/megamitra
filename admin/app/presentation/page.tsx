@@ -1,5 +1,5 @@
-import { PresentationConfig } from '@/components/presentation-config';
+import { redirect } from 'next/navigation';
 
 export default function PresentationPage() {
-  return <PresentationConfig />;
+  redirect('/portal/settings#appearance');
 }

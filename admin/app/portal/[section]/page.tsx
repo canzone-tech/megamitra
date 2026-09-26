@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { OwnerControlPortal, type OwnerControlSection } from '@/components/owner-control-portal';
 import { OwnerCorePortal, type OwnerCoreSection } from '@/components/owner-core-portal';
 import { OwnerFinancePortal, type OwnerFinanceSection } from '@/components/owner-finance-portal';
+import { SettingsGovernancePortal } from '@/components/settings-governance-portal';
 
 const SECTIONS = new Set([
   'income',
@@ -41,7 +42,6 @@ const CONTROL_SECTIONS = new Set<OwnerControlSection>([
   'reports',
   'notifications',
   'support',
-  'settings',
 ]);
 
 type PageProps = { params: Promise<{ section: string }> };
@@ -49,6 +49,7 @@ type PageProps = { params: Promise<{ section: string }> };
 export default async function OwnerPortalSectionPage({ params }: PageProps) {
   const { section } = await params;
   if (!SECTIONS.has(section)) notFound();
+  if (section === 'settings') return <SettingsGovernancePortal />;
   if (CORE_SECTIONS.has(section as OwnerCoreSection)) {
     return <OwnerCorePortal section={section as OwnerCoreSection} />;
   }
