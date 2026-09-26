@@ -173,8 +173,8 @@ export function PlatformConfigAdmin() {
       <section className="mm-card">
         <div className="mm-card-head"><h2>Authentication & recovery</h2><span className="mm-chip">DB CONFIG</span></div>
         <div className="mm-card-body">
-          <p className="mm-note" style={{ marginBottom: 18 }}>Control allowed login identifiers, CAPTCHA, token lifetimes and email-based recovery. At least one login method must remain enabled.</p>
-          <form className="mm-form" key={text(auth.updatedAt, 'auth')} onSubmit={saveAuth}>
+          <p className="mm-note" style={{ marginBottom: 18 }}>Control allowed login identifiers, CAPTCHA, credential lifetimes and email-based recovery. At least one login method must remain enabled.</p>
+          <form className="mm-form" method="post" key={text(auth.updatedAt, 'auth')} onSubmit={saveAuth}>
             <div className="mm-grid two">
               <div className="mm-card-body" style={{ padding: 0 }}>
                 <h3>Login methods</h3>
@@ -184,8 +184,8 @@ export function PlatformConfigAdmin() {
                 <Check name="captchaOnLoginEnabled" label="CAPTCHA on login" defaultChecked={bool(auth.captchaOnLoginEnabled)} />
                 <Check name="captchaOnRegistrationEnabled" label="CAPTCHA on registration" defaultChecked={bool(auth.captchaOnRegistrationEnabled)} />
                 <label>CAPTCHA validity (seconds)<input name="captchaTtlSeconds" type="number" min="30" defaultValue={num(auth.captchaTtlSeconds, 300)} required /></label>
-                <label>Access token TTL (seconds)<input name="accessTokenTtlSeconds" type="number" min="60" defaultValue={num(auth.accessTokenTtlSeconds, 900)} required /></label>
-                <label>Refresh token TTL (seconds)<input name="refreshTokenTtlSeconds" type="number" min="300" defaultValue={num(auth.refreshTokenTtlSeconds, 2592000)} required /></label>
+                <label>Short-session credential TTL (seconds)<input name="accessTokenTtlSeconds" type="number" min="60" defaultValue={num(auth.accessTokenTtlSeconds, 900)} required /></label>
+                <label>Renewal credential TTL (seconds)<input name="refreshTokenTtlSeconds" type="number" min="300" defaultValue={num(auth.refreshTokenTtlSeconds, 2592000)} required /></label>
               </div>
               <div className="mm-card-body" style={{ padding: 0 }}>
                 <h3>Recovery & verification</h3>
@@ -209,7 +209,7 @@ export function PlatformConfigAdmin() {
       <section className="mm-card">
         <div className="mm-card-head"><h2>Session & password security</h2><span className="mm-chip">ENFORCED</span></div>
         <div className="mm-card-body">
-          <form className="mm-form" key={text(security.updatedAt, 'security')} onSubmit={saveSecurity}>
+          <form className="mm-form" method="post" key={text(security.updatedAt, 'security')} onSubmit={saveSecurity}>
             <div className="mm-grid two">
               <label>Idle timeout (minutes)<input name="idleTimeoutMinutes" type="number" min="1" defaultValue={num(security.idleTimeoutMinutes, 30)} required /></label>
               <label>Absolute session timeout (minutes)<input name="absoluteSessionTimeoutMinutes" type="number" min="1" defaultValue={num(security.absoluteSessionTimeoutMinutes, 1440)} required /></label>
@@ -218,7 +218,7 @@ export function PlatformConfigAdmin() {
               <label>Account lock duration (minutes)<input name="lockoutMinutes" type="number" min="1" defaultValue={num(security.lockoutMinutes, 15)} required /></label>
               <label>Minimum password length<input name="passwordMinLength" type="number" min="8" max="256" defaultValue={num(security.passwordMinLength, 12)} required /></label>
               <label>Maximum password length<input name="passwordMaxLength" type="number" min="8" max="256" defaultValue={num(security.passwordMaxLength, 128)} required /></label>
-              <Check name="refreshTokenRotationEnabled" label="Rotate refresh tokens" defaultChecked={bool(security.refreshTokenRotationEnabled)} note="Recommended for session replay protection." />
+              <Check name="refreshTokenRotationEnabled" label="Rotate renewal credentials" defaultChecked={bool(security.refreshTokenRotationEnabled)} note="Recommended for session replay protection." />
             </div>
             <div><button className="mm-button" type="submit" disabled={busy}>SAVE SECURITY POLICY</button></div>
           </form>
@@ -229,7 +229,7 @@ export function PlatformConfigAdmin() {
         <div className="mm-card-head"><h2>Registration policy</h2><span className="mm-chip warning">BEFORE MEMBER ONBOARDING</span></div>
         <div className="mm-card-body">
           <p className="mm-note" style={{ marginBottom: 18 }}>Configure member account creation before onboarding starts. The default role must be an active RBAC role.</p>
-          <form className="mm-form" key={text(registration.updatedAt, 'registration')} onSubmit={saveRegistration}>
+          <form className="mm-form" method="post" key={text(registration.updatedAt, 'registration')} onSubmit={saveRegistration}>
             <div className="mm-grid two">
               <div className="mm-card-body" style={{ padding: 0 }}>
                 <Check name="publicRegistrationEnabled" label="Public/self registration enabled" defaultChecked={bool(registration.publicRegistrationEnabled)} />
