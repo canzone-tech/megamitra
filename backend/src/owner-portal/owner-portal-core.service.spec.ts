@@ -7,18 +7,20 @@ describe('OwnerPortalCoreService', () => {
       transaction: jest.fn(async (work: (connection: { query: jest.Mock }) => unknown) =>
         work({ query }),
       ),
+      execute: jest.fn().mockResolvedValue(undefined),
     };
     const portal = {
       createMember: jest.fn().mockResolvedValue({ id: 'member-1', username: 'MGC1001' }),
     };
     return {
       service: new OwnerPortalCoreService(db as never, portal as never),
+      db,
       portal,
     };
   }
 
-  it('generates a one-time password for AUTO owner registration', async () => {
-    const { service, portal } = serviceFor({
+  it('generates a one-time password and requires rotation for AUTO owner registration', async () => {
+    const { service, db, portal } = serviceFor({
       emailRequired: false,
       mobileRequired: true,
       passwordMode: 'AUTO',
@@ -42,12 +44,16 @@ describe('OwnerPortalCoreService', () => {
       expect.objectContaining({ password: expect.any(String) }),
       'admin-1',
     );
+    expect(db.execute).toHaveBeenCalledWith(
+      expect.stringContaining('mustChangePassword=TRUE'),
+      ['member-1'],
+    );
     expect(result.initialPassword).toEqual(expect.any(String));
     expect(result.initialPassword.length).toBeGreaterThanOrEqual(20);
   });
 
   it('enforces configured required identifiers before member creation', async () => {
-    const { service, portal } = serviceFor({
+    const { service, db, portal } = serviceFor({
       emailRequired: true,
       mobileRequired: true,
       passwordMode: 'MANUAL',
@@ -70,5 +76,6 @@ describe('OwnerPortalCoreService', () => {
       ),
     ).rejects.toThrow('Email is required by the registration policy');
     expect(portal.createMember).not.toHaveBeenCalled();
+    expect(db.execute).not.toHaveBeenCalled();
   });
 });
