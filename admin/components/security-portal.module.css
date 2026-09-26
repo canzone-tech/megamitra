@@ -1,0 +1,174 @@
+.scope {
+  display: grid;
+  gap: 18px;
+}
+
+.scope :global(.mm-grid) {
+  display: grid;
+  gap: 18px;
+}
+
+.scope :global(.mm-grid.two) {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.scope :global(.mm-card) {
+  overflow: hidden;
+  border: 1px solid #e7e9f1;
+  border-radius: 17px;
+  background: #fff;
+  box-shadow: 0 14px 38px rgba(30, 20, 70, .08);
+}
+
+.scope :global(.mm-card-head) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 18px 20px;
+  border-bottom: 1px solid #e7e9f1;
+}
+
+.scope :global(.mm-card-head h2) {
+  margin: 0;
+  color: #17152b;
+  font-size: 16px;
+  line-height: 1.3;
+}
+
+.scope :global(.mm-card-body) {
+  padding: 20px;
+}
+
+.scope :global(.mm-note) {
+  margin: 0;
+  color: #74788b;
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.scope :global(.mm-form) {
+  display: grid;
+  gap: 16px;
+}
+
+.scope :global(.mm-form h3) {
+  margin: 0 0 10px;
+  color: #312e81;
+  font-size: 16px;
+}
+
+.scope :global(.mm-form label) {
+  display: grid;
+  gap: 7px;
+  color: #4f5261;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.scope :global(.mm-form label span) {
+  color: #74788b;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.scope :global(.mm-form input:not([type='checkbox'])),
+.scope :global(.mm-form select),
+.scope :global(.mm-form textarea) {
+  width: 100%;
+  min-height: 44px;
+  box-sizing: border-box;
+  border: 1px solid #dfe1e9;
+  border-radius: 10px;
+  padding: 10px 12px;
+  outline: none;
+  color: #17152b;
+  background: #fcfcfe;
+  font: inherit;
+  font-size: 13px;
+}
+
+.scope :global(.mm-form input[type='checkbox']) {
+  width: 18px;
+  height: 18px;
+  accent-color: #6d28d9;
+}
+
+.scope :global(.mm-form input:focus),
+.scope :global(.mm-form select:focus),
+.scope :global(.mm-form textarea:focus) {
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 3px rgba(124, 58, 237, .08);
+}
+
+.scope :global(.mm-button) {
+  min-height: 40px;
+  border: 0;
+  border-radius: 10px;
+  padding: 0 15px;
+  color: #fff;
+  background: linear-gradient(135deg, #5b21b6, #db2777 62%, #ff6b00);
+  box-shadow: 0 8px 20px rgba(109, 40, 217, .14);
+  font-size: 11px;
+  font-weight: 900;
+  cursor: pointer;
+}
+
+.scope :global(.mm-button.secondary) {
+  color: #5b21b6;
+  background: #fff;
+  box-shadow: inset 0 0 0 1px #dcd4ef;
+}
+
+.scope :global(.mm-button:disabled) {
+  cursor: not-allowed;
+  opacity: .55;
+}
+
+.scope :global(.mm-chip) {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 6px 9px;
+  background: #f0e9ff;
+  color: #5b21b6;
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.scope :global(.mm-chip.warning) {
+  background: #fff8ed;
+  color: #a34b00;
+}
+
+.scope :global(.mm-error),
+.scope :global(.mm-success) {
+  margin: 0;
+  padding: 11px 12px;
+  border-radius: 11px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.scope :global(.mm-error) {
+  color: #b91c1c;
+  background: #fff1f2;
+  border: 1px solid #fecdd3;
+}
+
+.scope :global(.mm-success) {
+  color: #08734d;
+  background: #effcf7;
+  border: 1px solid #ccefe1;
+}
+
+.accountCard {
+  margin-top: 18px;
+}
+
+@media (max-width: 980px) {
+  .scope :global(.mm-grid.two) {
+    grid-template-columns: 1fr;
+  }
+}
