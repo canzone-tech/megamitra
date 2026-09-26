@@ -68,7 +68,6 @@ export function PlatformConfigAdmin() {
   }, [router]);
 
   const load = useCallback(async () => {
-    setError('');
     try {
       const [nextConfig, nextRoles] = await Promise.all([
         apiJson<PlatformConfig>(API),
