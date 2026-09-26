@@ -91,6 +91,13 @@ type DrawRunRow = {
   approvalNote: string | null;
 };
 
+type ResolvedUser = {
+  id: string;
+  username: string;
+  email: string | null;
+  phone: string | null;
+};
+
 const DEFAULT_PRIZES = [
   'Pulsar Bike 125CC',
   '₹50,000 Worth Gold',
@@ -651,7 +658,7 @@ export class OwnerPortalService {
     );
     await this.drawPolicies.publish(policyVersion.id, actorUserId);
     const seed = this.drawSeed(runId);
-    const draw = await this.draws.createInstance(
+    const { draw } = await this.draws.createInstance(
       {
         sourceKey: `owner-draw:${runId}`,
         policyVersionId: policyVersion.id,
@@ -981,7 +988,7 @@ export class OwnerPortalService {
     });
     if (!enrollment) throw new NotFoundException('No active membership enrollment was found for this member');
     const sourceKey = `owner-payment:${randomUUID()}`;
-    const attempt = await this.programPayments.createAttempt(
+    const { attempt } = await this.programPayments.createAttempt(
       {
         sourceKey,
         enrollmentId: enrollment.id,
@@ -1193,7 +1200,10 @@ export class OwnerPortalService {
     return rows[0];
   }
 
-  private async resolveUser(reference: string, required = true) {
+  private async resolveUser(reference: string): Promise<ResolvedUser>;
+  private async resolveUser(reference: string, required: true): Promise<ResolvedUser>;
+  private async resolveUser(reference: string, required: false): Promise<ResolvedUser | null>;
+  private async resolveUser(reference: string, required = true): Promise<ResolvedUser | null> {
     const value = reference.trim();
     const user = await this.prisma.user.findFirst({
       where: {

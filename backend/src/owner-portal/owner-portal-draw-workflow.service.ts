@@ -139,7 +139,7 @@ export class OwnerPortalDrawWorkflowService {
     await this.drawPolicies.publish(policyVersion.id, actorUserId);
 
     const seed = this.drawSeed(runId);
-    const draw = await this.draws.createInstance(
+    const { draw } = await this.draws.createInstance(
       {
         sourceKey: `owner-draw:${runId}`,
         policyVersionId: policyVersion.id,
