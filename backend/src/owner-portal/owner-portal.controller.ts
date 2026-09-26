@@ -24,6 +24,7 @@ import {
   VerifyOwnerWinnerDto,
 } from './owner-portal.dto';
 import { OwnerPortalDrawWorkflowService } from './owner-portal-draw-workflow.service';
+import { OwnerPortalFinanceService } from './owner-portal-finance.service';
 import { AssignOwnerPlacementDto } from './owner-portal-placement.dto';
 import { OwnerPortalService } from './owner-portal.service';
 
@@ -32,6 +33,7 @@ export class OwnerPortalController {
   constructor(
     private readonly portal: OwnerPortalService,
     private readonly drawWorkflow: OwnerPortalDrawWorkflowService,
+    private readonly finance: OwnerPortalFinanceService,
   ) {}
 
   @Permissions('operations.read')
@@ -227,7 +229,7 @@ export class OwnerPortalController {
   @Permissions('users.read')
   @Get('epins')
   epins() {
-    return this.portal.listEpins();
+    return this.finance.listEpins();
   }
 
   @Permissions('users.manage')
@@ -252,7 +254,7 @@ export class OwnerPortalController {
   @Permissions('platform.config.read')
   @Get('auth-codes')
   authCodes() {
-    return this.portal.listAuthCodes();
+    return this.finance.listAuthCodes();
   }
 
   @Permissions('platform.config.manage')
@@ -264,16 +266,29 @@ export class OwnerPortalController {
     return this.portal.consumeAuthCode(dto, actor.id);
   }
 
+  @Permissions('program.read')
+  @Get('payments')
+  payments(@Query('limit') limit?: string) {
+    const parsed = limit ? Number.parseInt(limit, 10) : 100;
+    return this.finance.listPayments(Number.isFinite(parsed) ? parsed : 100);
+  }
+
+  @Permissions('program.read')
+  @Get('payments/:id')
+  paymentReceipt(@Param('id') id: string) {
+    return this.finance.paymentReceipt(id);
+  }
+
   @Permissions('program.payment.manage')
   @Post('payments')
   recordPayment(@Body() dto: RecordOwnerPaymentDto, @CurrentUser() actor: AuthUser) {
-    return this.portal.recordPayment(dto, actor.id);
+    return this.finance.recordPayment(dto, actor.id);
   }
 
   @Permissions('wallet.read')
   @Get('wallet')
   wallet(@Query('member') member: string, @Query('currency') currency?: string) {
-    return this.portal.wallet(member, currency);
+    return this.finance.wallet(member, currency);
   }
 
   @Permissions('platform.config.manage')

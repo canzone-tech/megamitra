@@ -8,6 +8,7 @@ import { ReferralRewardModule } from '../referral-reward/referral-reward.module'
 import { UsersModule } from '../users/users.module';
 import { OwnerPortalController } from './owner-portal.controller';
 import { OwnerPortalDrawWorkflowService } from './owner-portal-draw-workflow.service';
+import { OwnerPortalFinanceService } from './owner-portal-finance.service';
 import { OwnerPortalService } from './owner-portal.service';
 
 @Module({
@@ -21,7 +22,7 @@ import { OwnerPortalService } from './owner-portal.service';
     LedgerModule,
   ],
   controllers: [OwnerPortalController],
-  providers: [OwnerPortalService, OwnerPortalDrawWorkflowService],
+  providers: [OwnerPortalService, OwnerPortalDrawWorkflowService, OwnerPortalFinanceService],
   exports: [OwnerPortalService],
 })
 export class OwnerPortalModule {}
