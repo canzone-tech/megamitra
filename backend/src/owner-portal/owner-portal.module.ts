@@ -6,6 +6,8 @@ import { LuckyDrawModule } from '../lucky-draw/lucky-draw.module';
 import { ProgramModule } from '../program/program.module';
 import { ReferralRewardModule } from '../referral-reward/referral-reward.module';
 import { UsersModule } from '../users/users.module';
+import { OwnerPortalControlController } from './owner-portal-control.controller';
+import { OwnerPortalControlService } from './owner-portal-control.service';
 import { OwnerPortalController } from './owner-portal.controller';
 import { OwnerPortalDrawWorkflowService } from './owner-portal-draw-workflow.service';
 import { OwnerPortalFinanceService } from './owner-portal-finance.service';
@@ -21,8 +23,13 @@ import { OwnerPortalService } from './owner-portal.service';
     LuckyDrawModule,
     LedgerModule,
   ],
-  controllers: [OwnerPortalController],
-  providers: [OwnerPortalService, OwnerPortalDrawWorkflowService, OwnerPortalFinanceService],
+  controllers: [OwnerPortalController, OwnerPortalControlController],
+  providers: [
+    OwnerPortalService,
+    OwnerPortalDrawWorkflowService,
+    OwnerPortalFinanceService,
+    OwnerPortalControlService,
+  ],
   exports: [OwnerPortalService],
 })
 export class OwnerPortalModule {}
