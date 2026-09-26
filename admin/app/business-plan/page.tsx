@@ -1,5 +1,5 @@
-import { BusinessPlanConfig } from '@/components/business-plan-config';
+import { redirect } from 'next/navigation';
 
 export default function BusinessPlanPage() {
-  return <BusinessPlanConfig />;
+  redirect('/portal/seasons');
 }
