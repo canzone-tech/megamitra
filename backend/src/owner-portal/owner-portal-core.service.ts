@@ -1,11 +1,68 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { randomBytes } from 'node:crypto';
 import { FinancialDbService } from '../database/financial-db.service';
+import type { CreateOwnerMemberDto } from './owner-portal.dto';
+import type { CreateOwnerCoreMemberDto } from './owner-portal-core.dto';
+import { OwnerPortalService } from './owner-portal.service';
 
 type SqlValue = string | number | bigint | boolean | Date | null;
+type RegistrationPolicyRow = {
+  emailRequired: boolean | number;
+  mobileRequired: boolean | number;
+  passwordMode: 'AUTO' | 'MANUAL' | 'AUTO_OR_MANUAL';
+  usernameMode: 'AUTO' | 'MANUAL' | 'AUTO_OR_MANUAL';
+  usernamePrefixEnabled: boolean | number;
+  usernamePrefix: string | null;
+  defaultRoleName: string;
+};
 
 @Injectable()
 export class OwnerPortalCoreService {
-  constructor(private readonly db: FinancialDbService) {}
+  constructor(
+    private readonly db: FinancialDbService,
+    private readonly portal: OwnerPortalService,
+  ) {}
+
+  async registrationPolicy() {
+    const rows = await this.rows<RegistrationPolicyRow>(
+      `SELECT emailRequired, mobileRequired, passwordMode, usernameMode,
+              usernamePrefixEnabled, usernamePrefix, defaultRoleName
+       FROM system_registration_config
+       WHERE id=1
+       LIMIT 1`,
+    );
+    if (!rows[0]) throw new BadRequestException('Registration policy is unavailable');
+    return rows[0];
+  }
+
+  async createMember(dto: CreateOwnerCoreMemberDto, actorUserId: string) {
+    const registration = await this.registrationPolicy();
+    if (Boolean(registration.emailRequired) && !dto.email?.trim()) {
+      throw new BadRequestException('Email is required by the registration policy');
+    }
+    if (Boolean(registration.mobileRequired) && !dto.phone?.trim()) {
+      throw new BadRequestException('Mobile is required by the registration policy');
+    }
+    if (registration.usernameMode === 'MANUAL' && !dto.username?.trim()) {
+      throw new BadRequestException('Username is required by the registration policy');
+    }
+
+    const generatedPassword =
+      registration.passwordMode === 'AUTO' ||
+      (registration.passwordMode === 'AUTO_OR_MANUAL' && !dto.password);
+    const password = generatedPassword
+      ? randomBytes(18).toString('base64url')
+      : dto.password;
+    if (!password) {
+      throw new BadRequestException('Password is required by the registration policy');
+    }
+
+    const member = await this.portal.createMember(
+      { ...dto, password } as CreateOwnerMemberDto,
+      actorUserId,
+    );
+    return generatedPassword ? { ...member, initialPassword: password } : member;
+  }
 
   async listMembers(query?: string) {
     const q = query?.trim();
