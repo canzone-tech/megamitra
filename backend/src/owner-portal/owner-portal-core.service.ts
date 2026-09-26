@@ -61,7 +61,17 @@ export class OwnerPortalCoreService {
       { ...dto, password } as CreateOwnerMemberDto,
       actorUserId,
     );
-    return generatedPassword ? { ...member, initialPassword: password } : member;
+    if (!generatedPassword) return member;
+
+    const memberId = String((member as { id?: unknown }).id ?? '');
+    if (!memberId) {
+      throw new BadRequestException('Created member identity is unavailable');
+    }
+    await this.db.execute(
+      'UPDATE users SET mustChangePassword=TRUE, updatedAt=CURRENT_TIMESTAMP(3) WHERE id=?',
+      [memberId],
+    );
+    return { ...member, initialPassword: password };
   }
 
   async listMembers(query?: string) {
