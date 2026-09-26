@@ -80,8 +80,9 @@ export class OwnerPortalDrawWorkflowService {
       name: string;
       winnerCount: number;
       nominalValue: string | null;
+      currencyCode: string;
     }>(
-      `SELECT prizeCode, name, winnerCount, nominalValue
+      `SELECT prizeCode, name, winnerCount, nominalValue, currencyCode
        FROM owner_season_prizes
        WHERE seasonId=? AND monthNumber=? AND status='ACTIVE'
        ORDER BY createdAt ASC`,
@@ -119,7 +120,7 @@ export class OwnerPortalDrawWorkflowService {
             ? {
                 prizeDefinition: {
                   nominalValue: String(prize.nominalValue),
-                  currencyCode: 'INR',
+                  currencyCode: prize.currencyCode,
                 },
               }
             : { prizeDefinition: {} }),

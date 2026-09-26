@@ -273,7 +273,7 @@ export class OwnerPortalController {
   @Permissions('wallet.read')
   @Get('wallet')
   wallet(@Query('member') member: string, @Query('currency') currency?: string) {
-    return this.portal.wallet(member, currency ?? 'INR');
+    return this.portal.wallet(member, currency);
   }
 
   @Permissions('platform.config.manage')

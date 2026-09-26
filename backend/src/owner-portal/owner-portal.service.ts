@@ -73,6 +73,8 @@ type SeasonRow = {
   dailyPairCap?: number | null;
   carryForwardEnabled?: boolean | number | null;
   fixedAmount?: string | number | null;
+  currencyCode?: string | null;
+  settlementTimezone?: string | null;
 };
 
 type DrawRunRow = {
@@ -96,6 +98,14 @@ type ResolvedUser = {
   username: string;
   email: string | null;
   phone: string | null;
+};
+
+type OwnerPortalSettings = {
+  companyName: string;
+  timezone: string;
+  currencyCode: string;
+  defaultLanguage: string;
+  updatedAt: Date | string;
 };
 
 const DEFAULT_PRIZES = [
@@ -147,7 +157,7 @@ export class OwnerPortalService {
         'SELECT COUNT(*) AS count FROM `binary_pair_matches` WHERE `payable` = TRUE',
       ),
       this.rows<SeasonRow>(
-        `SELECT s.*, bpv.pairPayoutAmount, bpv.dailyPairCap
+        `SELECT s.*, bpv.pairPayoutAmount, bpv.dailyPairCap, bpv.currencyCode, bpv.settlementTimezone
          FROM owner_seasons s
          LEFT JOIN binary_plan_versions bpv ON bpv.id = s.binaryPlanVersionId
          WHERE s.status IN ('ACTIVE','PAUSED')
@@ -337,6 +347,7 @@ export class OwnerPortalService {
     const existing = await this.rows<{ id: string }>('SELECT id FROM owner_seasons WHERE code = ? LIMIT 1', [code]);
     if (existing.length) throw new ConflictException('Season code already exists');
     this.validateSeasonMoney(dto);
+    const settings = await this.requireSettings();
 
     const effectiveFrom = this.dayStart(dto.startDate);
     const effectiveTo = dto.endDate ? this.dayEnd(dto.endDate) : undefined;
@@ -349,7 +360,7 @@ export class OwnerPortalService {
       {
         effectiveFrom,
         ...(effectiveTo ? { effectiveTo } : {}),
-        currencyCode: 'INR',
+        currencyCode: settings.currencyCode,
         registrationFee: dto.registrationFee,
         installmentAmount: dto.monthlyEmi,
         installmentCount: dto.totalMonths,
@@ -380,8 +391,8 @@ export class OwnerPortalService {
         leftVolumePerPair: '2.0000',
         rightVolumePerPair: '2.0000',
         pairPayoutAmount: dto.pairValue,
-        currencyCode: 'INR',
-        settlementTimezone: 'Asia/Kolkata',
+        currencyCode: settings.currencyCode,
+        settlementTimezone: settings.timezone,
         capOverflowMode: dto.carryForward ? BinaryCapOverflowMode.CARRY : BinaryCapOverflowMode.FLUSH,
         dailyPairCap,
         carryForwardEnabled: dto.carryForward,
@@ -402,7 +413,7 @@ export class OwnerPortalService {
         ...(effectiveTo ? { effectiveTo } : {}),
         rewardMode: ReferralRewardMode.FIXED,
         fixedAmount: dto.directReferral,
-        currencyCode: 'INR',
+        currencyCode: settings.currencyCode,
         roundingMode: ReferralRoundingMode.HALF_UP,
         eligibilityRules: { ownerSeasonCode: code, qualifyingReferralRequired: true },
       },
@@ -433,14 +444,18 @@ export class OwnerPortalService {
         actorUserId,
       ],
     );
-    await this.saveSeasonPrizesInternal(id, dto.prizes?.length ? dto.prizes : this.defaultPrizes(dto.totalMonths));
+    await this.saveSeasonPrizesInternal(
+      id,
+      dto.prizes?.length ? dto.prizes : this.defaultPrizes(dto.totalMonths),
+      settings.currencyCode,
+    );
     await this.audit.log({
       actorUserId,
       action: AuditAction.CREATE,
       entityType: 'OwnerSeason',
       entityId: id,
       description: 'Owner season draft created',
-      metadata: { code },
+      metadata: { code, currencyCode: settings.currencyCode, timezone: settings.timezone },
     });
     return this.getSeason(id);
   }
@@ -454,6 +469,7 @@ export class OwnerPortalService {
     if (!current.programVersionId || !current.binaryPlanVersionId || !current.referralPolicyVersionId) {
       throw new ConflictException('Season policy mapping is incomplete');
     }
+    const settings = await this.requireSettings();
     const effectiveFrom = this.dayStart(dto.startDate);
     const effectiveTo = dto.endDate ? this.dayEnd(dto.endDate) : undefined;
     await this.programs.updateDraft(
@@ -461,7 +477,7 @@ export class OwnerPortalService {
       {
         effectiveFrom,
         ...(effectiveTo ? { effectiveTo } : {}),
-        currencyCode: 'INR',
+        currencyCode: settings.currencyCode,
         registrationFee: dto.registrationFee,
         installmentAmount: dto.monthlyEmi,
         installmentCount: dto.totalMonths,
@@ -486,8 +502,8 @@ export class OwnerPortalService {
         leftVolumePerPair: '2.0000',
         rightVolumePerPair: '2.0000',
         pairPayoutAmount: dto.pairValue,
-        currencyCode: 'INR',
-        settlementTimezone: 'Asia/Kolkata',
+        currencyCode: settings.currencyCode,
+        settlementTimezone: settings.timezone,
         capOverflowMode: dto.carryForward ? BinaryCapOverflowMode.CARRY : BinaryCapOverflowMode.FLUSH,
         dailyPairCap: Math.floor(dto.dailyCap / pairValue),
         carryForwardEnabled: dto.carryForward,
@@ -503,7 +519,7 @@ export class OwnerPortalService {
         ...(effectiveTo ? { effectiveTo } : {}),
         rewardMode: ReferralRewardMode.FIXED,
         fixedAmount: dto.directReferral,
-        currencyCode: 'INR',
+        currencyCode: settings.currencyCode,
         roundingMode: ReferralRoundingMode.HALF_UP,
         eligibilityRules: { ownerSeasonCode: current.code, qualifyingReferralRequired: true },
       },
@@ -521,13 +537,16 @@ export class OwnerPortalService {
         id,
       ],
     );
-    if (dto.prizes) await this.saveSeasonPrizesInternal(id, dto.prizes);
+    if (dto.prizes) {
+      await this.saveSeasonPrizesInternal(id, dto.prizes, settings.currencyCode);
+    }
     await this.audit.log({
       actorUserId,
       action: AuditAction.UPDATE,
       entityType: 'OwnerSeason',
       entityId: id,
       description: 'Owner season draft updated',
+      metadata: { currencyCode: settings.currencyCode, timezone: settings.timezone },
     });
     return this.getSeason(id);
   }
@@ -597,14 +616,16 @@ export class OwnerPortalService {
     if (!['DRAFT', 'REVIEW'].includes(season.status)) {
       throw new ConflictException('Prize schedule is locked after season activation');
     }
-    await this.saveSeasonPrizesInternal(seasonId, prizes);
+    const currencyCode =
+      season.currencyCode?.toUpperCase() ?? (await this.requireSettings()).currencyCode;
+    await this.saveSeasonPrizesInternal(seasonId, prizes, currencyCode);
     await this.audit.log({
       actorUserId,
       action: AuditAction.UPDATE,
       entityType: 'OwnerSeasonPrizeSchedule',
       entityId: seasonId,
       description: 'Season prize schedule updated',
-      metadata: { prizeCount: prizes.length },
+      metadata: { prizeCount: prizes.length, currencyCode },
     });
     return this.listSeasonPrizes(seasonId);
   }
@@ -618,8 +639,14 @@ export class OwnerPortalService {
       [seasonId, dto.monthNumber],
     );
     if (existing[0]) return this.drawRun(existing[0].id);
-    const prizes = await this.rows<{ prizeCode: string; name: string; winnerCount: number; nominalValue: string | null }>(
-      `SELECT prizeCode, name, winnerCount, nominalValue FROM owner_season_prizes
+    const prizes = await this.rows<{
+      prizeCode: string;
+      name: string;
+      winnerCount: number;
+      nominalValue: string | null;
+      currencyCode: string;
+    }>(
+      `SELECT prizeCode, name, winnerCount, nominalValue, currencyCode FROM owner_season_prizes
        WHERE seasonId=? AND monthNumber=? AND status='ACTIVE' ORDER BY createdAt ASC`,
       [seasonId, dto.monthNumber],
     );
@@ -650,7 +677,12 @@ export class OwnerPortalService {
           winnerCount: Number(prize.winnerCount),
           prizeKind: 'ITEM' as const,
           ...(prize.nominalValue
-            ? { prizeDefinition: { nominalValue: String(prize.nominalValue), currencyCode: 'INR' } }
+            ? {
+                prizeDefinition: {
+                  nominalValue: String(prize.nominalValue),
+                  currencyCode: prize.currencyCode,
+                },
+              }
             : { prizeDefinition: {} }),
         })),
       },
@@ -1013,9 +1045,11 @@ export class OwnerPortalService {
     return { member: { id: user.id, username: user.username }, attempt, payment };
   }
 
-  async wallet(memberReference: string, currencyCode = 'INR') {
+  async wallet(memberReference: string, currencyCode?: string) {
     const user = await this.resolveUser(memberReference);
-    return this.ledger.getUserWallet(user.id, currencyCode.toUpperCase());
+    const resolvedCurrency =
+      currencyCode?.trim().toUpperCase() || (await this.requireSettings()).currencyCode;
+    return this.ledger.getUserWallet(user.id, resolvedCurrency);
   }
 
   async createNotification(dto: CreateOwnerNotificationDto, actorUserId: string) {
@@ -1127,10 +1161,7 @@ export class OwnerPortalService {
   }
 
   async settings() {
-    const rows = await this.rows<Record<string, unknown>>(
-      'SELECT companyName, timezone, currencyCode, defaultLanguage, updatedAt FROM owner_portal_settings WHERE id=1',
-    );
-    return rows[0];
+    return this.requireSettings();
   }
 
   async updateSettings(dto: UpdateOwnerPortalSettingsDto, actorUserId: string) {
@@ -1186,6 +1217,19 @@ export class OwnerPortalService {
     const rows = await this.rows<Record<string, unknown>>('SELECT * FROM owner_support_tickets WHERE id=? LIMIT 1', [id]);
     if (!rows[0]) throw new NotFoundException('Support ticket not found');
     return rows[0];
+  }
+
+  private async requireSettings(): Promise<OwnerPortalSettings> {
+    const rows = await this.rows<OwnerPortalSettings>(
+      'SELECT companyName, timezone, currencyCode, defaultLanguage, updatedAt FROM owner_portal_settings WHERE id=1',
+    );
+    const settings = rows[0];
+    if (!settings) throw new Error('Owner portal settings are missing');
+    return {
+      ...settings,
+      timezone: settings.timezone.trim(),
+      currencyCode: settings.currencyCode.trim().toUpperCase(),
+    };
   }
 
   private async requireSeason(id: string) {
@@ -1277,14 +1321,19 @@ export class OwnerPortalService {
     });
   }
 
-  private async saveSeasonPrizesInternal(seasonId: string, prizes: OwnerSeasonPrizeDto[]) {
+  private async saveSeasonPrizesInternal(
+    seasonId: string,
+    prizes: OwnerSeasonPrizeDto[],
+    currencyCode: string,
+  ) {
+    const normalizedCurrency = currencyCode.trim().toUpperCase();
     await this.db.transaction(async (connection) => {
       await connection.query('DELETE FROM owner_season_prizes WHERE seasonId=?', [seasonId]);
       for (const prize of prizes) {
         await connection.query(
           `INSERT INTO owner_season_prizes
            (id, seasonId, monthNumber, prizeCode, category, name, description, winnerCount, nominalValue, currencyCode, status)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'INR', 'ACTIVE')`,
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVE')`,
           [
             randomUUID(),
             seasonId,
@@ -1295,6 +1344,7 @@ export class OwnerPortalService {
             prize.description?.trim() || null,
             prize.winnerCount,
             prize.nominalValue ?? null,
+            normalizedCurrency,
           ],
         );
       }
@@ -1313,8 +1363,8 @@ export class OwnerPortalService {
 
   private seasonSelectSql(suffix: string) {
     return `SELECT s.*,
-                   pv.registrationFee, pv.installmentAmount, pv.installmentCount,
-                   bpv.pairPayoutAmount, bpv.dailyPairCap, bpv.carryForwardEnabled,
+                   pv.registrationFee, pv.installmentAmount, pv.installmentCount, pv.currencyCode,
+                   bpv.pairPayoutAmount, bpv.dailyPairCap, bpv.carryForwardEnabled, bpv.settlementTimezone,
                    rpv.fixedAmount
             FROM owner_seasons s
             LEFT JOIN program_versions pv ON pv.id=s.programVersionId
