@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { FormEvent } from 'react';
@@ -122,7 +123,7 @@ export function SettingsGovernancePortal() {
           <div className={styles.field}><label>Pair Value</label><input className={styles.input} readOnly value={money(active.pairPayoutAmount, currencyCode)} /></div>
         </div>
         <div className={styles.notice}>Daily Cap and Pair Value are authoritative Season policy values. Change them only in Season Management so financial configuration is never duplicated.</div>
-        <div className={styles.buttonLine}><button className={styles.button} disabled={busy}>SAVE SETTINGS</button><a className={classNames(styles.button, styles.outline, styles.linkButton)} href="/portal/seasons">SEASON MANAGEMENT</a></div>
+        <div className={styles.buttonLine}><button className={styles.button} disabled={busy}>SAVE SETTINGS</button><Link className={classNames(styles.button, styles.outline, styles.linkButton)} href="/portal/seasons">SEASON MANAGEMENT</Link></div>
       </form>
     </section>
 
