@@ -11,11 +11,18 @@ describe('OwnerPortalCoreService', () => {
     };
     const portal = {
       createMember: jest.fn().mockResolvedValue({ id: 'member-1', username: 'MGC1001' }),
+      memberDetail: jest.fn().mockResolvedValue({ id: 'member-1', username: 'MGC1001' }),
+    };
+    const genealogy = {
+      assignSponsor: jest.fn().mockResolvedValue(undefined),
+      autoPlace: jest.fn().mockResolvedValue(undefined),
+      assignPlacement: jest.fn().mockResolvedValue(undefined),
     };
     return {
-      service: new OwnerPortalCoreService(db as never, portal as never),
+      service: new OwnerPortalCoreService(db as never, portal as never, genealogy as never),
       db,
       portal,
+      genealogy,
     };
   }
 
@@ -44,6 +51,7 @@ describe('OwnerPortalCoreService', () => {
       expect.objectContaining({ password: expect.any(String) }),
       'admin-1',
     );
+    expect(portal.memberDetail).toHaveBeenCalledWith('member-1');
     expect(db.execute).toHaveBeenCalledWith(
       expect.stringContaining('mustChangePassword=TRUE'),
       ['member-1'],
