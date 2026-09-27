@@ -31,7 +31,7 @@ const NAV: NavItem[] = [
   { section: 'dashboard', label: 'Dashboard', symbol: '▦', group: 'Main' },
   { section: 'income', label: '9 Income Types', symbol: '↗', group: 'Main' },
   { section: 'members', label: 'Members', symbol: '●', group: 'Main' },
-  { section: 'binary', label: 'Binary 2:2 • AB : CD', symbol: '◇', group: 'Main' },
+  { section: 'binary', label: 'Binary 1:4', symbol: '◇', group: 'Main' },
   { section: 'placement', label: 'Placement / Pairing', symbol: '⌁', group: 'Main' },
   { section: 'seasons', label: 'Season Management', symbol: '□', group: 'Season & Draw' },
   { section: 'draw', label: 'Monthly Draw', symbol: '◆', group: 'Season & Draw' },
