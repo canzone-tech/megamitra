@@ -55,12 +55,15 @@ export default async function OwnerPortalSectionPage({ params }: PageProps) {
   if (section === 'settings') return <SettingsGovernancePortal />;
   if (CORE_SECTIONS.has(section as OwnerCoreSection)) {
     const coreSection = section as OwnerCoreSection;
+    const extension = coreSection === 'seasons'
+      ? <OwnerSeasonAdvancedPanel embedded />
+      : coreSection === 'members'
+        ? <OwnerKycPanel />
+        : undefined;
     return (
       <>
         {coreSection === 'members' ? <MemberRegistrationAutofillGuard /> : null}
-        <OwnerCorePortal section={coreSection} />
-        {coreSection === 'seasons' ? <OwnerSeasonAdvancedPanel /> : null}
-        {coreSection === 'members' ? <OwnerKycPanel /> : null}
+        <OwnerCorePortal section={coreSection} extension={extension} />
       </>
     );
   }
