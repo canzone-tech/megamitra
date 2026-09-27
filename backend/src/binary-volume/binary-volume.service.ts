@@ -4,6 +4,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import { Prisma } from '../generated/prisma/client';
 import { AuditAction, BinaryVolumeEventType, PolicyLifecycle } from '../generated/prisma/enums';
 import { AuditService } from '../audit/audit.service';
@@ -12,6 +13,21 @@ import type {
   CreateBinaryVolumeEventDto,
   ReverseBinaryVolumeEventDto,
 } from './binary-volume.dto';
+
+type AncestryRow = {
+  ancestorUserId: string;
+  depth: number;
+  firstLegSide: 'LEFT' | 'RIGHT';
+  firstLegSlot: 'A' | 'B' | 'C' | 'D';
+};
+type CreditRow = {
+  ancestorUserId: string;
+  planVersionId: string;
+  side: 'LEFT' | 'RIGHT';
+  slot: 'A' | 'B' | 'C' | 'D';
+  depth: number;
+  volume: Prisma.Decimal;
+};
 
 @Injectable()
 export class BinaryVolumeService {
@@ -49,10 +65,11 @@ export class BinaryVolumeService {
 
     try {
       const event = await this.prisma.$transaction(async (tx) => {
-        const ancestry = await tx.binaryAncestry.findMany({
-          where: { descendantUserId: dto.sourceMemberUserId },
-          orderBy: { depth: 'asc' },
-        });
+        const ancestry = await tx.$queryRawUnsafe<AncestryRow[]>(
+          `SELECT ancestorUserId, depth, firstLegSide, firstLegSlot
+           FROM binary_ancestry WHERE descendantUserId = ? ORDER BY depth ASC`,
+          dto.sourceMemberUserId,
+        );
         const created = await tx.binaryVolumeEvent.create({
           data: {
             sourceKey: dto.sourceKey,
@@ -65,17 +82,20 @@ export class BinaryVolumeService {
             createdByUserId: actorUserId,
           },
         });
-        if (ancestry.length > 0) {
-          await tx.binaryUplineVolumeCredit.createMany({
-            data: ancestry.map((ancestor) => ({
-              volumeEventId: created.id,
-              ancestorUserId: ancestor.ancestorUserId,
-              planVersionId: dto.planVersionId,
-              side: ancestor.firstLegSide,
-              depth: ancestor.depth,
-              volume: dto.volume,
-            })),
-          });
+        for (const ancestor of ancestry) {
+          await tx.$executeRawUnsafe(
+            `INSERT INTO binary_upline_volume_credits
+               (id, volumeEventId, ancestorUserId, planVersionId, side, slot, depth, volume, createdAt)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP(3))`,
+            randomUUID(),
+            created.id,
+            ancestor.ancestorUserId,
+            dto.planVersionId,
+            ancestor.firstLegSide,
+            ancestor.firstLegSlot,
+            ancestor.depth,
+            dto.volume,
+          );
         }
         return tx.binaryVolumeEvent.findUniqueOrThrow({
           where: { id: created.id },
@@ -88,12 +108,12 @@ export class BinaryVolumeService {
         action: AuditAction.CREATE,
         entityType: 'BinaryVolumeEvent',
         entityId: event.id,
-        description: 'Binary volume event created',
+        description: 'Binary 1:4 volume event created',
         metadata: { sourceKey: dto.sourceKey, eventType: dto.eventType },
       });
       return { event, idempotent: false };
     } catch (error) {
-      if ((error as { code?: string }).code === 'P2002') {
+      if ((error as { code?: string }).code === 'P2002' || (error as { code?: string }).code === 'ER_DUP_ENTRY') {
         const raced = await this.prisma.binaryVolumeEvent.findUnique({
           where: { sourceKey: dto.sourceKey },
           include: { uplineCredits: { orderBy: { depth: 'asc' } } },
@@ -122,16 +142,19 @@ export class BinaryVolumeService {
 
     const original = await this.prisma.binaryVolumeEvent.findUnique({
       where: { id: eventId },
-      include: {
-        reversedBy: true,
-        uplineCredits: { orderBy: { depth: 'asc' } },
-      },
+      include: { reversedBy: true },
     });
     if (!original) throw new NotFoundException('Binary volume event not found');
     if (original.eventType === BinaryVolumeEventType.REVERSAL) {
       throw new BadRequestException('A reversal event cannot be reversed again');
     }
     if (original.reversedBy) throw new ConflictException('Binary volume event is already reversed');
+
+    const originalCredits = await this.prisma.$queryRawUnsafe<CreditRow[]>(
+      `SELECT ancestorUserId, planVersionId, side, slot, depth, volume
+       FROM binary_upline_volume_credits WHERE volumeEventId = ? ORDER BY depth ASC`,
+      original.id,
+    );
 
     try {
       const event = await this.prisma.$transaction(async (tx) => {
@@ -148,17 +171,23 @@ export class BinaryVolumeService {
             createdByUserId: actorUserId,
           },
         });
-        if (original.uplineCredits.length > 0) {
-          await tx.binaryUplineVolumeCredit.createMany({
-            data: original.uplineCredits.map((credit) => ({
-              volumeEventId: created.id,
-              ancestorUserId: credit.ancestorUserId,
-              planVersionId: credit.planVersionId,
-              side: credit.side,
-              depth: credit.depth,
-              volume: credit.volume.negated(),
-            })),
-          });
+        for (const credit of originalCredits) {
+          const volume = credit.volume instanceof Prisma.Decimal
+            ? credit.volume.negated().toFixed(4)
+            : new Prisma.Decimal(String(credit.volume)).negated().toFixed(4);
+          await tx.$executeRawUnsafe(
+            `INSERT INTO binary_upline_volume_credits
+               (id, volumeEventId, ancestorUserId, planVersionId, side, slot, depth, volume, createdAt)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP(3))`,
+            randomUUID(),
+            created.id,
+            credit.ancestorUserId,
+            credit.planVersionId,
+            credit.side,
+            credit.slot,
+            credit.depth,
+            volume,
+          );
         }
         return tx.binaryVolumeEvent.findUniqueOrThrow({
           where: { id: created.id },
@@ -176,7 +205,7 @@ export class BinaryVolumeService {
       });
       return { event, idempotent: false };
     } catch (error) {
-      if ((error as { code?: string }).code === 'P2002') {
+      if ((error as { code?: string }).code === 'P2002' || (error as { code?: string }).code === 'ER_DUP_ENTRY') {
         throw new ConflictException('Binary volume event was already reversed or source key is duplicated');
       }
       throw error;
@@ -197,21 +226,26 @@ export class BinaryVolumeService {
   }
 
   async getMemberVolume(userId: string) {
-    const [user, totals, recentCredits] = await Promise.all([
-      this.prisma.user.findUnique({ where: { id: userId }, select: { id: true, username: true } }),
-      this.prisma.binaryUplineVolumeCredit.groupBy({
-        by: ['side'],
-        where: { ancestorUserId: userId },
-        _sum: { volume: true },
-      }),
-      this.prisma.binaryUplineVolumeCredit.findMany({
-        where: { ancestorUserId: userId },
-        orderBy: { createdAt: 'desc' },
-        take: 100,
-        include: { volumeEvent: true, planVersion: { include: { plan: true } } },
-      }),
-    ]);
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, username: true },
+    });
     if (!user) throw new NotFoundException('User not found');
+    const [totals, recentCredits] = await Promise.all([
+      this.prisma.$queryRawUnsafe<Array<{ slot: string; side: string; volume: string }>>(
+        `SELECT slot, side, CAST(COALESCE(SUM(volume), 0) AS CHAR) AS volume
+         FROM binary_upline_volume_credits
+         WHERE ancestorUserId = ? GROUP BY slot, side ORDER BY FIELD(slot,'A','B','C','D')`,
+        userId,
+      ),
+      this.prisma.$queryRawUnsafe<Array<Record<string, unknown>>>(
+        `SELECT c.*, e.sourceMemberUserId, e.occurredAt
+         FROM binary_upline_volume_credits c
+         INNER JOIN binary_volume_events e ON e.id=c.volumeEventId
+         WHERE c.ancestorUserId=? ORDER BY c.createdAt DESC LIMIT 100`,
+        userId,
+      ),
+    ]);
     return { user, totals, recentCredits };
   }
 
