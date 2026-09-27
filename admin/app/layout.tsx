@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './tokens.css';
 import './globals.css';
 import './auth-actions.css';
+import './workspace-overrides.css';
 
 export const metadata: Metadata = {
   title: 'MegaGoldenClub Admin',
