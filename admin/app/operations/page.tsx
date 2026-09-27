@@ -1,5 +1,5 @@
-import { OwnerCorePortal } from '@/components/owner-core-portal';
+import { OwnerCoreV14Portal } from '@/components/owner-core-v14-portal';
 
 export default function OperationsPage() {
-  return <OwnerCorePortal section="dashboard" />;
+  return <OwnerCoreV14Portal section="dashboard" />;
 }
