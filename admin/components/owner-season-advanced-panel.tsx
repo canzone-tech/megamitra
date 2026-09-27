@@ -7,13 +7,7 @@ import { WorkspaceTabs } from '@/components/workspace-tabs';
 import styles from './owner-portal.module.css';
 import extension from './owner-portal-extension.module.css';
 
-type Season = {
-  id: string;
-  code: string;
-  name: string;
-  status: string;
-};
-
+type Season = { id: string; code: string; name: string; status: string };
 type Advanced = {
   season: Season;
   binary: {
@@ -23,6 +17,12 @@ type Advanced = {
     rightVolumePerPair: string;
     monthlyPairCap: number | null;
     carryForwardExpiryDays: number | null;
+  };
+  binaryTopology?: {
+    model: string;
+    slots: Record<'A' | 'B' | 'C' | 'D', 'LEFT' | 'RIGHT'>;
+    pairLanes: string[][];
+    genericCrossPairingAllowed: boolean;
   };
   automaticRules: {
     configured: boolean;
@@ -62,63 +62,28 @@ export function OwnerSeasonAdvancedPanel({ embedded = false }: { embedded?: bool
       router.replace('/login');
       return;
     }
-    if (
-      reason instanceof ApiClientError &&
-      reason.status === 403 &&
-      /password/i.test(reason.message)
-    ) {
-      router.replace('/change-password');
-      return;
-    }
     setError(reason instanceof Error ? reason.message : 'Request failed');
   }, [router]);
 
   const loadConfig = useCallback(async (id: string) => {
-    if (!id) {
-      setConfig(null);
-      return;
-    }
-    setLoading(true);
-    setError('');
+    if (!id) { setConfig(null); return; }
+    setLoading(true); setError('');
     try {
-      setConfig(
-        await apiJson<Advanced>(
-          `${API}/seasons/${encodeURIComponent(id)}/advanced-configuration`,
-        ),
-      );
-    } catch (reason) {
-      fail(reason);
-    } finally {
-      setLoading(false);
-    }
+      setConfig(await apiJson<Advanced>(`${API}/seasons/${encodeURIComponent(id)}/advanced-configuration`));
+    } catch (reason) { fail(reason); }
+    finally { setLoading(false); }
   }, [fail]);
 
   const load = useCallback(async () => {
-    setLoading(true);
-    setError('');
+    setLoading(true); setError('');
     try {
       const rows = await apiJson<Season[]>(`${API}/seasons`);
       setSeasons(rows);
-      const preferred =
-        seasonId ||
-        rows.find((row) => ['DRAFT', 'REVIEW'].includes(row.status))?.id ||
-        rows[0]?.id ||
-        '';
+      const preferred = seasonId || rows.find((row) => ['DRAFT', 'REVIEW'].includes(row.status))?.id || rows[0]?.id || '';
       setSeasonId(preferred);
-      if (preferred) {
-        setConfig(
-          await apiJson<Advanced>(
-            `${API}/seasons/${encodeURIComponent(preferred)}/advanced-configuration`,
-          ),
-        );
-      } else {
-        setConfig(null);
-      }
-    } catch (reason) {
-      fail(reason);
-    } finally {
-      setLoading(false);
-    }
+      setConfig(preferred ? await apiJson<Advanced>(`${API}/seasons/${encodeURIComponent(preferred)}/advanced-configuration`) : null);
+    } catch (reason) { fail(reason); }
+    finally { setLoading(false); }
   }, [fail, seasonId]);
 
   useEffect(() => {
@@ -126,92 +91,55 @@ export function OwnerSeasonAdvancedPanel({ embedded = false }: { embedded?: bool
     return () => window.clearTimeout(timer);
   }, [load]);
 
-  function patchBinary(key: keyof Advanced['binary'], value: string | number | null) {
-    setConfig((current) =>
-      current
-        ? { ...current, binary: { ...current.binary, [key]: value } }
-        : current,
-    );
+  function patchBinary(key: 'monthlyPairCap' | 'carryForwardExpiryDays', value: number | null) {
+    setConfig((current) => current ? { ...current, binary: { ...current.binary, [key]: value } } : current);
   }
-
   function patchRules(
     key: keyof Advanced['automaticRules'],
     value: string | number | boolean | null | string[],
   ) {
-    setConfig((current) =>
-      current
-        ? {
-            ...current,
-            automaticRules: { ...current.automaticRules, [key]: value },
-          }
-        : current,
-    );
+    setConfig((current) => current ? {
+      ...current,
+      automaticRules: { ...current.automaticRules, [key]: value },
+    } : current);
   }
-
   function toggleAllocation(value: string, checked: boolean) {
     if (!config) return;
     const current = config.automaticRules.requiredAllocationTypes;
-    patchRules(
-      'requiredAllocationTypes',
-      checked
-        ? [...new Set([...current, value])]
-        : current.filter((item) => item !== value),
-    );
+    patchRules('requiredAllocationTypes', checked ? [...new Set([...current, value])] : current.filter((item) => item !== value));
   }
 
   async function save(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!config || !seasonId) return;
-    setBusy(true);
-    setError('');
-    setNotice('');
+    setBusy(true); setError(''); setNotice('');
     try {
       const form = new FormData(event.currentTarget);
       const body = {
-        qualifyingUnit: String(form.get('qualifyingUnit') ?? '').trim(),
-        leftVolumePerPair: String(form.get('leftVolumePerPair') ?? '').trim(),
-        rightVolumePerPair: String(form.get('rightVolumePerPair') ?? '').trim(),
+        // Binary 1:4 topology is fixed: one qualifying lane unit on each side of A:C or B:D.
+        qualifyingUnit: '1.0000',
+        leftVolumePerPair: '1.0000',
+        rightVolumePerPair: '1.0000',
         monthlyPairCap: optionalNumber(String(form.get('monthlyPairCap') ?? '')),
-        carryForwardExpiryDays: optionalNumber(
-          String(form.get('carryForwardExpiryDays') ?? ''),
-        ),
+        carryForwardExpiryDays: optionalNumber(String(form.get('carryForwardExpiryDays') ?? '')),
         binaryUnitsPerEvent: Number(form.get('binaryUnitsPerEvent') ?? 0),
-        referralHookEnabled:
-          String(form.get('referralHookEnabled') ?? 'false') === 'true',
-        referralBasisMode: String(
-          form.get('referralBasisMode') ?? 'PAYMENT_AMOUNT',
-        ),
-        drawEligibilityHookEnabled:
-          String(form.get('drawEligibilityHookEnabled') ?? 'false') === 'true',
-        minimumPaymentAmount:
-          String(form.get('minimumPaymentAmount') ?? '').trim() || undefined,
-        minimumRegistrationAllocation:
-          String(form.get('minimumRegistrationAllocation') ?? '').trim() ||
-          undefined,
-        minimumInstallmentAllocation:
-          String(form.get('minimumInstallmentAllocation') ?? '').trim() ||
-          undefined,
+        referralHookEnabled: String(form.get('referralHookEnabled') ?? 'false') === 'true',
+        referralBasisMode: String(form.get('referralBasisMode') ?? 'PAYMENT_AMOUNT'),
+        drawEligibilityHookEnabled: String(form.get('drawEligibilityHookEnabled') ?? 'false') === 'true',
+        minimumPaymentAmount: String(form.get('minimumPaymentAmount') ?? '').trim() || undefined,
+        minimumRegistrationAllocation: String(form.get('minimumRegistrationAllocation') ?? '').trim() || undefined,
+        minimumInstallmentAllocation: String(form.get('minimumInstallmentAllocation') ?? '').trim() || undefined,
         requiredAllocationTypes: config.automaticRules.requiredAllocationTypes,
       };
-      setConfig(
-        await apiJson<Advanced>(
-          `${API}/seasons/${encodeURIComponent(seasonId)}/advanced-configuration`,
-          { method: 'PUT', body: JSON.stringify(body) },
-        ),
-      );
-      setNotice(
-        'Advanced Binary 2:2 and automatic payment rules saved as the Season draft.',
-      );
-    } catch (reason) {
-      fail(reason);
-    } finally {
-      setBusy(false);
-    }
+      setConfig(await apiJson<Advanced>(`${API}/seasons/${encodeURIComponent(seasonId)}/advanced-configuration`, {
+        method: 'PUT', body: JSON.stringify(body),
+      }));
+      setNotice('Binary 1:4 controls and automatic payment rules saved as the Season draft.');
+    } catch (reason) { fail(reason); }
+    finally { setBusy(false); }
   }
 
-  const editable = Boolean(
-    config && ['DRAFT', 'REVIEW'].includes(config.season.status),
-  );
+  const editable = Boolean(config && ['DRAFT', 'REVIEW'].includes(config.season.status));
   const rules = config?.automaticRules;
   const binary = config?.binary;
 
@@ -221,300 +149,66 @@ export function OwnerSeasonAdvancedPanel({ embedded = false }: { embedded?: bool
         <div className={styles.sectionHead}>
           <div className={styles.sectionTitle}>
             <span className={styles.sectionIcon}>⚙</span>
-            <div>
-              <h2>Advanced Season Policy</h2>
-              <small>Single authority for Binary 2:2 and automatic payment-event rules</small>
-            </div>
+            <div><h2>Advanced Season Policy</h2><small>Binary 1:4 fixed topology + payment-event automation</small></div>
           </div>
-          <span className={styles.tag}>
-            {rules?.configured
-              ? `${rules.lifecycle ?? 'DRAFT'} AUTOMATIC RULES`
-              : 'CONFIGURATION REQUIRED'}
-          </span>
+          <span className={styles.tag}>{rules?.configured ? `${rules.lifecycle ?? 'DRAFT'} AUTOMATIC RULES` : 'CONFIGURATION REQUIRED'}</span>
         </div>
 
         <div className={styles.notice}>
-          The client reference defines the commercial values and Binary 2:2 model,
-          but does not define which payment event should automatically create a
-          Binary unit, referral hand-off or draw-eligibility hook. Configure those
-          rules here before activation; the system will not invent them.
+          <b>Fixed client rule:</b> A/B are LEFT, C/D are RIGHT. Only <b>A:C</b> and <b>B:D</b> form pairs. A:D and B:C are never eligible. Placement topology is not an editable ratio.
         </div>
-
         {error ? <div className={`${styles.notice} ${styles.error}`}>{error}</div> : null}
         {notice ? <div className={`${styles.notice} ${styles.success}`}>{notice}</div> : null}
 
         <div className={styles.fields}>
-          <div className={styles.field}>
-            <label>Season</label>
-            <select
-              className={styles.select}
-              value={seasonId}
-              onChange={(event) => {
-                setSeasonId(event.target.value);
-                void loadConfig(event.target.value);
-              }}
-            >
-              <option value="">Select season</option>
-              {seasons.map((season) => (
-                <option key={season.id} value={season.id}>
-                  {season.name} • {season.status}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className={styles.field}>
-            <label>Policy Status</label>
-            <input
-              className={styles.input}
-              readOnly
-              value={config ? `${config.season.status} • Binary ${binary?.lifecycle ?? '—'}` : '—'}
-            />
-          </div>
+          <div className={styles.field}><label>Season</label><select className={styles.select} value={seasonId} onChange={(event) => { setSeasonId(event.target.value); void loadConfig(event.target.value); }}><option value="">Select season</option>{seasons.map((season) => <option key={season.id} value={season.id}>{season.name} • {season.status}</option>)}</select></div>
+          <div className={styles.field}><label>Policy Status</label><input className={styles.input} readOnly value={config ? `${config.season.status} • Binary ${binary?.lifecycle ?? '—'}` : '—'} /></div>
         </div>
 
-        {loading ? (
-          <div className={styles.loading}>Loading season policy…</div>
-        ) : config && binary && rules ? (
+        {loading ? <div className={styles.loading}>Loading season policy…</div> : config && binary && rules ? (
           <form method="post" onSubmit={save}>
-            <WorkspaceTabs
-              ariaLabel="Advanced season policy sections"
-              tabs={[
-                { id: 'binary-engine', label: 'Binary 2:2 Engine' },
-                { id: 'automatic-rules', label: 'Automatic Payment Rules' },
-              ]}
-            >
+            <WorkspaceTabs ariaLabel="Advanced season policy sections" tabs={[
+              { id: 'binary-engine', label: 'Binary 1:4 Controls' },
+              { id: 'automatic-rules', label: 'Automatic Payment Rules' },
+            ]}>
               {(activeTab) => <>
                 <div hidden={activeTab !== 'binary-engine'}>
-                  <div className={styles.sectionHead}>
-                    <div className={styles.sectionTitle}>
-                      <span className={styles.sectionIcon}>◇</span>
-                      <h2>Binary 2:2 Engine</h2>
-                    </div>
-                    <small>AB : CD defaults remain 2 : 2 until explicitly changed</small>
+                  <div className={styles.sectionHead}><div className={styles.sectionTitle}><span className={styles.sectionIcon}>◇</span><h2>Binary 1:4</h2></div><small>Fixed placement and pair lanes</small></div>
+                  <div className={styles.summary}>
+                    <div><small>SLOT A</small><b>LEFT</b></div>
+                    <div><small>SLOT B</small><b>LEFT</b></div>
+                    <div><small>SLOT C</small><b>RIGHT</b></div>
+                    <div><small>SLOT D</small><b>RIGHT</b></div>
                   </div>
+                  <div className={styles.notice}><b>Pair 1:</b> A:C &nbsp; • &nbsp; <b>Pair 2:</b> B:D &nbsp; • &nbsp; Generic Left × Right matching: <b>Disabled</b></div>
                   <div className={styles.fields}>
-                    <div className={styles.field}>
-                      <label>Qualifying Unit</label>
-                      <input
-                        name="qualifyingUnit"
-                        className={styles.input}
-                        inputMode="decimal"
-                        required
-                        disabled={!editable}
-                        value={binary.qualifyingUnit}
-                        onChange={(event) => patchBinary('qualifyingUnit', event.target.value)}
-                      />
-                    </div>
-                    <div className={styles.field}>
-                      <label>AB / Left Volume Per Pair</label>
-                      <input
-                        name="leftVolumePerPair"
-                        className={styles.input}
-                        inputMode="decimal"
-                        required
-                        disabled={!editable}
-                        value={binary.leftVolumePerPair}
-                        onChange={(event) => patchBinary('leftVolumePerPair', event.target.value)}
-                      />
-                    </div>
-                    <div className={styles.field}>
-                      <label>CD / Right Volume Per Pair</label>
-                      <input
-                        name="rightVolumePerPair"
-                        className={styles.input}
-                        inputMode="decimal"
-                        required
-                        disabled={!editable}
-                        value={binary.rightVolumePerPair}
-                        onChange={(event) => patchBinary('rightVolumePerPair', event.target.value)}
-                      />
-                    </div>
-                    <div className={styles.field}>
-                      <label>Monthly Pair Cap (optional)</label>
-                      <input
-                        name="monthlyPairCap"
-                        className={styles.input}
-                        type="number"
-                        min="0"
-                        disabled={!editable}
-                        value={binary.monthlyPairCap ?? ''}
-                        onChange={(event) =>
-                          patchBinary(
-                            'monthlyPairCap',
-                            event.target.value ? Number(event.target.value) : null,
-                          )
-                        }
-                      />
-                    </div>
-                    <div className={styles.field}>
-                      <label>Carry Forward Expiry Days (optional)</label>
-                      <input
-                        name="carryForwardExpiryDays"
-                        className={styles.input}
-                        type="number"
-                        min="1"
-                        disabled={!editable}
-                        value={binary.carryForwardExpiryDays ?? ''}
-                        onChange={(event) =>
-                          patchBinary(
-                            'carryForwardExpiryDays',
-                            event.target.value ? Number(event.target.value) : null,
-                          )
-                        }
-                      />
-                    </div>
+                    <div className={styles.field}><label>Qualifying Unit</label><input className={styles.input} readOnly value="1.0000 (fixed lane unit)" /></div>
+                    <div className={styles.field}><label>Lane Requirement</label><input className={styles.input} readOnly value="1 left-slot unit + 1 mapped right-slot unit" /></div>
+                    <div className={styles.field}><label>Monthly Pair Cap (optional)</label><input name="monthlyPairCap" className={styles.input} type="number" min="0" disabled={!editable} value={binary.monthlyPairCap ?? ''} onChange={(event) => patchBinary('monthlyPairCap', event.target.value ? Number(event.target.value) : null)} /></div>
+                    <div className={styles.field}><label>Carry Forward Expiry Days (optional)</label><input name="carryForwardExpiryDays" className={styles.input} type="number" min="1" disabled={!editable} value={binary.carryForwardExpiryDays ?? ''} onChange={(event) => patchBinary('carryForwardExpiryDays', event.target.value ? Number(event.target.value) : null)} /></div>
                   </div>
                 </div>
 
                 <div hidden={activeTab !== 'automatic-rules'}>
-                  <div className={styles.sectionHead}>
-                    <div className={styles.sectionTitle}>
-                      <span className={styles.sectionIcon}>↗</span>
-                      <h2>Automatic Rules on Confirmed Payment</h2>
-                    </div>
-                    <small>Versioned and published with Season activation</small>
-                  </div>
+                  <div className={styles.sectionHead}><div className={styles.sectionTitle}><span className={styles.sectionIcon}>↗</span><h2>Automatic Rules on Confirmed Payment</h2></div><small>Versioned and published with Season activation</small></div>
                   <div className={styles.fields}>
-                    <div className={styles.field}>
-                      <label>Binary Qualifying Units / Payment</label>
-                      <input
-                        name="binaryUnitsPerEvent"
-                        className={styles.input}
-                        type="number"
-                        min="0"
-                        required
-                        disabled={!editable}
-                        value={rules.binaryUnitsPerEvent}
-                        onChange={(event) =>
-                          patchRules('binaryUnitsPerEvent', Number(event.target.value) || 0)
-                        }
-                      />
-                    </div>
-                    <div className={styles.field}>
-                      <label>Direct Referral Hand-off</label>
-                      <select
-                        name="referralHookEnabled"
-                        className={styles.select}
-                        disabled={!editable}
-                        value={String(rules.referralHookEnabled)}
-                        onChange={(event) =>
-                          patchRules('referralHookEnabled', event.target.value === 'true')
-                        }
-                      >
-                        <option value="false">Disabled</option>
-                        <option value="true">Enabled</option>
-                      </select>
-                    </div>
-                    <div className={styles.field}>
-                      <label>Referral Basis</label>
-                      <select
-                        name="referralBasisMode"
-                        className={styles.select}
-                        disabled={!editable || !rules.referralHookEnabled}
-                        value={rules.referralBasisMode}
-                        onChange={(event) => patchRules('referralBasisMode', event.target.value)}
-                      >
-                        <option value="PAYMENT_AMOUNT">Full Payment Amount</option>
-                        <option value="REGISTRATION_ALLOCATION">Registration Allocation</option>
-                        <option value="INSTALLMENT_ALLOCATION">Installment Allocation</option>
-                        <option value="TOTAL_APPLIED_AMOUNT">Registration + Installment Applied</option>
-                      </select>
-                    </div>
-                    <div className={styles.field}>
-                      <label>Lucky Draw Eligibility Hook</label>
-                      <select
-                        name="drawEligibilityHookEnabled"
-                        className={styles.select}
-                        disabled={!editable}
-                        value={String(rules.drawEligibilityHookEnabled)}
-                        onChange={(event) =>
-                          patchRules('drawEligibilityHookEnabled', event.target.value === 'true')
-                        }
-                      >
-                        <option value="false">Disabled</option>
-                        <option value="true">Enabled</option>
-                      </select>
-                    </div>
-                    <div className={styles.field}>
-                      <label>Minimum Payment Amount (optional)</label>
-                      <input
-                        name="minimumPaymentAmount"
-                        className={styles.input}
-                        inputMode="decimal"
-                        disabled={!editable}
-                        value={rules.minimumPaymentAmount ?? ''}
-                        onChange={(event) =>
-                          patchRules('minimumPaymentAmount', event.target.value || null)
-                        }
-                      />
-                    </div>
-                    <div className={styles.field}>
-                      <label>Minimum Registration Allocation</label>
-                      <input
-                        name="minimumRegistrationAllocation"
-                        className={styles.input}
-                        inputMode="decimal"
-                        disabled={!editable}
-                        value={rules.minimumRegistrationAllocation ?? ''}
-                        onChange={(event) =>
-                          patchRules('minimumRegistrationAllocation', event.target.value || null)
-                        }
-                      />
-                    </div>
-                    <div className={styles.field}>
-                      <label>Minimum Installment Allocation</label>
-                      <input
-                        name="minimumInstallmentAllocation"
-                        className={styles.input}
-                        inputMode="decimal"
-                        disabled={!editable}
-                        value={rules.minimumInstallmentAllocation ?? ''}
-                        onChange={(event) =>
-                          patchRules('minimumInstallmentAllocation', event.target.value || null)
-                        }
-                      />
-                    </div>
-                    <div className={styles.field}>
-                      <label>Required Allocation Types</label>
-                      <div className={extension.checkGrid}>
-                        {[
-                          ['REGISTRATION_FEE', 'Registration Fee'],
-                          ['INSTALLMENT', 'Installment'],
-                          ['UNAPPLIED', 'Unapplied'],
-                        ].map(([value, label]) => (
-                          <label className={styles.check} key={value}>
-                            <input
-                              type="checkbox"
-                              disabled={!editable}
-                              checked={rules.requiredAllocationTypes.includes(value)}
-                              onChange={(event) => toggleAllocation(value, event.target.checked)}
-                            />
-                            {label}
-                          </label>
-                        ))}
-                      </div>
-                    </div>
+                    <div className={styles.field}><label>Binary Qualifying Units / Payment</label><input name="binaryUnitsPerEvent" className={styles.input} type="number" min="0" required disabled={!editable} value={rules.binaryUnitsPerEvent} onChange={(event) => patchRules('binaryUnitsPerEvent', Number(event.target.value) || 0)} /></div>
+                    <div className={styles.field}><label>Direct Referral Hand-off</label><select name="referralHookEnabled" className={styles.select} disabled={!editable} value={String(rules.referralHookEnabled)} onChange={(event) => patchRules('referralHookEnabled', event.target.value === 'true')}><option value="false">Disabled</option><option value="true">Enabled</option></select></div>
+                    <div className={styles.field}><label>Referral Basis</label><select name="referralBasisMode" className={styles.select} disabled={!editable || !rules.referralHookEnabled} value={rules.referralBasisMode} onChange={(event) => patchRules('referralBasisMode', event.target.value)}><option value="PAYMENT_AMOUNT">Full Payment Amount</option><option value="REGISTRATION_ALLOCATION">Registration Allocation</option><option value="INSTALLMENT_ALLOCATION">Installment Allocation</option><option value="TOTAL_APPLIED_AMOUNT">Registration + Installment Applied</option></select></div>
+                    <div className={styles.field}><label>Lucky Draw Eligibility Hook</label><select name="drawEligibilityHookEnabled" className={styles.select} disabled={!editable} value={String(rules.drawEligibilityHookEnabled)} onChange={(event) => patchRules('drawEligibilityHookEnabled', event.target.value === 'true')}><option value="false">Disabled</option><option value="true">Enabled</option></select></div>
+                    <div className={styles.field}><label>Minimum Payment Amount (optional)</label><input name="minimumPaymentAmount" className={styles.input} inputMode="decimal" disabled={!editable} value={rules.minimumPaymentAmount ?? ''} onChange={(event) => patchRules('minimumPaymentAmount', event.target.value || null)} /></div>
+                    <div className={styles.field}><label>Minimum Registration Allocation</label><input name="minimumRegistrationAllocation" className={styles.input} inputMode="decimal" disabled={!editable} value={rules.minimumRegistrationAllocation ?? ''} onChange={(event) => patchRules('minimumRegistrationAllocation', event.target.value || null)} /></div>
+                    <div className={styles.field}><label>Minimum Installment Allocation</label><input name="minimumInstallmentAllocation" className={styles.input} inputMode="decimal" disabled={!editable} value={rules.minimumInstallmentAllocation ?? ''} onChange={(event) => patchRules('minimumInstallmentAllocation', event.target.value || null)} /></div>
+                    <div className={styles.field}><label>Required Allocation Types</label><div className={extension.checkGrid}>{[['REGISTRATION_FEE', 'Registration Fee'], ['INSTALLMENT', 'Installment'], ['UNAPPLIED', 'Unapplied']].map(([value, label]) => <label className={styles.check} key={value}><input type="checkbox" disabled={!editable} checked={rules.requiredAllocationTypes.includes(value)} onChange={(event) => toggleAllocation(value, event.target.checked)} />{label}</label>)}</div></div>
                   </div>
                 </div>
               </>}
             </WorkspaceTabs>
 
-            <div className={styles.notice} style={{ marginTop: 14 }}>
-              Season activation is blocked until this automatic-rule draft exists
-              and every Season month has a prize schedule. Activation publishes
-              Membership, Binary, Referral and Automatic Rules together.
-            </div>
-            <div className={styles.buttonLine}>
-              <button className={styles.button} disabled={busy || !editable}>
-                {busy ? 'SAVING…' : 'SAVE ADVANCED SEASON POLICY'}
-              </button>
-            </div>
+            <div className={styles.notice} style={{ marginTop: 14 }}>Season activation is blocked until the automatic-rule draft exists and every Season month has a prize schedule. Membership, Binary, Referral and Automatic Rules publish together.</div>
+            <div className={styles.buttonLine}><button className={styles.button} disabled={busy || !editable}>{busy ? 'SAVING…' : 'SAVE ADVANCED SEASON POLICY'}</button></div>
           </form>
-        ) : (
-          <div className={styles.empty}>
-            Create a Season draft before configuring advanced rules.
-          </div>
-        )}
+        ) : <div className={styles.empty}>Create a Season draft before configuring advanced rules.</div>}
       </div>
     </section>
   );
