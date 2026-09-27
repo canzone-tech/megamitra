@@ -9,6 +9,6 @@ export class AssignOwnerPlacementDto {
   @Length(1, 191)
   parentReference!: string;
 
-  @IsIn(['LEFT', 'RIGHT', 'AUTO'])
-  side!: 'LEFT' | 'RIGHT' | 'AUTO';
+  @IsIn(['A', 'B', 'C', 'D', 'AUTO'])
+  slot!: 'A' | 'B' | 'C' | 'D' | 'AUTO';
 }
