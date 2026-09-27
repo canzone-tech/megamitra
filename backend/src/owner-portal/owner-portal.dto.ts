@@ -20,7 +20,7 @@ import { Type } from 'class-transformer';
 
 export const OWNER_SEASON_STATUSES = ['DRAFT', 'REVIEW', 'ACTIVE', 'PAUSED', 'CLOSED', 'ARCHIVED'] as const;
 export const OWNER_MEMBER_TYPES = ['PARTNER', 'CUSTOMER'] as const;
-export const OWNER_PLACEMENTS = ['AUTO', 'LEFT', 'RIGHT'] as const;
+export const OWNER_PLACEMENTS = ['AUTO', 'A', 'B', 'C', 'D'] as const;
 export const OWNER_ELIGIBILITY_CUTOFFS = ['BEFORE_DRAW_DATE', 'PAYMENT_DUE_DATE', 'ADMIN_DEFINED'] as const;
 export const OWNER_NOTIFICATION_CHANNELS = ['PORTAL', 'SMS', 'EMAIL', 'PUSH'] as const;
 export const OWNER_NOTIFICATION_AUDIENCES = ['ALL_ACTIVE_MEMBERS', 'SEASON_MEMBERS', 'AGENTS', 'ADMINS'] as const;
