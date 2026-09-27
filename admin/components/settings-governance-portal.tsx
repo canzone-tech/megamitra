@@ -9,6 +9,7 @@ import { AdminEmailChangeForm } from '@/components/auth-account-forms';
 import { AppearanceSettingsPanel } from '@/components/appearance-settings-panel';
 import { OwnerManagementShell } from '@/components/owner-management-shell';
 import { PlatformConfigAdmin } from '@/components/platform-config-admin';
+import { WorkspaceTabs } from '@/components/workspace-tabs';
 import styles from './owner-portal.module.css';
 
 type Row = Record<string, unknown>;
@@ -104,57 +105,64 @@ export function SettingsGovernancePortal() {
     {error ? <div className={classNames(styles.notice, styles.error)} role="alert">{error}</div> : null}
     {notice ? <div className={classNames(styles.notice, styles.success)} role="status">{notice}</div> : null}
 
-    <div className="mm-tabs" aria-label="Settings sections">
-      <a className="mm-tab active" href="#general">General</a>
-      <a className="mm-tab" href="#security">Security & registration</a>
-      <a className="mm-tab" href="#appearance">Appearance</a>
-      <a className="mm-tab" href="#governance">Governance</a>
-    </div>
+    <WorkspaceTabs
+      ariaLabel="Settings sections"
+      tabs={[
+        { id: 'general', label: 'General' },
+        { id: 'security', label: 'Security & Registration' },
+        { id: 'appearance', label: 'Appearance' },
+        { id: 'governance', label: 'Governance', count: controls.length },
+      ]}
+    >
+      {(activeTab) => <>
+        {activeTab === 'general' ? <>
+          <section className={styles.card}>
+            <div className={styles.sectionHead}><div className={styles.sectionTitle}><span className={styles.sectionIcon}>⚙</span><h2>Portal Configuration</h2></div><small>Single source for global portal preferences</small></div>
+            <form key={text(settings.updatedAt, 'settings')} method="post" onSubmit={saveSettings}>
+              <div className={styles.fields}>
+                <div className={styles.field}><label>Company Name</label><input name="companyName" className={styles.input} required defaultValue={text(settings.companyName, 'MegaGoldenClub')} /></div>
+                <div className={styles.field}><label>Portal Time Zone</label><input name="timezone" className={styles.input} required defaultValue={text(settings.timezone, 'Asia/Kolkata')} placeholder="Asia/Kolkata" /></div>
+                <div className={styles.field}><label>Currency</label><input name="currencyCode" className={styles.input} required maxLength={3} pattern="[A-Za-z]{3}" defaultValue={currencyCode} placeholder="INR" /></div>
+                <div className={styles.field}><label>Default Language</label><input name="defaultLanguage" className={styles.input} required defaultValue={text(settings.defaultLanguage, 'English')} /></div>
+                <div className={styles.field}><label>Daily Cap</label><input className={styles.input} readOnly value={money(snapshot.dailyCap, currencyCode)} /></div>
+                <div className={styles.field}><label>Pair Value</label><input className={styles.input} readOnly value={money(active.pairPayoutAmount, currencyCode)} /></div>
+              </div>
+              <div className={styles.notice}>Daily Cap and Pair Value are authoritative Season policy values. Change them only in Season Management so financial configuration is never duplicated.</div>
+              <div className={styles.buttonLine}><button className={styles.button} disabled={busy}>SAVE SETTINGS</button><Link className={classNames(styles.button, styles.outline, styles.linkButton)} href="/portal/seasons">SEASON MANAGEMENT</Link></div>
+            </form>
+          </section>
 
-    <section id="general" className={styles.card} style={{ scrollMarginTop: 90 }}>
-      <div className={styles.sectionHead}><div className={styles.sectionTitle}><span className={styles.sectionIcon}>⚙</span><h2>Portal Configuration</h2></div><small>Single source for global portal preferences</small></div>
-      <form key={text(settings.updatedAt, 'settings')} method="post" onSubmit={saveSettings}>
-        <div className={styles.fields}>
-          <div className={styles.field}><label>Company Name</label><input name="companyName" className={styles.input} required defaultValue={text(settings.companyName, 'MegaGoldenClub')} /></div>
-          <div className={styles.field}><label>Portal Time Zone</label><input name="timezone" className={styles.input} required defaultValue={text(settings.timezone, 'Asia/Kolkata')} placeholder="Asia/Kolkata" /></div>
-          <div className={styles.field}><label>Currency</label><input name="currencyCode" className={styles.input} required maxLength={3} pattern="[A-Za-z]{3}" defaultValue={currencyCode} placeholder="INR" /></div>
-          <div className={styles.field}><label>Default Language</label><input name="defaultLanguage" className={styles.input} required defaultValue={text(settings.defaultLanguage, 'English')} /></div>
-          <div className={styles.field}><label>Daily Cap</label><input className={styles.input} readOnly value={money(snapshot.dailyCap, currencyCode)} /></div>
-          <div className={styles.field}><label>Pair Value</label><input className={styles.input} readOnly value={money(active.pairPayoutAmount, currencyCode)} /></div>
-        </div>
-        <div className={styles.notice}>Daily Cap and Pair Value are authoritative Season policy values. Change them only in Season Management so financial configuration is never duplicated.</div>
-        <div className={styles.buttonLine}><button className={styles.button} disabled={busy}>SAVE SETTINGS</button><Link className={classNames(styles.button, styles.outline, styles.linkButton)} href="/portal/seasons">SEASON MANAGEMENT</Link></div>
-      </form>
-    </section>
+          <div className={styles.kpis}>
+            <div className={styles.kpi}><small>Active Season</small><strong>{text(active.name, 'No active season')}</strong><span>{text(active.status, 'Not published')}</span></div>
+            <div className={styles.kpi}><small>Open Support</small><strong>{number(snapshot.openSupportTickets)}</strong><span>Tickets requiring attention</span></div>
+            <div className={styles.kpi}><small>Pending Notices</small><strong>{number(snapshot.pendingNotifications)}</strong><span>Draft / scheduled / queued</span></div>
+            <div className={styles.kpi}><small>Currency</small><strong>{currencyCode}</strong><span>{text(settings.timezone, 'Portal timezone')}</span></div>
+          </div>
+        </> : null}
 
-    <div className={styles.kpis}>
-      <div className={styles.kpi}><small>Active Season</small><strong>{text(active.name, 'No active season')}</strong><span>{text(active.status, 'Not published')}</span></div>
-      <div className={styles.kpi}><small>Open Support</small><strong>{number(snapshot.openSupportTickets)}</strong><span>Tickets requiring attention</span></div>
-      <div className={styles.kpi}><small>Pending Notices</small><strong>{number(snapshot.pendingNotifications)}</strong><span>Draft / scheduled / queued</span></div>
-      <div className={styles.kpi}><small>Currency</small><strong>{currencyCode}</strong><span>{text(settings.timezone, 'Portal timezone')}</span></div>
-    </div>
+        {activeTab === 'security' ? <section style={{ display: 'grid', gap: 18 }}>
+          <div className={styles.sectionHead}><div className={styles.sectionTitle}><span className={styles.sectionIcon}>◇</span><h2>Authentication, Security & Registration</h2></div><small>Platform-wide SuperAdmin configuration</small></div>
+          <PlatformConfigAdmin />
+          <section className="mm-card">
+            <div className="mm-card-head"><div><h2>SuperAdmin account email</h2><p className="mm-note">Account-specific action; platform-wide email policy is configured above.</p></div><span className="mm-chip warning">ACCOUNT ACTION</span></div>
+            <div className="mm-card-body"><AdminEmailChangeForm /></div>
+          </section>
+        </section> : null}
 
-    <section id="security" style={{ scrollMarginTop: 90, display: 'grid', gap: 18 }}>
-      <div className={styles.sectionHead}><div className={styles.sectionTitle}><span className={styles.sectionIcon}>◇</span><h2>Authentication, Security & Registration</h2></div><small>Platform-wide SuperAdmin configuration</small></div>
-      <PlatformConfigAdmin />
-      <section className="mm-card">
-        <div className="mm-card-head"><div><h2>SuperAdmin account email</h2><p className="mm-note">Account-specific action; platform-wide email policy is configured above.</p></div><span className="mm-chip warning">ACCOUNT ACTION</span></div>
-        <div className="mm-card-body"><AdminEmailChangeForm /></div>
-      </section>
-    </section>
+        {activeTab === 'appearance' ? <section style={{ display: 'grid', gap: 18 }}>
+          <div className={styles.sectionHead}><div className={styles.sectionTitle}><span className={styles.sectionIcon}>◐</span><h2>Portal Appearance</h2></div><small>Versioned member portal theme, layout and copy</small></div>
+          <AppearanceSettingsPanel />
+        </section> : null}
 
-    <section id="appearance" style={{ scrollMarginTop: 90, display: 'grid', gap: 18 }}>
-      <div className={styles.sectionHead}><div className={styles.sectionTitle}><span className={styles.sectionIcon}>◐</span><h2>Portal Appearance</h2></div><small>Versioned member portal theme, layout and copy</small></div>
-      <AppearanceSettingsPanel />
-    </section>
-
-    <section id="governance" className={styles.card} style={{ scrollMarginTop: 90 }}>
-      <div className={styles.sectionHead}><div className={styles.sectionTitle}><span className={styles.sectionIcon}>✓</span><h2>Governance Checklist</h2></div><small>Runtime capability status — unsupported controls are not marked complete.</small></div>
-      {controls.length ? <div className={styles.tableBox}><table className={styles.table}><thead><tr><th>CONTROL</th><th>STATUS</th><th>DETAIL</th></tr></thead><tbody>{controls.map((row) => {
-        const status = text(row.status);
-        const activeStatus = ['ACTIVE', 'ENFORCED', 'RUNBOOK'].includes(status);
-        return <tr key={text(row.code)}><td><b>{text(row.label)}</b></td><td className={activeStatus ? styles.status : styles.statusOff}>{status.replaceAll('_', ' ')}</td><td>{text(row.detail)}</td></tr>;
-      })}</tbody></table></div> : <div className={styles.empty}>Governance status unavailable.</div>}
-    </section>
+        {activeTab === 'governance' ? <section className={styles.card}>
+          <div className={styles.sectionHead}><div className={styles.sectionTitle}><span className={styles.sectionIcon}>✓</span><h2>Governance Checklist</h2></div><small>Runtime capability status — unsupported controls are not marked complete.</small></div>
+          {controls.length ? <div className={styles.tableBox}><table className={styles.table}><thead><tr><th>CONTROL</th><th>STATUS</th><th>DETAIL</th></tr></thead><tbody>{controls.map((row) => {
+            const status = text(row.status);
+            const activeStatus = ['ACTIVE', 'ENFORCED', 'RUNBOOK'].includes(status);
+            return <tr key={text(row.code)}><td><b>{text(row.label)}</b></td><td className={activeStatus ? styles.status : styles.statusOff}>{status.replaceAll('_', ' ')}</td><td>{text(row.detail)}</td></tr>;
+          })}</tbody></table></div> : <div className={styles.empty}>Governance status unavailable.</div>}
+        </section> : null}
+      </>}
+    </WorkspaceTabs>
   </OwnerManagementShell>;
 }
