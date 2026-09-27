@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import styles from './owner-portal.module.css';
+import styles from './workspace-tabs.module.css';
 
 type WorkspaceTab = {
   id: string;
@@ -42,14 +42,14 @@ export function WorkspaceTabs({
 
   return (
     <>
-      <div className={styles.workspaceTabs} role="tablist" aria-label={ariaLabel}>
+      <div className={styles.tabs} role="tablist" aria-label={ariaLabel}>
         {tabs.map((tab) => (
           <button
             key={tab.id}
             type="button"
             role="tab"
             aria-selected={activeTab === tab.id}
-            className={`${styles.workspaceTab} ${activeTab === tab.id ? styles.workspaceTabActive : ''}`}
+            className={`${styles.tab} ${activeTab === tab.id ? styles.active : ''}`}
             onClick={() => activate(tab.id)}
           >
             <span>{tab.label}</span>
