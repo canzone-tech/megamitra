@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ApiClientError, apiJson } from '@/lib/client-api';
+import { WorkspaceTabs } from '@/components/workspace-tabs';
 import styles from './owner-portal.module.css';
 import extension from './owner-portal-extension.module.css';
 
@@ -46,7 +47,7 @@ function optionalNumber(value: string): number | undefined {
   return Number.isFinite(parsed) ? Math.trunc(parsed) : undefined;
 }
 
-export function OwnerSeasonAdvancedPanel() {
+export function OwnerSeasonAdvancedPanel({ embedded = false }: { embedded?: boolean }) {
   const router = useRouter();
   const [seasons, setSeasons] = useState<Season[]>([]);
   const [seasonId, setSeasonId] = useState('');
@@ -190,8 +191,7 @@ export function OwnerSeasonAdvancedPanel() {
         minimumInstallmentAllocation:
           String(form.get('minimumInstallmentAllocation') ?? '').trim() ||
           undefined,
-        requiredAllocationTypes:
-          config.automaticRules.requiredAllocationTypes,
+        requiredAllocationTypes: config.automaticRules.requiredAllocationTypes,
       };
       setConfig(
         await apiJson<Advanced>(
@@ -216,16 +216,14 @@ export function OwnerSeasonAdvancedPanel() {
   const binary = config?.binary;
 
   return (
-    <section id="advanced-policy" className={extension.extension}>
+    <section id="advanced-policy" className={embedded ? undefined : extension.extension}>
       <div className={styles.card}>
         <div className={styles.sectionHead}>
           <div className={styles.sectionTitle}>
             <span className={styles.sectionIcon}>⚙</span>
             <div>
               <h2>Advanced Season Policy</h2>
-              <small>
-                Single authority for Binary 2:2 and automatic payment-event rules
-              </small>
+              <small>Single authority for Binary 2:2 and automatic payment-event rules</small>
             </div>
           </div>
           <span className={styles.tag}>
@@ -242,12 +240,8 @@ export function OwnerSeasonAdvancedPanel() {
           rules here before activation; the system will not invent them.
         </div>
 
-        {error ? (
-          <div className={`${styles.notice} ${styles.error}`}>{error}</div>
-        ) : null}
-        {notice ? (
-          <div className={`${styles.notice} ${styles.success}`}>{notice}</div>
-        ) : null}
+        {error ? <div className={`${styles.notice} ${styles.error}`}>{error}</div> : null}
+        {notice ? <div className={`${styles.notice} ${styles.success}`}>{notice}</div> : null}
 
         <div className={styles.fields}>
           <div className={styles.field}>
@@ -273,11 +267,7 @@ export function OwnerSeasonAdvancedPanel() {
             <input
               className={styles.input}
               readOnly
-              value={
-                config
-                  ? `${config.season.status} • Binary ${binary?.lifecycle ?? '—'}`
-                  : '—'
-              }
+              value={config ? `${config.season.status} • Binary ${binary?.lifecycle ?? '—'}` : '—'}
             />
           </div>
         </div>
@@ -286,245 +276,228 @@ export function OwnerSeasonAdvancedPanel() {
           <div className={styles.loading}>Loading season policy…</div>
         ) : config && binary && rules ? (
           <form method="post" onSubmit={save}>
-            <div className={styles.sectionHead} style={{ marginTop: 18 }}>
-              <div className={styles.sectionTitle}>
-                <span className={styles.sectionIcon}>◇</span>
-                <h2>Binary 2:2 Engine</h2>
-              </div>
-              <small>AB : CD defaults remain 2 : 2 until explicitly changed</small>
-            </div>
-            <div className={styles.fields}>
-              <div className={styles.field}>
-                <label>Qualifying Unit</label>
-                <input
-                  name="qualifyingUnit"
-                  className={styles.input}
-                  inputMode="decimal"
-                  required
-                  disabled={!editable}
-                  value={binary.qualifyingUnit}
-                  onChange={(event) =>
-                    patchBinary('qualifyingUnit', event.target.value)
-                  }
-                />
-              </div>
-              <div className={styles.field}>
-                <label>AB / Left Volume Per Pair</label>
-                <input
-                  name="leftVolumePerPair"
-                  className={styles.input}
-                  inputMode="decimal"
-                  required
-                  disabled={!editable}
-                  value={binary.leftVolumePerPair}
-                  onChange={(event) =>
-                    patchBinary('leftVolumePerPair', event.target.value)
-                  }
-                />
-              </div>
-              <div className={styles.field}>
-                <label>CD / Right Volume Per Pair</label>
-                <input
-                  name="rightVolumePerPair"
-                  className={styles.input}
-                  inputMode="decimal"
-                  required
-                  disabled={!editable}
-                  value={binary.rightVolumePerPair}
-                  onChange={(event) =>
-                    patchBinary('rightVolumePerPair', event.target.value)
-                  }
-                />
-              </div>
-              <div className={styles.field}>
-                <label>Monthly Pair Cap (optional)</label>
-                <input
-                  name="monthlyPairCap"
-                  className={styles.input}
-                  type="number"
-                  min="0"
-                  disabled={!editable}
-                  value={binary.monthlyPairCap ?? ''}
-                  onChange={(event) =>
-                    patchBinary(
-                      'monthlyPairCap',
-                      event.target.value ? Number(event.target.value) : null,
-                    )
-                  }
-                />
-              </div>
-              <div className={styles.field}>
-                <label>Carry Forward Expiry Days (optional)</label>
-                <input
-                  name="carryForwardExpiryDays"
-                  className={styles.input}
-                  type="number"
-                  min="1"
-                  disabled={!editable}
-                  value={binary.carryForwardExpiryDays ?? ''}
-                  onChange={(event) =>
-                    patchBinary(
-                      'carryForwardExpiryDays',
-                      event.target.value ? Number(event.target.value) : null,
-                    )
-                  }
-                />
-              </div>
-            </div>
-
-            <div className={styles.sectionHead} style={{ marginTop: 22 }}>
-              <div className={styles.sectionTitle}>
-                <span className={styles.sectionIcon}>↗</span>
-                <h2>Automatic Rules on Confirmed Payment</h2>
-              </div>
-              <small>Versioned and published with Season activation</small>
-            </div>
-            <div className={styles.fields}>
-              <div className={styles.field}>
-                <label>Binary Qualifying Units / Payment</label>
-                <input
-                  name="binaryUnitsPerEvent"
-                  className={styles.input}
-                  type="number"
-                  min="0"
-                  required
-                  disabled={!editable}
-                  value={rules.binaryUnitsPerEvent}
-                  onChange={(event) =>
-                    patchRules(
-                      'binaryUnitsPerEvent',
-                      Number(event.target.value) || 0,
-                    )
-                  }
-                />
-              </div>
-              <div className={styles.field}>
-                <label>Direct Referral Hand-off</label>
-                <select
-                  name="referralHookEnabled"
-                  className={styles.select}
-                  disabled={!editable}
-                  value={String(rules.referralHookEnabled)}
-                  onChange={(event) =>
-                    patchRules(
-                      'referralHookEnabled',
-                      event.target.value === 'true',
-                    )
-                  }
-                >
-                  <option value="false">Disabled</option>
-                  <option value="true">Enabled</option>
-                </select>
-              </div>
-              <div className={styles.field}>
-                <label>Referral Basis</label>
-                <select
-                  name="referralBasisMode"
-                  className={styles.select}
-                  disabled={!editable || !rules.referralHookEnabled}
-                  value={rules.referralBasisMode}
-                  onChange={(event) =>
-                    patchRules('referralBasisMode', event.target.value)
-                  }
-                >
-                  <option value="PAYMENT_AMOUNT">Full Payment Amount</option>
-                  <option value="REGISTRATION_ALLOCATION">
-                    Registration Allocation
-                  </option>
-                  <option value="INSTALLMENT_ALLOCATION">
-                    Installment Allocation
-                  </option>
-                  <option value="TOTAL_APPLIED_AMOUNT">
-                    Registration + Installment Applied
-                  </option>
-                </select>
-              </div>
-              <div className={styles.field}>
-                <label>Lucky Draw Eligibility Hook</label>
-                <select
-                  name="drawEligibilityHookEnabled"
-                  className={styles.select}
-                  disabled={!editable}
-                  value={String(rules.drawEligibilityHookEnabled)}
-                  onChange={(event) =>
-                    patchRules(
-                      'drawEligibilityHookEnabled',
-                      event.target.value === 'true',
-                    )
-                  }
-                >
-                  <option value="false">Disabled</option>
-                  <option value="true">Enabled</option>
-                </select>
-              </div>
-              <div className={styles.field}>
-                <label>Minimum Payment Amount (optional)</label>
-                <input
-                  name="minimumPaymentAmount"
-                  className={styles.input}
-                  inputMode="decimal"
-                  disabled={!editable}
-                  value={rules.minimumPaymentAmount ?? ''}
-                  onChange={(event) =>
-                    patchRules('minimumPaymentAmount', event.target.value || null)
-                  }
-                />
-              </div>
-              <div className={styles.field}>
-                <label>Minimum Registration Allocation</label>
-                <input
-                  name="minimumRegistrationAllocation"
-                  className={styles.input}
-                  inputMode="decimal"
-                  disabled={!editable}
-                  value={rules.minimumRegistrationAllocation ?? ''}
-                  onChange={(event) =>
-                    patchRules(
-                      'minimumRegistrationAllocation',
-                      event.target.value || null,
-                    )
-                  }
-                />
-              </div>
-              <div className={styles.field}>
-                <label>Minimum Installment Allocation</label>
-                <input
-                  name="minimumInstallmentAllocation"
-                  className={styles.input}
-                  inputMode="decimal"
-                  disabled={!editable}
-                  value={rules.minimumInstallmentAllocation ?? ''}
-                  onChange={(event) =>
-                    patchRules(
-                      'minimumInstallmentAllocation',
-                      event.target.value || null,
-                    )
-                  }
-                />
-              </div>
-              <div className={styles.field}>
-                <label>Required Allocation Types</label>
-                <div className={extension.checkGrid}>
-                  {[
-                    ['REGISTRATION_FEE', 'Registration Fee'],
-                    ['INSTALLMENT', 'Installment'],
-                    ['UNAPPLIED', 'Unapplied'],
-                  ].map(([value, label]) => (
-                    <label className={styles.check} key={value}>
+            <WorkspaceTabs
+              ariaLabel="Advanced season policy sections"
+              tabs={[
+                { id: 'binary-engine', label: 'Binary 2:2 Engine' },
+                { id: 'automatic-rules', label: 'Automatic Payment Rules' },
+              ]}
+            >
+              {(activeTab) => <>
+                <div hidden={activeTab !== 'binary-engine'}>
+                  <div className={styles.sectionHead}>
+                    <div className={styles.sectionTitle}>
+                      <span className={styles.sectionIcon}>◇</span>
+                      <h2>Binary 2:2 Engine</h2>
+                    </div>
+                    <small>AB : CD defaults remain 2 : 2 until explicitly changed</small>
+                  </div>
+                  <div className={styles.fields}>
+                    <div className={styles.field}>
+                      <label>Qualifying Unit</label>
                       <input
-                        type="checkbox"
+                        name="qualifyingUnit"
+                        className={styles.input}
+                        inputMode="decimal"
+                        required
                         disabled={!editable}
-                        checked={rules.requiredAllocationTypes.includes(value)}
+                        value={binary.qualifyingUnit}
+                        onChange={(event) => patchBinary('qualifyingUnit', event.target.value)}
+                      />
+                    </div>
+                    <div className={styles.field}>
+                      <label>AB / Left Volume Per Pair</label>
+                      <input
+                        name="leftVolumePerPair"
+                        className={styles.input}
+                        inputMode="decimal"
+                        required
+                        disabled={!editable}
+                        value={binary.leftVolumePerPair}
+                        onChange={(event) => patchBinary('leftVolumePerPair', event.target.value)}
+                      />
+                    </div>
+                    <div className={styles.field}>
+                      <label>CD / Right Volume Per Pair</label>
+                      <input
+                        name="rightVolumePerPair"
+                        className={styles.input}
+                        inputMode="decimal"
+                        required
+                        disabled={!editable}
+                        value={binary.rightVolumePerPair}
+                        onChange={(event) => patchBinary('rightVolumePerPair', event.target.value)}
+                      />
+                    </div>
+                    <div className={styles.field}>
+                      <label>Monthly Pair Cap (optional)</label>
+                      <input
+                        name="monthlyPairCap"
+                        className={styles.input}
+                        type="number"
+                        min="0"
+                        disabled={!editable}
+                        value={binary.monthlyPairCap ?? ''}
                         onChange={(event) =>
-                          toggleAllocation(value, event.target.checked)
+                          patchBinary(
+                            'monthlyPairCap',
+                            event.target.value ? Number(event.target.value) : null,
+                          )
                         }
                       />
-                      {label}
-                    </label>
-                  ))}
+                    </div>
+                    <div className={styles.field}>
+                      <label>Carry Forward Expiry Days (optional)</label>
+                      <input
+                        name="carryForwardExpiryDays"
+                        className={styles.input}
+                        type="number"
+                        min="1"
+                        disabled={!editable}
+                        value={binary.carryForwardExpiryDays ?? ''}
+                        onChange={(event) =>
+                          patchBinary(
+                            'carryForwardExpiryDays',
+                            event.target.value ? Number(event.target.value) : null,
+                          )
+                        }
+                      />
+                    </div>
+                  </div>
                 </div>
-              </div>
-            </div>
+
+                <div hidden={activeTab !== 'automatic-rules'}>
+                  <div className={styles.sectionHead}>
+                    <div className={styles.sectionTitle}>
+                      <span className={styles.sectionIcon}>↗</span>
+                      <h2>Automatic Rules on Confirmed Payment</h2>
+                    </div>
+                    <small>Versioned and published with Season activation</small>
+                  </div>
+                  <div className={styles.fields}>
+                    <div className={styles.field}>
+                      <label>Binary Qualifying Units / Payment</label>
+                      <input
+                        name="binaryUnitsPerEvent"
+                        className={styles.input}
+                        type="number"
+                        min="0"
+                        required
+                        disabled={!editable}
+                        value={rules.binaryUnitsPerEvent}
+                        onChange={(event) =>
+                          patchRules('binaryUnitsPerEvent', Number(event.target.value) || 0)
+                        }
+                      />
+                    </div>
+                    <div className={styles.field}>
+                      <label>Direct Referral Hand-off</label>
+                      <select
+                        name="referralHookEnabled"
+                        className={styles.select}
+                        disabled={!editable}
+                        value={String(rules.referralHookEnabled)}
+                        onChange={(event) =>
+                          patchRules('referralHookEnabled', event.target.value === 'true')
+                        }
+                      >
+                        <option value="false">Disabled</option>
+                        <option value="true">Enabled</option>
+                      </select>
+                    </div>
+                    <div className={styles.field}>
+                      <label>Referral Basis</label>
+                      <select
+                        name="referralBasisMode"
+                        className={styles.select}
+                        disabled={!editable || !rules.referralHookEnabled}
+                        value={rules.referralBasisMode}
+                        onChange={(event) => patchRules('referralBasisMode', event.target.value)}
+                      >
+                        <option value="PAYMENT_AMOUNT">Full Payment Amount</option>
+                        <option value="REGISTRATION_ALLOCATION">Registration Allocation</option>
+                        <option value="INSTALLMENT_ALLOCATION">Installment Allocation</option>
+                        <option value="TOTAL_APPLIED_AMOUNT">Registration + Installment Applied</option>
+                      </select>
+                    </div>
+                    <div className={styles.field}>
+                      <label>Lucky Draw Eligibility Hook</label>
+                      <select
+                        name="drawEligibilityHookEnabled"
+                        className={styles.select}
+                        disabled={!editable}
+                        value={String(rules.drawEligibilityHookEnabled)}
+                        onChange={(event) =>
+                          patchRules('drawEligibilityHookEnabled', event.target.value === 'true')
+                        }
+                      >
+                        <option value="false">Disabled</option>
+                        <option value="true">Enabled</option>
+                      </select>
+                    </div>
+                    <div className={styles.field}>
+                      <label>Minimum Payment Amount (optional)</label>
+                      <input
+                        name="minimumPaymentAmount"
+                        className={styles.input}
+                        inputMode="decimal"
+                        disabled={!editable}
+                        value={rules.minimumPaymentAmount ?? ''}
+                        onChange={(event) =>
+                          patchRules('minimumPaymentAmount', event.target.value || null)
+                        }
+                      />
+                    </div>
+                    <div className={styles.field}>
+                      <label>Minimum Registration Allocation</label>
+                      <input
+                        name="minimumRegistrationAllocation"
+                        className={styles.input}
+                        inputMode="decimal"
+                        disabled={!editable}
+                        value={rules.minimumRegistrationAllocation ?? ''}
+                        onChange={(event) =>
+                          patchRules('minimumRegistrationAllocation', event.target.value || null)
+                        }
+                      />
+                    </div>
+                    <div className={styles.field}>
+                      <label>Minimum Installment Allocation</label>
+                      <input
+                        name="minimumInstallmentAllocation"
+                        className={styles.input}
+                        inputMode="decimal"
+                        disabled={!editable}
+                        value={rules.minimumInstallmentAllocation ?? ''}
+                        onChange={(event) =>
+                          patchRules('minimumInstallmentAllocation', event.target.value || null)
+                        }
+                      />
+                    </div>
+                    <div className={styles.field}>
+                      <label>Required Allocation Types</label>
+                      <div className={extension.checkGrid}>
+                        {[
+                          ['REGISTRATION_FEE', 'Registration Fee'],
+                          ['INSTALLMENT', 'Installment'],
+                          ['UNAPPLIED', 'Unapplied'],
+                        ].map(([value, label]) => (
+                          <label className={styles.check} key={value}>
+                            <input
+                              type="checkbox"
+                              disabled={!editable}
+                              checked={rules.requiredAllocationTypes.includes(value)}
+                              onChange={(event) => toggleAllocation(value, event.target.checked)}
+                            />
+                            {label}
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </>}
+            </WorkspaceTabs>
 
             <div className={styles.notice} style={{ marginTop: 14 }}>
               Season activation is blocked until this automatic-rule draft exists
