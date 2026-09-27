@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import styles from './workspace-tabs.module.css';
 
@@ -9,6 +9,8 @@ type WorkspaceTab = {
   label: string;
   count?: number | string;
 };
+
+const WorkspaceTabsDepth = createContext(0);
 
 export function WorkspaceTabs({
   tabs,
@@ -21,6 +23,8 @@ export function WorkspaceTabs({
   children: (activeTab: string) => ReactNode;
   ariaLabel?: string;
 }) {
+  const depth = useContext(WorkspaceTabsDepth);
+  const ownsLocationHash = depth === 0;
   const fallback = initialTab && tabs.some((tab) => tab.id === initialTab)
     ? initialTab
     : tabs[0]?.id ?? '';
@@ -28,6 +32,7 @@ export function WorkspaceTabs({
   const tabKey = tabs.map((tab) => tab.id).join('|');
 
   useEffect(() => {
+    if (!ownsLocationHash) return;
     const validIds = new Set(tabKey.split('|').filter(Boolean));
     const syncFromHash = () => {
       const fromHash = window.location.hash.replace(/^#/, '');
@@ -39,10 +44,11 @@ export function WorkspaceTabs({
       window.clearTimeout(timer);
       window.removeEventListener('hashchange', syncFromHash);
     };
-  }, [tabKey]);
+  }, [ownsLocationHash, tabKey]);
 
   function activate(id: string) {
     setActiveTab(id);
+    if (!ownsLocationHash) return;
     const url = new URL(window.location.href);
     url.hash = id;
     window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`);
@@ -50,7 +56,7 @@ export function WorkspaceTabs({
   }
 
   return (
-    <>
+    <WorkspaceTabsDepth.Provider value={depth + 1}>
       <div className={styles.tabs} role="tablist" aria-label={ariaLabel}>
         {tabs.map((tab) => (
           <button
@@ -67,6 +73,6 @@ export function WorkspaceTabs({
         ))}
       </div>
       {children(activeTab)}
-    </>
+    </WorkspaceTabsDepth.Provider>
   );
 }

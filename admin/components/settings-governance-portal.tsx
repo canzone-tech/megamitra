@@ -110,6 +110,7 @@ export function SettingsGovernancePortal() {
       tabs={[
         { id: 'general', label: 'General' },
         { id: 'security', label: 'Security & Registration' },
+        { id: 'account', label: 'SuperAdmin Account' },
         { id: 'appearance', label: 'Appearance' },
         { id: 'governance', label: 'Governance', count: controls.length },
       ]}
@@ -143,8 +144,12 @@ export function SettingsGovernancePortal() {
         {activeTab === 'security' ? <section style={{ display: 'grid', gap: 18 }}>
           <div className={styles.sectionHead}><div className={styles.sectionTitle}><span className={styles.sectionIcon}>◇</span><h2>Authentication, Security & Registration</h2></div><small>Platform-wide SuperAdmin configuration</small></div>
           <PlatformConfigAdmin />
+        </section> : null}
+
+        {activeTab === 'account' ? <section style={{ display: 'grid', gap: 18 }}>
+          <div className={styles.sectionHead}><div className={styles.sectionTitle}><span className={styles.sectionIcon}>A</span><h2>SuperAdmin Account</h2></div><small>Account-specific actions stay separate from platform policy</small></div>
           <section className="mm-card">
-            <div className="mm-card-head"><div><h2>SuperAdmin account email</h2><p className="mm-note">Account-specific action; platform-wide email policy is configured above.</p></div><span className="mm-chip warning">ACCOUNT ACTION</span></div>
+            <div className="mm-card-head"><div><h2>SuperAdmin account email</h2><p className="mm-note">Change the signed-in SuperAdmin email without mixing this action into registration policy.</p></div><span className="mm-chip warning">ACCOUNT ACTION</span></div>
             <div className="mm-card-body"><AdminEmailChangeForm /></div>
           </section>
         </section> : null}
