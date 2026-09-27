@@ -23,6 +23,7 @@ import {
   UpdateSupportTicketDto,
   VerifyOwnerWinnerDto,
 } from './owner-portal.dto';
+import { OwnerPortalCoreService } from './owner-portal-core.service';
 import { OwnerPortalDrawWorkflowService } from './owner-portal-draw-workflow.service';
 import { OwnerPortalFinanceService } from './owner-portal-finance.service';
 import { AssignOwnerPlacementDto } from './owner-portal-placement.dto';
@@ -34,6 +35,7 @@ import { OwnerSeasonConfigurationService } from './owner-season-configuration.se
 export class OwnerPortalController {
   constructor(
     private readonly portal: OwnerPortalService,
+    private readonly core: OwnerPortalCoreService,
     private readonly drawWorkflow: OwnerPortalDrawWorkflowService,
     private readonly finance: OwnerPortalFinanceService,
     private readonly seasonConfiguration: OwnerSeasonConfigurationService,
@@ -48,13 +50,13 @@ export class OwnerPortalController {
   @Permissions('users.read')
   @Get('members')
   members(@Query('q') q?: string) {
-    return this.portal.listMembers(q);
+    return this.core.listMembers(q);
   }
 
   @Permissions('users.manage')
   @Post('members')
   createMember(@Body() dto: CreateOwnerMemberDto, @CurrentUser() actor: AuthUser) {
-    return this.portal.createMember(dto, actor.id);
+    return this.core.createMember(dto, actor.id);
   }
 
   @Permissions('users.read')
@@ -72,10 +74,10 @@ export class OwnerPortalController {
   @Permissions('genealogy.manage')
   @Post('placements')
   placement(@Body() dto: AssignOwnerPlacementDto, @CurrentUser() actor: AuthUser) {
-    return this.portal.assignPlacement(
+    return this.core.assignPlacement(
       dto.memberReference,
       dto.parentReference,
-      dto.side,
+      dto.slot,
       actor.id,
     );
   }
@@ -84,7 +86,7 @@ export class OwnerPortalController {
   @Get('pair-ledger')
   pairLedger(@Query('limit') limit?: string) {
     const parsed = limit ? Number.parseInt(limit, 10) : 100;
-    return this.portal.listPairLedger(Number.isFinite(parsed) ? parsed : 100);
+    return this.core.listPairLedger(Number.isFinite(parsed) ? parsed : 100);
   }
 
   @Permissions('program.read')
