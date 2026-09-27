@@ -65,7 +65,6 @@ function classNames(...values: Array<string | false | null | undefined>) {
 export function OwnerManagementShell({
   title,
   currentSection,
-  currentPath,
   children,
 }: {
   title: string;
@@ -122,8 +121,6 @@ export function OwnerManagementShell({
         <header className={styles.topbar}>
           <div className={styles.crumb}><b>{title}</b><span>MegaGoldenClub • Professional management portal</span></div>
           <div className={styles.actions}>
-            <Link className={classNames(styles.iconButton, styles.linkButton, currentPath === '/presentation' && styles.activeAction)} href="/presentation" aria-label="Appearance">◐</Link>
-            <Link className={classNames(styles.iconButton, styles.linkButton, currentPath === '/security' && styles.activeAction)} href="/security" aria-label="Security">◇</Link>
             <button className={styles.logout} type="button" onClick={logout} disabled={busy}>LOG OUT</button>
           </div>
         </header>
@@ -151,8 +148,6 @@ export function OwnerManagementShell({
               <span>{item.symbol}</span><span>{item.label}</span>
             </Link>
           ))}
-          <Link className={classNames(styles.navItem, currentPath === '/security' && styles.activeNav)} href="/security" onClick={() => setMobileMore(false)}><span>◇</span><span>Security & Registration</span></Link>
-          <Link className={classNames(styles.navItem, currentPath === '/presentation' && styles.activeNav)} href="/presentation" onClick={() => setMobileMore(false)}><span>◐</span><span>Appearance</span></Link>
           <button className={classNames(styles.button, styles.dark)} type="button" onClick={logout}>LOG OUT</button>
         </div>
       </> : null}
