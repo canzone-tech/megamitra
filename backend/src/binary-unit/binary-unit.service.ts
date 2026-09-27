@@ -1,5 +1,5 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { AuditService } from '../audit/audit.service';
 import { PrismaService } from '../database/prisma.service';
 import type { Prisma } from '../generated/prisma/client';
@@ -12,6 +12,13 @@ import type {
   CreateBinaryQualifyingUnitDto,
   ReverseBinaryQualifyingUnitDto,
 } from './binary-unit.dto';
+
+type SlotAncestryRow = {
+  ancestorUserId: string;
+  depth: number;
+  firstLegSide: 'LEFT' | 'RIGHT';
+  firstLegSlot: 'A' | 'B' | 'C' | 'D';
+};
 
 @Injectable()
 export class BinaryUnitService {
@@ -41,10 +48,13 @@ export class BinaryUnitService {
 
     try {
       const event = await this.prisma.$transaction(async (tx) => {
-        const ancestry = await tx.binaryAncestry.findMany({
-          where: { descendantUserId: dto.sourceMemberUserId },
-          orderBy: { depth: 'asc' },
-        });
+        const ancestry = await tx.$queryRawUnsafe<SlotAncestryRow[]>(
+          `SELECT ancestorUserId, depth, firstLegSide, firstLegSlot
+           FROM binary_ancestry
+           WHERE descendantUserId = ?
+           ORDER BY depth ASC`,
+          dto.sourceMemberUserId,
+        );
         const created = await tx.binaryQualifyingUnitEvent.create({
           data: {
             sourceKey: dto.sourceKey,
@@ -59,23 +69,26 @@ export class BinaryUnitService {
         });
 
         for (const ancestor of ancestry) {
-          const sequenceKey = `BU:${ancestor.ancestorUserId}:${dto.planVersionId}:${ancestor.firstLegSide}`;
+          const sequenceKey = `BU:${ancestor.ancestorUserId}:${dto.planVersionId}:${ancestor.firstLegSlot}`;
           const state = await tx.systemSequence.upsert({
             where: { key: sequenceKey },
             create: { key: sequenceKey, nextValue: 1n },
             update: { nextValue: { increment: 1n } },
             select: { nextValue: true },
           });
-          await tx.binaryUplineQualifyingUnit.create({
-            data: {
-              unitEventId: created.id,
-              ancestorUserId: ancestor.ancestorUserId,
-              planVersionId: dto.planVersionId,
-              side: ancestor.firstLegSide,
-              depth: ancestor.depth,
-              sequence: Number(state.nextValue),
-            },
-          });
+          await tx.$executeRawUnsafe(
+            `INSERT INTO binary_upline_qualifying_units
+               (id, unitEventId, ancestorUserId, planVersionId, side, slot, depth, sequence, createdAt)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP(3))`,
+            randomUUID(),
+            created.id,
+            ancestor.ancestorUserId,
+            dto.planVersionId,
+            ancestor.firstLegSide,
+            ancestor.firstLegSlot,
+            ancestor.depth,
+            Number(state.nextValue),
+          );
         }
 
         return tx.binaryQualifyingUnitEvent.findUniqueOrThrow({
@@ -89,12 +102,12 @@ export class BinaryUnitService {
         action: AuditAction.CREATE,
         entityType: 'BinaryQualifyingUnitEvent',
         entityId: event.id,
-        description: 'Binary qualifying unit created',
+        description: 'Binary qualifying unit created for slot-aware 1:4 genealogy',
         metadata: { sourceKey: dto.sourceKey, sourceMemberUserId: dto.sourceMemberUserId },
       });
       return { event, idempotent: false };
     } catch (error) {
-      if ((error as { code?: string }).code === 'P2002') {
+      if ((error as { code?: string }).code === 'P2002' || (error as { code?: string }).code === 'ER_DUP_ENTRY') {
         const raced = await this.prisma.binaryQualifyingUnitEvent.findUnique({
           where: { sourceKey: dto.sourceKey },
           include: { uplineUnits: { orderBy: { depth: 'asc' } } },
@@ -211,21 +224,18 @@ export class BinaryUnitService {
       select: { id: true, username: true },
     });
     if (!user) throw new NotFoundException('User not found');
-    const units = await this.prisma.binaryUplineQualifyingUnit.findMany({
-      where: { ancestorUserId: userId },
-      orderBy: [{ planVersionId: 'asc' }, { side: 'asc' }, { sequence: 'asc' }],
-      include: {
-        unitEvent: {
-          include: {
-            sourceMember: { select: { id: true, username: true } },
-            reversedBy: true,
-          },
-        },
-        leftPairMatch: true,
-        rightPairMatch: true,
-        disposition: true,
-      },
-    });
+    const units = await this.prisma.$queryRawUnsafe<Array<Record<string, unknown>>>(
+      `SELECT u.*, e.sourceMemberUserId, e.occurredAt,
+              lm.id AS leftPairMatchId, rm.id AS rightPairMatchId, d.id AS dispositionId
+       FROM binary_upline_qualifying_units u
+       INNER JOIN binary_qualifying_unit_events e ON e.id=u.unitEventId
+       LEFT JOIN binary_pair_matches lm ON lm.leftUnitId=u.id
+       LEFT JOIN binary_pair_matches rm ON rm.rightUnitId=u.id
+       LEFT JOIN binary_unit_dispositions d ON d.uplineUnitId=u.id
+       WHERE u.ancestorUserId=?
+       ORDER BY u.planVersionId, FIELD(u.slot,'A','B','C','D'), u.sequence`,
+      userId,
+    );
     return { user, units };
   }
 
