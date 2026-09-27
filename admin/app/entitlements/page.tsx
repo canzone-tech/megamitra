@@ -1,5 +1,5 @@
-import { EntitlementsAdmin } from '@/components/entitlements-admin';
+import { redirect } from 'next/navigation';
 
 export default function EntitlementsAdminPage() {
-  return <EntitlementsAdmin />;
+  redirect('/operations');
 }

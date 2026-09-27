@@ -1,5 +1,5 @@
-import { WithdrawalsAdmin } from '@/components/withdrawals-admin';
+import { redirect } from 'next/navigation';
 
 export default function WithdrawalsAdminPage() {
-  return <WithdrawalsAdmin />;
+  redirect('/portal/wallet');
 }

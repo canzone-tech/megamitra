@@ -1,5 +1,5 @@
-import { KycAdmin } from '@/components/kyc-admin';
+import { redirect } from 'next/navigation';
 
 export default function KycAdminPage() {
-  return <KycAdmin />;
+  redirect('/portal/members#kyc');
 }

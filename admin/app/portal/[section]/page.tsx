@@ -2,6 +2,8 @@ import { notFound } from 'next/navigation';
 import { OwnerControlPortal, type OwnerControlSection } from '@/components/owner-control-portal';
 import { OwnerCorePortal, type OwnerCoreSection } from '@/components/owner-core-portal';
 import { OwnerFinancePortal, type OwnerFinanceSection } from '@/components/owner-finance-portal';
+import { OwnerKycPanel } from '@/components/owner-kyc-panel';
+import { OwnerSeasonAdvancedPanel } from '@/components/owner-season-advanced-panel';
 import { SettingsGovernancePortal } from '@/components/settings-governance-portal';
 
 const SECTIONS = new Set([
@@ -51,7 +53,14 @@ export default async function OwnerPortalSectionPage({ params }: PageProps) {
   if (!SECTIONS.has(section)) notFound();
   if (section === 'settings') return <SettingsGovernancePortal />;
   if (CORE_SECTIONS.has(section as OwnerCoreSection)) {
-    return <OwnerCorePortal section={section as OwnerCoreSection} />;
+    const coreSection = section as OwnerCoreSection;
+    return (
+      <>
+        <OwnerCorePortal section={coreSection} />
+        {coreSection === 'seasons' ? <OwnerSeasonAdvancedPanel /> : null}
+        {coreSection === 'members' ? <OwnerKycPanel /> : null}
+      </>
+    );
   }
   if (FINANCE_SECTIONS.has(section as OwnerFinanceSection)) {
     return <OwnerFinancePortal section={section as OwnerFinanceSection} />;

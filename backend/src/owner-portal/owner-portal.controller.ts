@@ -27,6 +27,8 @@ import { OwnerPortalDrawWorkflowService } from './owner-portal-draw-workflow.ser
 import { OwnerPortalFinanceService } from './owner-portal-finance.service';
 import { AssignOwnerPlacementDto } from './owner-portal-placement.dto';
 import { OwnerPortalService } from './owner-portal.service';
+import { OwnerSeasonAdvancedConfigDto } from './owner-season-configuration.dto';
+import { OwnerSeasonConfigurationService } from './owner-season-configuration.service';
 
 @Controller('admin/owner-portal')
 export class OwnerPortalController {
@@ -34,6 +36,7 @@ export class OwnerPortalController {
     private readonly portal: OwnerPortalService,
     private readonly drawWorkflow: OwnerPortalDrawWorkflowService,
     private readonly finance: OwnerPortalFinanceService,
+    private readonly seasonConfiguration: OwnerSeasonConfigurationService,
   ) {}
 
   @Permissions('operations.read')
@@ -99,7 +102,7 @@ export class OwnerPortalController {
   @Permissions('program.manage')
   @Post('seasons')
   createSeason(@Body() dto: CreateOwnerSeasonDto, @CurrentUser() actor: AuthUser) {
-    return this.portal.createSeason(dto, actor.id);
+    return this.seasonConfiguration.createSeason(dto, actor.id);
   }
 
   @Permissions('program.manage')
@@ -109,7 +112,23 @@ export class OwnerPortalController {
     @Body() dto: UpdateOwnerSeasonDto,
     @CurrentUser() actor: AuthUser,
   ) {
-    return this.portal.updateSeason(id, dto, actor.id);
+    return this.seasonConfiguration.updateSeason(id, dto, actor.id);
+  }
+
+  @Permissions('program.read')
+  @Get('seasons/:id/advanced-configuration')
+  advancedSeasonConfiguration(@Param('id') id: string) {
+    return this.seasonConfiguration.getAdvancedConfiguration(id);
+  }
+
+  @Permissions('program.manage')
+  @Put('seasons/:id/advanced-configuration')
+  updateAdvancedSeasonConfiguration(
+    @Param('id') id: string,
+    @Body() dto: OwnerSeasonAdvancedConfigDto,
+    @CurrentUser() actor: AuthUser,
+  ) {
+    return this.seasonConfiguration.updateAdvancedConfiguration(id, dto, actor.id);
   }
 
   @Permissions('program.manage')
@@ -119,7 +138,7 @@ export class OwnerPortalController {
     @Body() dto: OwnerSeasonStatusDto,
     @CurrentUser() actor: AuthUser,
   ) {
-    return this.portal.changeSeasonStatus(id, dto, actor.id);
+    return this.seasonConfiguration.changeSeasonStatus(id, dto, actor.id);
   }
 
   @Permissions('draw.policy.read')

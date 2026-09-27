@@ -14,6 +14,7 @@ import { OwnerPortalController } from './owner-portal.controller';
 import { OwnerPortalDrawWorkflowService } from './owner-portal-draw-workflow.service';
 import { OwnerPortalFinanceService } from './owner-portal-finance.service';
 import { OwnerPortalService } from './owner-portal.service';
+import { OwnerSeasonConfigurationService } from './owner-season-configuration.service';
 
 @Module({
   imports: [
@@ -36,6 +37,7 @@ import { OwnerPortalService } from './owner-portal.service';
     OwnerPortalFinanceService,
     OwnerPortalCoreService,
     OwnerPortalControlService,
+    OwnerSeasonConfigurationService,
   ],
   exports: [OwnerPortalService],
 })
