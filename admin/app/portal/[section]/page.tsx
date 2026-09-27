@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { MemberRegistrationAutofillGuard } from '@/components/member-registration-autofill-guard';
 import { OwnerControlPortal, type OwnerControlSection } from '@/components/owner-control-portal';
 import { OwnerCorePortal, type OwnerCoreSection } from '@/components/owner-core-portal';
+import { OwnerCoreV14Portal, type OwnerCoreV14Section } from '@/components/owner-core-v14-portal';
 import { OwnerFinancePortal, type OwnerFinanceSection } from '@/components/owner-finance-portal';
 import { OwnerKycPanel } from '@/components/owner-kyc-panel';
 import { OwnerSeasonAdvancedPanel } from '@/components/owner-season-advanced-panel';
@@ -25,11 +26,13 @@ const SECTIONS = new Set([
   'support',
   'settings',
 ]);
-const CORE_SECTIONS = new Set<OwnerCoreSection>([
+const V14_CORE_SECTIONS = new Set<OwnerCoreV14Section>([
   'income',
   'members',
   'binary',
   'placement',
+]);
+const LEGACY_CORE_SECTIONS = new Set<OwnerCoreSection>([
   'seasons',
   'draw',
   'winners',
@@ -53,19 +56,20 @@ export default async function OwnerPortalSectionPage({ params }: PageProps) {
   const { section } = await params;
   if (!SECTIONS.has(section)) notFound();
   if (section === 'settings') return <SettingsGovernancePortal />;
-  if (CORE_SECTIONS.has(section as OwnerCoreSection)) {
-    const coreSection = section as OwnerCoreSection;
-    const extension = coreSection === 'seasons'
-      ? <OwnerSeasonAdvancedPanel embedded />
-      : coreSection === 'members'
-        ? <OwnerKycPanel />
-        : undefined;
+  if (V14_CORE_SECTIONS.has(section as OwnerCoreV14Section)) {
+    const coreSection = section as OwnerCoreV14Section;
+    const extension = coreSection === 'members' ? <OwnerKycPanel /> : undefined;
     return (
       <>
         {coreSection === 'members' ? <MemberRegistrationAutofillGuard /> : null}
-        <OwnerCorePortal section={coreSection} extension={extension} />
+        <OwnerCoreV14Portal section={coreSection} extension={extension} />
       </>
     );
+  }
+  if (LEGACY_CORE_SECTIONS.has(section as OwnerCoreSection)) {
+    const coreSection = section as OwnerCoreSection;
+    const extension = coreSection === 'seasons' ? <OwnerSeasonAdvancedPanel embedded /> : undefined;
+    return <OwnerCorePortal section={coreSection} extension={extension} />;
   }
   if (FINANCE_SECTIONS.has(section as OwnerFinanceSection)) {
     return <OwnerFinancePortal section={section as OwnerFinanceSection} />;
