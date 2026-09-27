@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import type { ReactNode } from 'react';
 import styles from './workspace-tabs.module.css';
 
@@ -25,12 +25,21 @@ export function WorkspaceTabs({
     ? initialTab
     : tabs[0]?.id ?? '';
   const [activeTab, setActiveTab] = useState(fallback);
-  const validIds = useMemo(() => new Set(tabs.map((tab) => tab.id)), [tabs]);
+  const tabKey = tabs.map((tab) => tab.id).join('|');
 
   useEffect(() => {
-    const fromHash = window.location.hash.replace(/^#/, '');
-    if (fromHash && validIds.has(fromHash)) setActiveTab(fromHash);
-  }, [validIds]);
+    const validIds = new Set(tabKey.split('|').filter(Boolean));
+    const syncFromHash = () => {
+      const fromHash = window.location.hash.replace(/^#/, '');
+      if (fromHash && validIds.has(fromHash)) setActiveTab(fromHash);
+    };
+    const timer = window.setTimeout(syncFromHash, 0);
+    window.addEventListener('hashchange', syncFromHash);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener('hashchange', syncFromHash);
+    };
+  }, [tabKey]);
 
   function activate(id: string) {
     setActiveTab(id);
