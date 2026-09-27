@@ -4,6 +4,7 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { Permissions } from '../rbac/permissions.decorator';
 import { CreateOwnerCoreMemberDto } from './owner-portal-core.dto';
 import { OwnerPortalCoreService } from './owner-portal-core.service';
+import { AssignOwnerPlacementDto } from './owner-portal-placement.dto';
 
 @Controller('admin/owner-portal/core')
 export class OwnerPortalCoreController {
@@ -28,6 +29,17 @@ export class OwnerPortalCoreController {
     @CurrentUser() actor: AuthUser,
   ) {
     return this.core.createMember(dto, actor.id);
+  }
+
+  @Permissions('genealogy.manage')
+  @Post('placements')
+  placement(@Body() dto: AssignOwnerPlacementDto, @CurrentUser() actor: AuthUser) {
+    return this.core.assignPlacement(
+      dto.memberReference,
+      dto.parentReference,
+      dto.slot,
+      actor.id,
+    );
   }
 
   @Permissions('binary.settlement.read')
