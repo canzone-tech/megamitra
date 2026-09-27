@@ -1,4 +1,5 @@
 import { notFound } from 'next/navigation';
+import { MemberRegistrationAutofillGuard } from '@/components/member-registration-autofill-guard';
 import { OwnerControlPortal, type OwnerControlSection } from '@/components/owner-control-portal';
 import { OwnerCorePortal, type OwnerCoreSection } from '@/components/owner-core-portal';
 import { OwnerFinancePortal, type OwnerFinanceSection } from '@/components/owner-finance-portal';
@@ -56,6 +57,7 @@ export default async function OwnerPortalSectionPage({ params }: PageProps) {
     const coreSection = section as OwnerCoreSection;
     return (
       <>
+        {coreSection === 'members' ? <MemberRegistrationAutofillGuard /> : null}
         <OwnerCorePortal section={coreSection} />
         {coreSection === 'seasons' ? <OwnerSeasonAdvancedPanel /> : null}
         {coreSection === 'members' ? <OwnerKycPanel /> : null}
