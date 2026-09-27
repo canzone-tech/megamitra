@@ -86,8 +86,8 @@ const TITLES: Record<OwnerCoreSection, string> = {
 function href(section: Section) {
   return section === 'dashboard' ? '/operations' : `/portal/${section}`;
 }
-function text(value: unknown, fallback = '—') {
-  if (value === null || value === undefined || value === '') return fallback;
+function text(value: unknown, fallback: string | number = '—') {
+  if (value === null || value === undefined || value === '') return String(fallback);
   return String(value);
 }
 function number(value: unknown, fallback = 0) {
