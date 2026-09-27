@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import type { CSSProperties } from 'react';
 import { useRouter } from 'next/navigation';
 import { ApiClientError, apiJson } from '@/lib/client-api';
 import styles from './presentation-config.module.css';
@@ -176,13 +177,85 @@ export function AppearanceSettingsPanel() {
             <label className="mm-field"><span>Version</span><select className="mm-input" value={active.selected?.id ?? ''} onChange={(event) => void selectVersion(event.target.value)} disabled={busy || !active.versions.length}><option value="">Default design</option>{active.versions.map((item) => <option key={item.id} value={item.id}>{versionLabel(item)}</option>)}</select></label>
             <div className={styles.actions}>{!editable ? <button className="mm-button" type="button" onClick={() => void createDraft()} disabled={busy}>CREATE DRAFT</button> : <><button className="mm-button secondary" type="button" onClick={() => void save()} disabled={busy}>SAVE DRAFT</button><button className="mm-button" type="button" onClick={() => void publish()} disabled={busy}>PUBLISH</button></>}{active.selected?.lifecycle === 'PUBLISHED' ? <button className="mm-button secondary" type="button" onClick={() => void retire()} disabled={busy}>RETIRE</button> : null}</div>
           </div>
-          {tab === 'THEME' ? <ThemeFields value={theme} disabled={!editable || busy} onChange={updateTheme} /> : null}
-          {tab === 'TEMPLATE' ? <TemplateFields value={template} disabled={!editable || busy} onChange={updateTemplate} /> : null}
-          {tab === 'CMS' ? <CmsFields value={cms} disabled={!editable || busy} onChange={updateCms} /> : null}
-          {!editable ? <p className="mm-note" style={{ marginTop: 18 }}>Published/retired versions are read-only. Create a draft before editing.</p> : null}
+          <div className={styles.layout}>
+            <div>
+              {tab === 'THEME' ? <ThemeFields value={theme} disabled={!editable || busy} onChange={updateTheme} /> : null}
+              {tab === 'TEMPLATE' ? <TemplateFields value={template} disabled={!editable || busy} onChange={updateTemplate} /> : null}
+              {tab === 'CMS' ? <CmsFields value={cms} disabled={!editable || busy} onChange={updateCms} /> : null}
+              {!editable ? <p className="mm-note" style={{ marginTop: 18 }}>Published/retired versions are read-only. Create a draft before editing.</p> : null}
+            </div>
+            <div>
+              <div className="mm-note" style={{ marginBottom: 10 }}><b>LIVE MEMBER PORTAL PREVIEW</b><br />Unsaved Theme, Layout and Portal Copy changes appear here immediately.</div>
+              <MemberPortalPreview theme={theme} template={template} cms={cms} />
+              <p className="mm-note" style={{ marginTop: 10 }}>Preview data is illustrative only. Saving or publishing the appearance does not create member or financial records.</p>
+            </div>
+          </div>
         </> : <div className="mm-empty">No default appearance definition is configured.</div>}
       </div>
     </section>
+  </div>;
+}
+
+function MemberPortalPreview({ theme, template, cms }: { theme: Theme; template: Template; cms: Cms }) {
+  const previewStyle = {
+    '--preview-primary': theme.primary,
+    '--preview-secondary': theme.secondary,
+    '--preview-accent': theme.accent,
+    '--preview-page': theme.pageBackground,
+    '--preview-card': theme.cardBackground,
+    '--preview-text': theme.textColor,
+    '--preview-muted': theme.mutedTextColor,
+    '--preview-border': theme.borderColor,
+    '--preview-gradient-from': theme.gradientFrom,
+    '--preview-gradient-via': theme.gradientVia,
+    '--preview-gradient-to': theme.gradientTo,
+  } as CSSProperties;
+  const contentStyle: CSSProperties = template.contentWidth === 'STANDARD'
+    ? { maxWidth: 430, marginInline: 'auto' }
+    : template.contentWidth === 'WIDE'
+      ? { maxWidth: 620, marginInline: 'auto' }
+      : {};
+
+  return <div
+    className={styles.preview}
+    style={previewStyle}
+    data-sidebar-width={template.sidebarWidth}
+    data-sidebar-position={template.sidebarPosition}
+    data-sidebar-style={template.sidebarStyle}
+    data-nav-style={template.navigationStyle}
+    data-topbar-style={template.topbarStyle}
+    data-topbar-density={template.topbarDensity}
+    data-radius={theme.radius}
+    data-density={theme.density}
+    data-shadow={theme.shadow}
+  >
+    {template.sidebarVisible ? <aside className={styles.previewSidebar}>
+      <strong>MEGA GOLDEN</strong>
+      <span>Dashboard</span><span>Program</span><span>Binary 2:2</span><span>Wallet</span><span>Lucky Draw</span><span>Rewards</span>
+    </aside> : null}
+    <div className={styles.previewMain}>
+      {template.topbarVisible ? <div className={styles.previewTopbar}><b>MegaGoldenClub Member</b><span>{template.topbarSticky ? 'Sticky topbar' : 'Standard topbar'} • Mobile {template.mobileNavigation.toLowerCase()}</span></div> : null}
+      <div className={styles.previewBody}>
+        <div style={contentStyle}>
+          <div className={styles.previewHero}>
+            <small>{cms.dashboardEyebrow}</small>
+            <strong>Welcome back, Member</strong>
+            <span>{cms.dashboardSubtitle}</span>
+          </div>
+          <div className={styles.previewStats}>
+            <div><small>Program</small><strong>Month 6 / 21</strong></div>
+            <div><small>Wallet</small><strong>₹12,480</strong></div>
+            <div><small>Binary</small><strong>18 pairs</strong></div>
+          </div>
+          <div className={styles.previewCards}>
+            <div><strong>{cms.programSectionTitle}</strong><span>Current season progress and EMI status</span></div>
+            <div><strong>{cms.walletSectionTitle}</strong><span>Recent credits and withdrawals</span></div>
+            <div><strong>{cms.binarySectionTitle}</strong><span>AB : CD • AC + BD qualification</span></div>
+            <div><strong>{cms.rewardsSectionTitle}</strong><span style={{ color: theme.accent }}>Lucky draw eligible • rewards overview</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>;
 }
 
