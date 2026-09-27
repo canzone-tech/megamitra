@@ -70,13 +70,7 @@ function Kpi({ label, value, note }: { label: string; value: ReactNode; note: st
   return <div className={styles.kpi}><small>{label}</small><strong>{value}</strong><span>{note}</span></div>;
 }
 
-export function OwnerCoreV14Portal({
-  section,
-  extension,
-}: {
-  section: OwnerCoreV14Section;
-  extension?: ReactNode;
-}) {
+export function OwnerCoreV14Portal({ section, extension }: { section: OwnerCoreV14Section; extension?: ReactNode }) {
   const router = useRouter();
   const [settings, setSettings] = useState<Settings>({});
   const [registrationPolicy, setRegistrationPolicy] = useState<RegistrationPolicy>({});
@@ -189,18 +183,6 @@ export function OwnerCoreV14Portal({
     }), 'Binary 1:4 placement saved');
   }
 
-  return (
-    <OwnerManagementShell title={TITLES[section]} currentSection={section}>
-      {error ? <div className={classNames(styles.notice, styles.error)}>{error}</div> : null}
-      {notice ? <div className={classNames(styles.notice, styles.success)}>{notice}</div> : null}
-      {section === 'dashboard' ? renderDashboard() : null}
-      {section === 'income' ? renderIncome() : null}
-      {section === 'members' ? renderMembers() : null}
-      {section === 'binary' ? renderBinary() : null}
-      {section === 'placement' ? renderPlacement() : null}
-    </OwnerManagementShell>
-  );
-
   function activeSeason(rows: Row[]) {
     return rows.find((row) => ['ACTIVE', 'PAUSED'].includes(text(row.status, ''))) ?? rows[0] ?? {};
   }
@@ -210,11 +192,7 @@ export function OwnerCoreV14Portal({
     const active = (row.activeSeason && typeof row.activeSeason === 'object' ? row.activeSeason : {}) as Row;
     const currency = text(active.currencyCode, settings.currencyCode ?? 'INR');
     return <>
-      <Hero
-        title="MegaGoldenClub Management Dashboard"
-        subtitle="Central control for seasons, members, Binary 1:4, payments, monthly draws and reporting."
-        pill="LIVE MANAGEMENT ENVIRONMENT"
-      />
+      <Hero title="MegaGoldenClub Management Dashboard" subtitle="Central control for seasons, members, Binary 1:4, payments, monthly draws and reporting." pill="LIVE MANAGEMENT ENVIRONMENT" />
       <div className={styles.kpis}>
         <Kpi label="Active Season" value={text(active.name, 'No active season')} note={text(active.status, 'Create or activate a season')} />
         <Kpi label="Members" value={number(row.memberCount).toLocaleString('en-IN')} note="Registered accounts" />
@@ -320,7 +298,7 @@ export function OwnerCoreV14Portal({
       </div>
       <div className={styles.card}>
         <SectionHead icon="⌁" title="Pair Ledger" note="Fixed-lane qualified pair records" />
-        {rows.length ? <div className={styles.tableBox}><table className={styles.table}><thead><tr><th>PAIR</th><th>MEMBER</th><th>LANE</th><th>LEFT SLOT</th><th>RIGHT SLOT</th><th>VALUE</th><th>STATUS</th></tr></thead><tbody>{rows.map((row) => <tr key={text(row.id)}><td>{text(row.pairSequence)}</td><td>{text(row.username)}</td><td><b>{text(row.pairLane, row.crossMatch)}</b></td><td>{text(row.leftSlot)}</td><td>{text(row.rightSlot)}</td><td>{money(row.payoutAmount, text(row.currencyCode, currency))}</td><td className={row.payable ? styles.status : styles.statusOff}>{row.payable ? 'QUALIFIED' : 'CAP LIMITED'}</td></tr>)}</tbody></table></div> : <Empty>No pair records yet.</Empty>}
+        {rows.length ? <div className={styles.tableBox}><table className={styles.table}><thead><tr><th>PAIR</th><th>MEMBER</th><th>LANE</th><th>LEFT SLOT</th><th>RIGHT SLOT</th><th>VALUE</th><th>STATUS</th></tr></thead><tbody>{rows.map((row) => <tr key={text(row.id)}><td>{text(row.pairSequence)}</td><td>{text(row.username)}</td><td><b>{text(row.pairLane, text(row.crossMatch))}</b></td><td>{text(row.leftSlot)}</td><td>{text(row.rightSlot)}</td><td>{money(row.payoutAmount, text(row.currencyCode, currency))}</td><td className={row.payable ? styles.status : styles.statusOff}>{row.payable ? 'QUALIFIED' : 'CAP LIMITED'}</td></tr>)}</tbody></table></div> : <Empty>No pair records yet.</Empty>}
       </div>
     </>;
   }
@@ -346,6 +324,18 @@ export function OwnerCoreV14Portal({
       <div className={styles.card}><SectionHead icon="✓" title="Pairing Controls" /><div className={styles.notice}>The genealogy engine persists A/B/C/D ancestry. Settlement accepts only A:C and B:D; generic Left × Right matching is disabled.</div></div>
     </>;
   }
+
+  return (
+    <OwnerManagementShell title={TITLES[section]} currentSection={section}>
+      {error ? <div className={classNames(styles.notice, styles.error)}>{error}</div> : null}
+      {notice ? <div className={classNames(styles.notice, styles.success)}>{notice}</div> : null}
+      {section === 'dashboard' ? renderDashboard() : null}
+      {section === 'income' ? renderIncome() : null}
+      {section === 'members' ? renderMembers() : null}
+      {section === 'binary' ? renderBinary() : null}
+      {section === 'placement' ? renderPlacement() : null}
+    </OwnerManagementShell>
+  );
 }
 
 function PlacementSelect({ name }: { name: string }) {
