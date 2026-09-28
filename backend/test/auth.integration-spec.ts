@@ -1,6 +1,7 @@
 import type { INestApplication } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
-import { randomUUID } from 'node:crypto';
+import { createHmac, randomUUID } from 'node:crypto';
 import { AppModule } from '../src/app.module';
 import { configureApp } from '../src/bootstrap/configure-app';
 import { PrismaService } from '../src/database/prisma.service';
@@ -48,8 +49,10 @@ type RegistrationConfigSnapshot = {
 describe('MegaGoldenClub auth integration', () => {
   let app: INestApplication;
   let prisma: PrismaService;
+  let config: ConfigService;
   let baseUrl: string;
   const createdUserIds: string[] = [];
+  const epinIds: string[] = [];
 
   let originalAuth: AuthConfigSnapshot;
   let originalSecurity: SecurityConfigSnapshot;
@@ -70,12 +73,33 @@ describe('MegaGoldenClub auth integration', () => {
     return { status: response.status, body };
   }
 
+  async function createEpin(raw: string) {
+    const id = randomUUID();
+    epinIds.push(id);
+    const pinHash = createHmac(
+      'sha256',
+      config.getOrThrow<string>('CAPTCHA_HMAC_SECRET'),
+    )
+      .update(`owner-portal:epin:${raw}`)
+      .digest('hex');
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO owner_epins
+         (id, pinHash, displaySuffix, status, expiresAt, createdAt, updatedAt)
+       VALUES (?, ?, ?, 'ACTIVE', ?, CURRENT_TIMESTAMP(3), CURRENT_TIMESTAMP(3))`,
+      id,
+      pinHash,
+      raw.slice(-6),
+      new Date(Date.now() + 60 * 60 * 1000),
+    );
+  }
+
   beforeAll(async () => {
     app = await NestFactory.create(AppModule, { logger: false });
     configureApp(app);
     await app.listen(0, '127.0.0.1');
     baseUrl = await app.getUrl();
     prisma = app.get(PrismaService);
+    config = app.get(ConfigService);
 
     const [auth, security, registration] = await Promise.all([
       prisma.systemAuthConfig.findUniqueOrThrow({ where: { id: 1 } }),
@@ -168,6 +192,12 @@ describe('MegaGoldenClub auth integration', () => {
           ],
         },
       });
+      if (epinIds.length) {
+        await prisma.$executeRawUnsafe(
+          `DELETE FROM owner_epins WHERE id IN (${epinIds.map(() => '?').join(',')})`,
+          ...epinIds,
+        );
+      }
       await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
       await Promise.all([
         prisma.systemAuthConfig.update({
@@ -191,11 +221,20 @@ describe('MegaGoldenClub auth integration', () => {
     const suffix = randomUUID().replaceAll('-', '').slice(0, 16);
     const username = `it_${suffix}`;
     const email = `${username}@example.test`;
+    const epin = `IT-${suffix}`;
     let password = 'Integration-Pass-123!';
+    await createEpin(epin);
 
     const registered = await request('/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ username, email, password }),
+      body: JSON.stringify({
+        username,
+        email,
+        password,
+        fullName: 'Integration Member',
+        memberType: 'PARTNER',
+        epin,
+      }),
     });
     expect(registered.status).toBe(201);
     const userId = String(registered.body.user.id);
