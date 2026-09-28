@@ -1,6 +1,5 @@
 import {
   IsEmail,
-  IsIn,
   IsOptional,
   IsString,
   Length,
@@ -54,10 +53,6 @@ export class RegisterDto {
   @IsString()
   @MaxLength(100)
   city?: string;
-
-  @IsOptional()
-  @IsIn(['PARTNER', 'CUSTOMER'])
-  memberType?: 'PARTNER' | 'CUSTOMER';
 
   @IsOptional()
   @IsString()
