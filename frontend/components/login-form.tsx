@@ -1,12 +1,18 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ApiClientError, apiJson } from '@/lib/client-api';
 
 type LoginResponse = { user: { mustChangePassword: boolean } };
 type CaptchaChallenge = { captchaId: string; prompt: string; expiresInSeconds: number };
+type PublicAuthConfig = {
+  publicRegistrationEnabled: boolean;
+  passwordResetEnabled: boolean;
+  emailVerificationEnabled: boolean;
+  emailVerificationRequiredForLogin: boolean;
+};
 
 export function LoginForm() {
   const router = useRouter();
@@ -14,8 +20,19 @@ export function LoginForm() {
   const [password, setPassword] = useState('');
   const [captcha, setCaptcha] = useState<CaptchaChallenge | null>(null);
   const [captchaAnswer, setCaptchaAnswer] = useState('');
+  const [authConfig, setAuthConfig] = useState<PublicAuthConfig | null>(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void apiJson<PublicAuthConfig>('/api/backend/auth/public-config')
+      .then((config) => {
+        if (!cancelled) setAuthConfig(config);
+      })
+      .catch(() => undefined);
+    return () => { cancelled = true; };
+  }, []);
 
   async function requestCaptcha(message: string) {
     try {
@@ -54,6 +71,10 @@ export function LoginForm() {
     }
   }
 
+  const verificationRequired = Boolean(
+    authConfig?.emailVerificationEnabled && authConfig.emailVerificationRequiredForLogin,
+  );
+
   return (
     <form method="post" onSubmit={submit}>
       <div className="mm-field">
@@ -64,10 +85,12 @@ export function LoginForm() {
         <label htmlFor="password">Password</label>
         <input className="mm-input" id="password" type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required />
       </div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap', marginTop: -8, marginBottom: 18, fontSize: 13 }}>
-        <Link href="/forgot-password">Forgot password?</Link>
-        <Link href="/request-email-verification">Resend verification email</Link>
-      </div>
+      {(authConfig?.passwordResetEnabled || verificationRequired) ? (
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap', marginTop: -8, marginBottom: 18, fontSize: 13 }}>
+          {authConfig?.passwordResetEnabled ? <Link href="/forgot-password">Forgot password?</Link> : null}
+          {verificationRequired ? <Link href="/request-email-verification">Resend verification email</Link> : null}
+        </div>
+      ) : null}
       {captcha ? (
         <div className="mm-field">
           <label htmlFor="captchaAnswer">Security check: {captcha.prompt}</label>
@@ -77,6 +100,11 @@ export function LoginForm() {
       ) : null}
       {error ? <div className="mm-error" role="alert">{error}</div> : null}
       <button className="mm-button" type="submit" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
+      {authConfig?.publicRegistrationEnabled ? (
+        <p style={{ marginTop: 20, marginBottom: 0, fontSize: 13, color: 'var(--mm-ink-500)' }}>
+          New member with an E-PIN? <Link href="/signup">Create an account</Link>
+        </p>
+      ) : null}
     </form>
   );
 }
