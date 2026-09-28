@@ -201,7 +201,7 @@ export class OwnerPortalController {
     @Body() dto: VerifyOwnerWinnerDto,
     @CurrentUser() actor: AuthUser,
   ) {
-    return this.portal.verifyWinner(id, winnerId, dto, actor.id);
+    return this.drawWorkflow.verifyWinner(id, winnerId, dto, actor.id);
   }
 
   @Permissions('draw.execution.manage')
