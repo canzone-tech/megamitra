@@ -1,10 +1,12 @@
 import { Body, Controller, Get, Param, Post } from '@nestjs/common';
 import type { AuthUser } from '../auth/auth-user';
 import { CurrentUser } from '../auth/current-user.decorator';
+import { Roles } from '../rbac/roles.decorator';
 import { ClaimEntitlementDto } from './entitlement.dto';
 import { EntitlementService } from './entitlement.service';
 
 @Controller('entitlements')
+@Roles('MEMBER')
 export class EntitlementMemberController {
   constructor(private readonly entitlements: EntitlementService) {}
 
