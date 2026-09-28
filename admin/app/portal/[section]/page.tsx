@@ -1,10 +1,12 @@
 import { notFound } from 'next/navigation';
 import { MemberRegistrationAutofillGuard } from '@/components/member-registration-autofill-guard';
 import { OwnerControlPortal, type OwnerControlSection } from '@/components/owner-control-portal';
-import { OwnerCorePortal, type OwnerCoreSection } from '@/components/owner-core-portal';
+import { OwnerCoreLegacyContent } from '@/components/owner-core-legacy-content';
+import type { OwnerCoreSection } from '@/components/owner-core-portal';
 import { OwnerCoreV14Portal, type OwnerCoreV14Section } from '@/components/owner-core-v14-portal';
 import { OwnerFinancePortal, type OwnerFinanceSection } from '@/components/owner-finance-portal';
 import { OwnerKycPanel } from '@/components/owner-kyc-panel';
+import { OwnerManagementShell } from '@/components/owner-management-shell';
 import { OwnerSeasonAdvancedPanel } from '@/components/owner-season-advanced-panel';
 import { SettingsGovernancePortal } from '@/components/settings-governance-portal';
 
@@ -38,6 +40,12 @@ const LEGACY_CORE_SECTIONS = new Set<OwnerCoreSection>([
   'winners',
   'prizes',
 ]);
+const LEGACY_CORE_TITLES: Record<'seasons' | 'draw' | 'winners' | 'prizes', string> = {
+  seasons: 'Season Management',
+  draw: 'Monthly Draw',
+  winners: 'Winners',
+  prizes: 'Prize Catalogue',
+};
 const FINANCE_SECTIONS = new Set<OwnerFinanceSection>([
   'payments',
   'wallet',
@@ -67,9 +75,13 @@ export default async function OwnerPortalSectionPage({ params }: PageProps) {
     );
   }
   if (LEGACY_CORE_SECTIONS.has(section as OwnerCoreSection)) {
-    const coreSection = section as OwnerCoreSection;
+    const coreSection = section as 'seasons' | 'draw' | 'winners' | 'prizes';
     const extension = coreSection === 'seasons' ? <OwnerSeasonAdvancedPanel embedded /> : undefined;
-    return <OwnerCorePortal section={coreSection} extension={extension} />;
+    return (
+      <OwnerManagementShell title={LEGACY_CORE_TITLES[coreSection]} currentSection={coreSection}>
+        <OwnerCoreLegacyContent section={coreSection} extension={extension} />
+      </OwnerManagementShell>
+    );
   }
   if (FINANCE_SECTIONS.has(section as OwnerFinanceSection)) {
     return <OwnerFinancePortal section={section as OwnerFinanceSection} />;
