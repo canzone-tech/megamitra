@@ -3,6 +3,7 @@ import {
   IsArray,
   IsEmail,
   IsEnum,
+  IsIn,
   IsOptional,
   IsString,
   MaxLength,
@@ -39,6 +40,11 @@ export class CreateManagedUserDto {
   @IsString()
   @MaxLength(100)
   lastName?: string;
+}
+
+export class CreateManagedStaffDto extends CreateManagedUserDto {
+  @IsIn(['ADMIN', 'AGENT'])
+  role!: 'ADMIN' | 'AGENT';
 }
 
 export class UpdateUserStatusDto {
