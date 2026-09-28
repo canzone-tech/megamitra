@@ -29,7 +29,6 @@ type SponsorLookupRow = {
   firstName: string | null;
   lastName: string | null;
   status: string;
-  memberType: string | null;
 };
 
 type EpinRow = {
@@ -70,6 +69,7 @@ export class MemberRegistrationService {
       passwordMaxLength: security.passwordMaxLength,
       epinRequired: true,
       sponsorLookupEnabled: true,
+      accountRole: 'MEMBER',
     };
   }
 
@@ -79,10 +79,15 @@ export class MemberRegistrationService {
       throw new BadRequestException('Enter at least 3 characters to find a sponsor');
     }
     const rows = await this.prisma.$queryRawUnsafe<SponsorLookupRow[]>(
-      `SELECT u.id, u.username, u.firstName, u.lastName, u.status, mp.memberType
+      `SELECT u.id, u.username, u.firstName, u.lastName, u.status
        FROM users u
-       LEFT JOIN member_profiles mp ON mp.userId=u.id
        WHERE u.status='ACTIVE'
+         AND EXISTS (
+           SELECT 1
+           FROM user_roles ur
+           INNER JOIN roles r ON r.id=ur.roleId
+           WHERE ur.userId=u.id AND r.name='MEMBER' AND r.status='ACTIVE'
+         )
          AND (u.id=? OR u.username=? OR LOWER(u.email)=LOWER(?) OR u.phone=?)
        LIMIT 1`,
       value,
@@ -97,7 +102,7 @@ export class MemberRegistrationService {
       id: sponsor.id,
       username: sponsor.username,
       fullName: fullName || sponsor.username,
-      memberType: sponsor.memberType ?? 'MEMBER',
+      role: 'MEMBER',
       status: sponsor.status,
     };
   }
@@ -147,7 +152,6 @@ export class MemberRegistrationService {
     const nameParts = dto.fullName?.trim().split(/\s+/).filter(Boolean) ?? [];
     const firstName = nameParts.length ? nameParts[0] : dto.firstName?.trim() || null;
     const lastName = nameParts.length > 1 ? nameParts.slice(1).join(' ') : dto.lastName?.trim() || null;
-    const memberType = dto.memberType ?? 'PARTNER';
     const epinHash = this.epinHash(rawEpin);
 
     try {
@@ -184,11 +188,9 @@ export class MemberRegistrationService {
         }
         if (!username) throw new BadRequestException('Username is required');
 
-        const defaultRole = await tx.role.findUnique({
-          where: { name: registration.defaultRoleName },
-        });
+        const defaultRole = await tx.role.findUnique({ where: { name: 'MEMBER' } });
         if (!defaultRole || defaultRole.status !== RoleStatus.ACTIVE) {
-          throw new BadRequestException('Configured default registration role is unavailable');
+          throw new BadRequestException('MEMBER registration role is unavailable');
         }
 
         const created = await tx.user.create({
@@ -217,12 +219,11 @@ export class MemberRegistrationService {
 
         await tx.$executeRawUnsafe(
           `INSERT INTO member_profiles (userId, dateOfBirth, state, city, memberType)
-           VALUES (?, ?, ?, ?, ?)`,
+           VALUES (?, ?, ?, ?, 'MEMBER')`,
           created.id,
           dto.dateOfBirth ? new Date(`${dto.dateOfBirth}T00:00:00.000Z`) : null,
           dto.state?.trim() || null,
           dto.city?.trim() || null,
-          memberType,
         );
         if (sponsor) {
           await tx.sponsorRelationship.create({
@@ -255,8 +256,8 @@ export class MemberRegistrationService {
         entityId: user.id,
         description: 'Public member registration created with required E-PIN',
         metadata: {
+          accountRole: 'MEMBER',
           sponsorUserId: sponsor?.id ?? null,
-          memberType,
           placementSlot: placement?.slot ?? null,
           epinRequired: true,
         },
@@ -286,8 +287,7 @@ export class MemberRegistrationService {
   }
 
   private async requireSponsor(reference: string) {
-    const safe = await this.sponsor(reference);
-    return safe;
+    return this.sponsor(reference);
   }
 
   private async autoPlaceWithRetry(memberUserId: string, sponsorUserId: string) {
