@@ -41,7 +41,7 @@ export class CreateOwnerMemberDto {
   @IsOptional() @IsString() @MaxLength(191) sponsorReference?: string;
   @IsIn(OWNER_PLACEMENTS) placement!: (typeof OWNER_PLACEMENTS)[number];
   @IsOptional() @IsString() @MaxLength(191) placementReference?: string;
-  @IsOptional() @IsString() @MaxLength(80) epin?: string;
+  @IsString() @MinLength(1) @MaxLength(80) epin!: string;
 }
 
 export class OwnerSeasonPrizeDto {
