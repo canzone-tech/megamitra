@@ -68,6 +68,14 @@ export function SignupForm() {
     setCaptcha(challenge);
   }
 
+  function changeSponsorReference(value: string) {
+    const reference = value.trim();
+    setSponsorReference(value);
+    setSponsor(null);
+    setSponsorResolvedFor('');
+    setSponsorState(reference.length >= 3 ? 'checking' : 'idle');
+  }
+
   useEffect(() => {
     let cancelled = false;
     void (async () => {
@@ -88,16 +96,10 @@ export function SignupForm() {
 
   useEffect(() => {
     const reference = sponsorReference.trim();
-    setSponsor(null);
-    setSponsorResolvedFor('');
-    if (reference.length < 3) {
-      setSponsorState('idle');
-      return;
-    }
+    if (reference.length < 3) return;
 
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
-      setSponsorState('checking');
       void apiJson<Sponsor>(`/api/backend/auth/sponsor?reference=${encodeURIComponent(reference)}`, {
         signal: controller.signal,
       })
@@ -106,11 +108,11 @@ export function SignupForm() {
           setSponsorResolvedFor(reference);
           setSponsorState('found');
         })
-        .catch((reason) => {
+        .catch(() => {
           if (controller.signal.aborted) return;
           setSponsor(null);
           setSponsorResolvedFor(reference);
-          setSponsorState(reason instanceof ApiClientError && reason.status === 404 ? 'missing' : 'missing');
+          setSponsorState('missing');
         });
     }, 450);
 
@@ -203,7 +205,7 @@ export function SignupForm() {
           id="sponsorReference"
           name="sponsorReference"
           value={sponsorReference}
-          onChange={(event) => setSponsorReference(event.target.value)}
+          onChange={(event) => changeSponsorReference(event.target.value)}
           placeholder="Enter sponsor reference"
           autoComplete="off"
         />
