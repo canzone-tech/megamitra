@@ -1,6 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Post, Query } from '@nestjs/common';
 import type { AuthUser } from '../auth/auth-user';
 import { CurrentUser } from '../auth/current-user.decorator';
+import { Roles } from '../rbac/roles.decorator';
 import {
   CreateWithdrawalDestinationDto,
   CreateWithdrawalRequestDto,
@@ -10,6 +11,7 @@ import { WithdrawalEligibilityService } from './withdrawal-eligibility.service';
 import { WithdrawalService } from './withdrawal.service';
 
 @Controller('withdrawals')
+@Roles('MEMBER')
 export class WithdrawalMemberController {
   constructor(
     private readonly withdrawals: WithdrawalService,
