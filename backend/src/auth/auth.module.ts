@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { CaptchaModule } from '../captcha/captcha.module';
 import { GenealogyModule } from '../genealogy/genealogy.module';
+import { RolesGuard } from '../rbac/roles.guard';
 import { AuthController } from './auth.controller';
 import { AuthEmailTemplateController } from './auth-email-template.controller';
 import { AuthEmailTemplateService } from './auth-email-template.service';
@@ -24,8 +25,15 @@ import { SuperAdminLifecycleService } from './super-admin-lifecycle.service';
     PasswordService,
     SuperAdminLifecycleService,
     JwtAuthGuard,
+    RolesGuard,
     MemberRegistrationService,
   ],
-  exports: [PasswordService, SuperAdminLifecycleService, JwtAuthGuard, AuthRecoveryService],
+  exports: [
+    PasswordService,
+    SuperAdminLifecycleService,
+    JwtAuthGuard,
+    RolesGuard,
+    AuthRecoveryService,
+  ],
 })
 export class AuthModule {}
