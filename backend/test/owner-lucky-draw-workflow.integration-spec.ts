@@ -1,0 +1,464 @@
+import { NestFactory } from '@nestjs/core';
+import { randomUUID } from 'node:crypto';
+import { AppModule } from '../src/app.module';
+import { PasswordService } from '../src/auth/password.service';
+import { configureApp } from '../src/bootstrap/configure-app';
+import { PrismaService } from '../src/database/prisma.service';
+import {
+  PolicyLifecycle,
+  ProgramBusinessEventType,
+  ProgramEnrollmentStatus,
+  ProgramIntervalUnit,
+  UserStatus,
+} from '../src/generated/prisma/enums';
+
+describe('MegaGoldenClub owner lucky draw workflow integration', () => {
+  let app: Awaited<ReturnType<typeof NestFactory.create>>;
+  let prisma: PrismaService;
+  let passwords: PasswordService;
+  let baseUrl: string;
+  let adminToken: string;
+  let memberToken: string;
+  let adminId = '';
+  let memberId = '';
+  let seasonId = '';
+  let seasonCode = '';
+  let programId = '';
+  let programVersionId = '';
+  let enrollmentId = '';
+  let businessEventId = '';
+  let processingRunId = '';
+  let hookId = '';
+  let drawRunId = '';
+  let drawId = '';
+  let drawPolicyId = '';
+  let drawPolicyVersionId = '';
+
+  async function request(path: string, token?: string, init: RequestInit = {}) {
+    const response = await fetch(`${baseUrl}${path}`, {
+      ...init,
+      headers: {
+        'content-type': 'application/json',
+        ...(token ? { authorization: `Bearer ${token}` } : {}),
+        ...(init.headers ?? {}),
+      },
+    });
+    return {
+      status: response.status,
+      body: (await response.json()) as Record<string, any>,
+    };
+  }
+
+  async function login(username: string, password: string) {
+    const response = await request('/auth/login', undefined, {
+      method: 'POST',
+      body: JSON.stringify({ identifier: username, password }),
+    });
+    expect(response.status).toBe(200);
+    return String(response.body.accessToken);
+  }
+
+  beforeAll(async () => {
+    app = await NestFactory.create(AppModule, { logger: false });
+    configureApp(app);
+    await app.listen(0, '127.0.0.1');
+    baseUrl = await app.getUrl();
+    prisma = app.get(PrismaService);
+    passwords = app.get(PasswordService);
+
+    const suffix = randomUUID().replaceAll('-', '').slice(0, 10);
+    const password = 'Owner-Draw-Workflow-Pass-123!';
+    const passwordHash = await passwords.hash(password);
+    const [admin, member] = await Promise.all([
+      prisma.user.create({
+        data: {
+          username: `owner_flow_admin_${suffix}`,
+          passwordHash,
+          status: UserStatus.ACTIVE,
+        },
+      }),
+      prisma.user.create({
+        data: {
+          username: `owner_flow_member_${suffix}`,
+          passwordHash,
+          status: UserStatus.ACTIVE,
+        },
+      }),
+    ]);
+    adminId = admin.id;
+    memberId = member.id;
+    const superAdmin = await prisma.role.findUniqueOrThrow({ where: { name: 'SUPER_ADMIN' } });
+    await prisma.userRole.create({ data: { userId: admin.id, roleId: superAdmin.id } });
+    [adminToken, memberToken] = await Promise.all([
+      login(admin.username, password),
+      login(member.username, password),
+    ]);
+
+    programId = randomUUID();
+    await prisma.program.create({
+      data: {
+        id: programId,
+        code: `OWP${suffix}`,
+        name: `Owner workflow program ${suffix}`,
+      },
+    });
+    const programVersion = await prisma.programVersion.create({
+      data: {
+        programId,
+        version: 1,
+        lifecycle: PolicyLifecycle.PUBLISHED,
+        effectiveFrom: new Date('2025-12-01T00:00:00.000Z'),
+        currencyCode: 'INR',
+        registrationFee: '0.00',
+        installmentAmount: '0.00',
+        installmentCount: 0,
+        installmentIntervalUnit: ProgramIntervalUnit.MONTH,
+        installmentIntervalCount: 1,
+        firstInstallmentOffsetDays: 0,
+        gracePeriodDays: 0,
+        partialPaymentsAllowed: true,
+        overpaymentsAllowed: false,
+        publishedAt: new Date('2025-12-01T00:00:00.000Z'),
+      },
+    });
+    programVersionId = programVersion.id;
+
+    const enrollment = await prisma.programEnrollment.create({
+      data: {
+        sourceKey: `OWNER-FLOW-ENROLL-${suffix}`,
+        requestFingerprint: 'a'.repeat(64),
+        userId: member.id,
+        programVersionId,
+        enrolledAt: new Date('2026-01-02T00:00:00.000Z'),
+        enrollmentDate: '2026-01-02',
+        status: ProgramEnrollmentStatus.ACTIVE,
+        eligibilitySnapshot: { eligible: true, source: 'owner-workflow-uat' },
+        currencyCode: 'INR',
+        registrationFeeSnapshot: '0.00',
+        installmentAmountSnapshot: '0.00',
+        installmentCountSnapshot: 0,
+        gracePeriodDaysSnapshot: 0,
+      },
+    });
+    enrollmentId = enrollment.id;
+
+    const occurredAt = new Date('2026-01-10T06:00:00.000Z');
+    const businessEvent = await prisma.programBusinessEvent.create({
+      data: {
+        sourceKey: `OWNER-FLOW-EVENT-${suffix}`,
+        type: ProgramBusinessEventType.ENROLLMENT_CREATED,
+        enrollmentId,
+        occurredAt,
+        payload: { source: 'owner-workflow-uat' },
+      },
+    });
+    businessEventId = businessEvent.id;
+    processingRunId = randomUUID();
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO program_event_processing_runs
+         (id, businessEventId, policyVersionId, status, eligible, eligibilitySnapshot,
+          attempts, errorMessage, startedAt, completedAt, createdAt, updatedAt)
+       VALUES (?, ?, NULL, 'PROCESSED', TRUE, ?, 1, NULL, ?, ?, CURRENT_TIMESTAMP(3), CURRENT_TIMESTAMP(3))`,
+      processingRunId,
+      businessEventId,
+      JSON.stringify({ eligible: true, source: 'owner-workflow-uat' }),
+      occurredAt,
+      occurredAt,
+    );
+    hookId = randomUUID();
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO program_draw_eligibility_hooks
+         (id, sourceKey, runId, businessEventId, userId, programVersionId, status,
+          eligibilitySnapshot, occurredAt, createdAt, updatedAt)
+       VALUES (?, ?, ?, ?, ?, ?, 'ELIGIBLE', ?, ?, CURRENT_TIMESTAMP(3), CURRENT_TIMESTAMP(3))`,
+      hookId,
+      `OWNER-FLOW-HOOK-${suffix}`,
+      processingRunId,
+      businessEventId,
+      member.id,
+      programVersionId,
+      JSON.stringify({ eligible: true, source: 'owner-workflow-uat' }),
+      occurredAt,
+    );
+
+    seasonId = randomUUID();
+    seasonCode = `OWS${suffix}`;
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO owner_seasons
+         (id, code, name, status, startDate, drawDay, eligibilityCutoff,
+          programId, programVersionId, createdByUserId)
+       VALUES (?, ?, ?, 'ACTIVE', ?, 25, 'BEFORE_DRAW_DATE', ?, ?, ?)`,
+      seasonId,
+      seasonCode,
+      `Owner workflow season ${suffix}`,
+      new Date('2026-01-01T00:00:00.000Z'),
+      programId,
+      programVersionId,
+      admin.id,
+    );
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO owner_season_prizes
+         (id, seasonId, monthNumber, prizeCode, category, name, winnerCount, currencyCode)
+       VALUES (?, ?, 1, ?, 'UAT', 'January Workflow Prize', 1, 'INR')`,
+      randomUUID(),
+      seasonId,
+      `JAN${suffix}`,
+    );
+  });
+
+  afterAll(async () => {
+    if (prisma) {
+      const userIds = [adminId, memberId].filter(Boolean);
+      if (userIds.length) {
+        await prisma.auditLog.deleteMany({ where: { actorUserId: { in: userIds } } });
+      }
+
+      if (drawId) {
+        const claims = await prisma.$queryRawUnsafe<Array<{ id: string }>>(
+          'SELECT id FROM lucky_draw_prize_claims WHERE drawId = ?',
+          drawId,
+        );
+        const claimIds = claims.map((row) => row.id);
+        if (claimIds.length) {
+          await prisma.$executeRawUnsafe(
+            `DELETE FROM lucky_draw_prize_claim_events WHERE claimId IN (${claimIds.map(() => '?').join(',')})`,
+            ...claimIds,
+          );
+          await prisma.$executeRawUnsafe(
+            `DELETE FROM lucky_draw_prize_fulfillment_reversals WHERE fulfillmentId IN (
+               SELECT id FROM lucky_draw_prize_fulfillments WHERE claimId IN (${claimIds.map(() => '?').join(',')})
+             )`,
+            ...claimIds,
+          );
+          await prisma.$executeRawUnsafe(
+            `DELETE FROM lucky_draw_prize_fulfillments WHERE claimId IN (${claimIds.map(() => '?').join(',')})`,
+            ...claimIds,
+          );
+          await prisma.$executeRawUnsafe(
+            `DELETE FROM lucky_draw_prize_claims WHERE id IN (${claimIds.map(() => '?').join(',')})`,
+            ...claimIds,
+          );
+        }
+        await prisma.$executeRawUnsafe('DELETE FROM owner_winner_verifications WHERE drawRunId = ?', drawRunId);
+        await prisma.$executeRawUnsafe('DELETE FROM owner_draw_runs WHERE id = ?', drawRunId);
+        await prisma.$executeRawUnsafe('DELETE FROM lucky_draw_winners WHERE drawId = ?', drawId);
+        await prisma.$executeRawUnsafe('DELETE FROM lucky_draw_entries WHERE drawId = ?', drawId);
+        await prisma.$executeRawUnsafe('DELETE FROM lucky_draw_instances WHERE id = ?', drawId);
+      }
+
+      if (drawPolicyVersionId) {
+        await prisma.$executeRawUnsafe(
+          'DELETE FROM lucky_draw_fulfillment_rules WHERE policyVersionId = ?',
+          drawPolicyVersionId,
+        );
+        await prisma.$executeRawUnsafe(
+          'DELETE FROM lucky_draw_prize_tiers WHERE policyVersionId = ?',
+          drawPolicyVersionId,
+        );
+        await prisma.$executeRawUnsafe(
+          'DELETE FROM lucky_draw_policy_versions WHERE id = ?',
+          drawPolicyVersionId,
+        );
+      }
+      if (drawPolicyId) {
+        await prisma.$executeRawUnsafe('DELETE FROM lucky_draw_policies WHERE id = ?', drawPolicyId);
+      }
+
+      if (hookId) {
+        await prisma.$executeRawUnsafe('DELETE FROM program_draw_eligibility_hooks WHERE id = ?', hookId);
+      }
+      if (processingRunId) {
+        await prisma.$executeRawUnsafe('DELETE FROM program_event_processing_runs WHERE id = ?', processingRunId);
+      }
+      if (businessEventId) {
+        await prisma.programBusinessEvent.deleteMany({ where: { id: businessEventId } });
+      }
+      if (enrollmentId) {
+        await prisma.programEnrollment.deleteMany({ where: { id: enrollmentId } });
+      }
+      if (seasonId) {
+        await prisma.$executeRawUnsafe('DELETE FROM owner_season_prizes WHERE seasonId = ?', seasonId);
+        await prisma.$executeRawUnsafe('DELETE FROM owner_seasons WHERE id = ?', seasonId);
+      }
+      if (programVersionId) {
+        await prisma.programVersion.deleteMany({ where: { id: programVersionId } });
+      }
+      if (programId) {
+        await prisma.program.deleteMany({ where: { id: programId } });
+      }
+      await prisma.systemSequence.deleteMany({ where: { key: { startsWith: 'DRAW:' } } });
+      if (userIds.length) {
+        await prisma.userRole.deleteMany({ where: { userId: { in: userIds } } });
+        await prisma.authSession.deleteMany({ where: { userId: { in: userIds } } });
+        await prisma.user.deleteMany({ where: { id: { in: userIds } } });
+      }
+    }
+    await app?.close();
+  });
+
+  it('keeps failed verification reviewable and completes publish, claim, and fulfilment after correction', async () => {
+    const prepared = await request(
+      `/admin/owner-portal/seasons/${seasonId}/draws`,
+      adminToken,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          monthNumber: 1,
+          entryWindowStart: '2026-01-01T00:00:00+05:30',
+          entryWindowEnd: '2026-01-17T23:00:00+05:30',
+          drawAt: '2026-01-18T10:00:00+05:30',
+          claimWindowDays: 36500,
+        }),
+      },
+    );
+    expect(prepared.status).toBe(201);
+    expect(prepared.body.status).toBe('SCHEDULED');
+    drawRunId = String(prepared.body.id);
+    drawId = String(prepared.body.drawId);
+    drawPolicyId = String(prepared.body.policyId);
+    drawPolicyVersionId = String(prepared.body.policyVersionId);
+
+    const memberDenied = await request(
+      `/admin/owner-portal/draws/${drawRunId}/lock-eligibility`,
+      memberToken,
+      { method: 'POST', body: '{}' },
+    );
+    expect(memberDenied.status).toBe(403);
+
+    const locked = await request(
+      `/admin/owner-portal/draws/${drawRunId}/lock-eligibility`,
+      adminToken,
+      { method: 'POST', body: '{}' },
+    );
+    expect(locked.status).toBe(201);
+    expect(locked.body.status).toBe('ELIGIBILITY_LOCKED');
+    expect(Number(locked.body.eligibleEntryCount)).toBe(1);
+
+    const selected = await request(
+      `/admin/owner-portal/draws/${drawRunId}/select-winners`,
+      adminToken,
+      { method: 'POST', body: '{}' },
+    );
+    expect(selected.status).toBe(201);
+    expect(selected.body.status).toBe('SELECTED');
+    expect(selected.body.winners).toHaveLength(1);
+    expect(selected.body.winners[0].verificationStatus).toBe('PENDING');
+    const winnerId = String(selected.body.winners[0].id);
+
+    const failedVerification = await request(
+      `/admin/owner-portal/draws/${drawRunId}/winners/${winnerId}/verify`,
+      adminToken,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({
+          eligibilityStatus: 'PASS',
+          identityStatus: 'FAIL',
+          paymentStatus: 'PASS',
+        }),
+      },
+    );
+    expect(failedVerification.status).toBe(200);
+    expect(failedVerification.body.status).toBe('VERIFICATION');
+    expect(failedVerification.body.winners[0].verificationStatus).toBe('FAILED');
+
+    const prematureApproval = await request(
+      `/admin/owner-portal/draws/${drawRunId}/approve`,
+      adminToken,
+      {
+        method: 'POST',
+        body: JSON.stringify({ approvalReference: 'UAT-FAIL-BLOCK' }),
+      },
+    );
+    expect(prematureApproval.status).toBe(409);
+
+    const correctedVerification = await request(
+      `/admin/owner-portal/draws/${drawRunId}/winners/${winnerId}/verify`,
+      adminToken,
+      {
+        method: 'PATCH',
+        body: JSON.stringify({
+          eligibilityStatus: 'PASS',
+          identityStatus: 'PASS',
+          paymentStatus: 'PASS',
+        }),
+      },
+    );
+    expect(correctedVerification.status).toBe(200);
+    expect(correctedVerification.body.status).toBe('VERIFIED');
+    expect(correctedVerification.body.winners[0].verificationStatus).toBe('VERIFIED');
+
+    const approved = await request(
+      `/admin/owner-portal/draws/${drawRunId}/approve`,
+      adminToken,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          approvalReference: 'UAT-WINNER-APPROVAL',
+          approvalNote: 'Owner workflow authenticated integration',
+        }),
+      },
+    );
+    expect(approved.status).toBe(201);
+    expect(approved.body.status).toBe('APPROVED');
+
+    const published = await request(
+      `/admin/owner-portal/draws/${drawRunId}/publish`,
+      adminToken,
+      { method: 'POST', body: '{}' },
+    );
+    expect(published.status).toBe(201);
+    expect(published.body.status).toBe('PUBLISHED');
+    expect(published.body.winners[0].claimStatus).toBe('PENDING');
+    const claimId = String(published.body.winners[0].claimId);
+    expect(claimId).toBeTruthy();
+
+    const claimWindow = await prisma.$queryRawUnsafe<
+      Array<{ claimWindowDaysSnapshot: number; deadlineMatches: number | bigint }>
+    >(
+      `SELECT c.claimWindowDaysSnapshot,
+              CASE WHEN c.claimDeadline = DATE_ADD(d.drawnAt, INTERVAL c.claimWindowDaysSnapshot DAY)
+                   THEN 1 ELSE 0 END AS deadlineMatches
+       FROM lucky_draw_prize_claims c
+       JOIN lucky_draw_instances d ON d.id=c.drawId
+       WHERE c.id=? LIMIT 1`,
+      claimId,
+    );
+    expect(Number(claimWindow[0]?.claimWindowDaysSnapshot)).toBe(36500);
+    expect(Number(claimWindow[0]?.deadlineMatches)).toBe(1);
+
+    const memberClaimDenied = await request(
+      `/admin/owner-portal/draws/${drawRunId}/winners/${winnerId}/claim`,
+      memberToken,
+      { method: 'POST', body: '{}' },
+    );
+    expect(memberClaimDenied.status).toBe(403);
+
+    const claimed = await request(
+      `/admin/owner-portal/draws/${drawRunId}/winners/${winnerId}/claim`,
+      adminToken,
+      { method: 'POST', body: '{}' },
+    );
+    expect(claimed.status).toBe(201);
+    expect(claimed.body.winners[0].claimStatus).toBe('CLAIMED');
+
+    const fulfilled = await request(
+      `/admin/owner-portal/draws/${drawRunId}/winners/${winnerId}/fulfill`,
+      adminToken,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          externalReference: 'UAT-NON-CASH-REF-001',
+          note: 'Prize handed over in authenticated workflow UAT',
+        }),
+      },
+    );
+    expect(fulfilled.status).toBe(201);
+    expect(fulfilled.body.winners[0].claimStatus).toBe('FULFILLED');
+
+    const fulfillment = await prisma.$queryRawUnsafe<Array<{ externalReference: string | null }>>(
+      'SELECT externalReference FROM lucky_draw_prize_fulfillments WHERE claimId=? LIMIT 1',
+      claimId,
+    );
+    expect(fulfillment[0]?.externalReference).toBe('UAT-NON-CASH-REF-001');
+  });
+});
