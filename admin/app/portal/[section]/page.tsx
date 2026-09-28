@@ -7,6 +7,7 @@ import { OwnerCoreV14Portal, type OwnerCoreV14Section } from '@/components/owner
 import { OwnerFinancePortal, type OwnerFinanceSection } from '@/components/owner-finance-portal';
 import { OwnerKycPanel } from '@/components/owner-kyc-panel';
 import { OwnerManagementShell } from '@/components/owner-management-shell';
+import { OwnerMembersPortal } from '@/components/owner-members-portal';
 import { OwnerSeasonAdvancedPanel } from '@/components/owner-season-advanced-panel';
 import { SettingsGovernancePortal } from '@/components/settings-governance-portal';
 
@@ -64,15 +65,16 @@ export default async function OwnerPortalSectionPage({ params }: PageProps) {
   const { section } = await params;
   if (!SECTIONS.has(section)) notFound();
   if (section === 'settings') return <SettingsGovernancePortal />;
-  if (V14_CORE_SECTIONS.has(section as OwnerCoreV14Section)) {
-    const coreSection = section as OwnerCoreV14Section;
-    const extension = coreSection === 'members' ? <OwnerKycPanel /> : undefined;
+  if (section === 'members') {
     return (
       <>
-        {coreSection === 'members' ? <MemberRegistrationAutofillGuard /> : null}
-        <OwnerCoreV14Portal section={coreSection} extension={extension} />
+        <MemberRegistrationAutofillGuard />
+        <OwnerMembersPortal extension={<OwnerKycPanel />} />
       </>
     );
+  }
+  if (V14_CORE_SECTIONS.has(section as OwnerCoreV14Section)) {
+    return <OwnerCoreV14Portal section={section as OwnerCoreV14Section} />;
   }
   if (LEGACY_CORE_SECTIONS.has(section as OwnerCoreSection)) {
     const coreSection = section as 'seasons' | 'draw' | 'winners' | 'prizes';
