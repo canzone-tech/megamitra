@@ -384,6 +384,8 @@ export class OwnerPortalController {
   @Permissions('operations.read')
   @Get('reports')
   reports() {
-    return this.portal.reportCatalogue();
+    return this.portal.reportCatalogue().map((report) =>
+      report.code === 'BINARY' ? { ...report, name: 'Binary 1:4 Pair Ledger' } : report,
+    );
   }
 }
