@@ -19,7 +19,9 @@ import {
 import { Type } from 'class-transformer';
 
 export const OWNER_SEASON_STATUSES = ['DRAFT', 'REVIEW', 'ACTIVE', 'PAUSED', 'CLOSED', 'ARCHIVED'] as const;
-export const OWNER_MEMBER_TYPES = ['PARTNER', 'CUSTOMER'] as const;
+// Legacy owner endpoint compatibility only. Account authorization is role-based and
+// MEMBER is the only valid member profile value; PARTNER/CUSTOMER are retired.
+export const OWNER_MEMBER_TYPES = ['MEMBER'] as const;
 export const OWNER_PLACEMENTS = ['AUTO', 'A', 'B', 'C', 'D'] as const;
 export const OWNER_ELIGIBILITY_CUTOFFS = ['BEFORE_DRAW_DATE', 'PAYMENT_DUE_DATE', 'ADMIN_DEFINED'] as const;
 export const OWNER_NOTIFICATION_CHANNELS = ['PORTAL', 'SMS', 'EMAIL', 'PUSH'] as const;
