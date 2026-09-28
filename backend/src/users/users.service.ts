@@ -14,7 +14,7 @@ import {
   UserStatus,
   UsernameCreationMode,
 } from '../generated/prisma/enums';
-import type { CreateManagedUserDto } from './users.dto';
+import type { CreateManagedStaffDto, CreateManagedUserDto } from './users.dto';
 
 @Injectable()
 export class UsersService {
@@ -55,6 +55,39 @@ export class UsersService {
   }
 
   async createManaged(dto: CreateManagedUserDto, actorUserId: string) {
+    const registration = await this.prisma.systemRegistrationConfig.findUniqueOrThrow({
+      where: { id: 1 },
+    });
+    return this.createWithRole(
+      dto,
+      registration.defaultRoleName,
+      actorUserId,
+      false,
+      'Member created from owner management portal',
+    );
+  }
+
+  async createManagedStaff(dto: CreateManagedStaffDto, actorUserId: string) {
+    const roleName = dto.role.trim().toUpperCase();
+    if (roleName !== 'ADMIN' && roleName !== 'AGENT') {
+      throw new BadRequestException('Managed staff role must be ADMIN or AGENT');
+    }
+    return this.createWithRole(
+      dto,
+      roleName,
+      actorUserId,
+      true,
+      `${roleName} account created from access control`,
+    );
+  }
+
+  private async createWithRole(
+    dto: CreateManagedUserDto,
+    roleName: string,
+    actorUserId: string,
+    mustChangePassword: boolean,
+    auditDescription: string,
+  ) {
     const [registration, security] = await Promise.all([
       this.prisma.systemRegistrationConfig.findUniqueOrThrow({ where: { id: 1 } }),
       this.prisma.systemSecurityConfig.findUniqueOrThrow({ where: { id: 1 } }),
@@ -85,11 +118,9 @@ export class UsersService {
         }
         if (!username) throw new BadRequestException('Username is required');
 
-        const defaultRole = await tx.role.findUnique({
-          where: { name: registration.defaultRoleName },
-        });
-        if (!defaultRole || defaultRole.status !== RoleStatus.ACTIVE) {
-          throw new BadRequestException('Configured default member role is unavailable');
+        const role = await tx.role.findUnique({ where: { name: roleName } });
+        if (!role || role.status !== RoleStatus.ACTIVE) {
+          throw new BadRequestException(`Configured ${roleName} role is unavailable`);
         }
 
         const created = await tx.user.create({
@@ -101,10 +132,10 @@ export class UsersService {
             firstName: dto.firstName?.trim() || null,
             lastName: dto.lastName?.trim() || null,
             status: UserStatus.ACTIVE,
-            mustChangePassword: false,
+            mustChangePassword,
           },
         });
-        await tx.userRole.create({ data: { userId: created.id, roleId: defaultRole.id } });
+        await tx.userRole.create({ data: { userId: created.id, roleId: role.id } });
 
         if (email && !registration.allowMultipleAccountsPerEmail) {
           await tx.userIdentifierClaim.create({
@@ -123,7 +154,8 @@ export class UsersService {
         action: AuditAction.CREATE,
         entityType: 'User',
         entityId: user.id,
-        description: 'Member created from owner management portal',
+        description: auditDescription,
+        metadata: { role: roleName },
       });
       return this.get(user.id);
     } catch (error) {
