@@ -14,7 +14,6 @@ import { GenealogyService } from '../genealogy/genealogy.service';
 import {
   AuditAction,
   BinaryCapOverflowMode,
-  BinaryPlacementSide,
   ProgramIntervalUnit,
   ReferralRewardMode,
   ReferralRoundingMode,
@@ -261,16 +260,13 @@ export class OwnerPortalService {
           {
             memberUserId: user.id,
             parentUserId: placementRoot.id,
-            side:
-              dto.placement === 'LEFT'
-                ? BinaryPlacementSide.LEFT
-                : BinaryPlacementSide.RIGHT,
+            slot: dto.placement,
           },
           actorUserId,
         );
       }
     } else if (dto.placement !== 'AUTO') {
-      throw new BadRequestException('Placement reference is required for a fixed placement side');
+      throw new BadRequestException('Placement reference is required for a fixed A/B/C/D slot');
     }
 
     if (dto.epin) await this.consumeEpin(dto.epin, user.id, actorUserId);
@@ -302,22 +298,23 @@ export class OwnerPortalService {
   async assignPlacement(
     memberReference: string,
     parentReference: string,
-    side: 'LEFT' | 'RIGHT' | 'AUTO',
+    slot: 'A' | 'B' | 'C' | 'D' | 'AUTO',
     actorUserId: string,
   ) {
     const [member, parent] = await Promise.all([
       this.resolveUser(memberReference),
       this.resolveUser(parentReference),
     ]);
-    if (side === 'AUTO') return this.autoPlace(member.id, parent.id, actorUserId);
-    return this.genealogy.assignPlacement(
-      {
-        memberUserId: member.id,
-        parentUserId: parent.id,
-        side: side === 'LEFT' ? BinaryPlacementSide.LEFT : BinaryPlacementSide.RIGHT,
-      },
-      actorUserId,
-    );
+    return slot === 'AUTO'
+      ? this.autoPlace(member.id, parent.id, actorUserId)
+      : this.genealogy.assignPlacement(
+          {
+            memberUserId: member.id,
+            parentUserId: parent.id,
+            slot,
+          },
+          actorUserId,
+        );
   }
 
   async listPairLedger(limit = 100) {
@@ -1265,29 +1262,7 @@ export class OwnerPortalService {
   }
 
   private async autoPlace(memberUserId: string, rootUserId: string, actorUserId: string) {
-    const queue = [rootUserId];
-    const visited = new Set<string>();
-    while (queue.length && visited.size < 10000) {
-      const parentUserId = queue.shift()!;
-      if (visited.has(parentUserId)) continue;
-      visited.add(parentUserId);
-      const children = await this.prisma.binaryPlacement.findMany({
-        where: { parentUserId },
-        select: { memberUserId: true, side: true },
-        orderBy: { createdAt: 'asc' },
-      });
-      const sides = new Set(children.map((child) => child.side));
-      const side = !sides.has(BinaryPlacementSide.LEFT)
-        ? BinaryPlacementSide.LEFT
-        : !sides.has(BinaryPlacementSide.RIGHT)
-          ? BinaryPlacementSide.RIGHT
-          : null;
-      if (side) {
-        return this.genealogy.assignPlacement({ memberUserId, parentUserId, side }, actorUserId);
-      }
-      queue.push(...children.map((child) => child.memberUserId));
-    }
-    throw new ConflictException('No available placement was found under the selected reference member');
+    return this.genealogy.autoPlace(memberUserId, rootUserId, actorUserId);
   }
 
   private async requireUsableEpin(raw: string) {
