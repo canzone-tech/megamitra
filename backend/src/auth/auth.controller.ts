@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Post, Query } from '@nestjs/common';
 import type { AuthUser } from './auth-user';
 import { AuthService } from './auth.service';
 import { CurrentUser } from './current-user.decorator';
@@ -12,6 +12,7 @@ import {
   ResetPasswordDto,
 } from './auth-recovery.dto';
 import { AuthRecoveryService } from './auth-recovery.service';
+import { MemberRegistrationService } from './member-registration.service';
 import { AllowPasswordChangeRequired } from './password-change-required.decorator';
 import { Public } from './public.decorator';
 
@@ -20,6 +21,7 @@ export class AuthController {
   constructor(
     private readonly auth: AuthService,
     private readonly recovery: AuthRecoveryService,
+    private readonly memberRegistration: MemberRegistrationService,
   ) {}
 
   @Public()
@@ -29,9 +31,21 @@ export class AuthController {
   }
 
   @Public()
+  @Get('registration-config')
+  registrationConfig() {
+    return this.memberRegistration.registrationConfig();
+  }
+
+  @Public()
+  @Get('sponsor')
+  sponsor(@Query('reference') reference?: string) {
+    return this.memberRegistration.sponsor(reference ?? '');
+  }
+
+  @Public()
   @Post('register')
   register(@Body() dto: RegisterDto) {
-    return this.auth.register(dto);
+    return this.memberRegistration.register(dto);
   }
 
   @Public()
