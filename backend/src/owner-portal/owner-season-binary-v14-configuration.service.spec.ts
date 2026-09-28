@@ -5,6 +5,21 @@ import { OwnerSeasonBinaryV14ConfigurationService } from './owner-season-binary-
 
 describe('OwnerSeasonBinaryV14ConfigurationService', () => {
   function service() {
+    const db = {
+      transaction: jest.fn(async (work: (connection: { query: jest.Mock }) => unknown) =>
+        work({
+          query: jest.fn().mockResolvedValue([
+            {
+              drawStartMonth: 1,
+              drawWeekOfMonth: 3,
+              drawWeekday: 'SUNDAY',
+              drawTimezone: 'Asia/Kolkata',
+            },
+          ]),
+        }),
+      ),
+      execute: jest.fn(),
+    };
     return new OwnerSeasonBinaryV14ConfigurationService(
       {} as never,
       {} as never,
@@ -14,7 +29,7 @@ describe('OwnerSeasonBinaryV14ConfigurationService', () => {
       {} as never,
       {} as never,
       {} as never,
-      {} as never,
+      db as never,
       {} as never,
     );
   }
@@ -39,7 +54,7 @@ describe('OwnerSeasonBinaryV14ConfigurationService', () => {
     );
   });
 
-  it('always exposes the authoritative A/B/C/D topology and fixed pair lanes', async () => {
+  it('always exposes the authoritative A/B/C/D topology, fixed pair lanes and default draw recurrence', async () => {
     jest
       .spyOn(OwnerSeasonConfigurationService.prototype, 'getAdvancedConfiguration')
       .mockResolvedValue({ season: { id: 'season-1' }, binary: {} } as never);
@@ -61,6 +76,13 @@ describe('OwnerSeasonBinaryV14ConfigurationService', () => {
           ['B', 'D'],
         ],
         genericCrossPairingAllowed: false,
+      },
+      drawSchedule: {
+        startMonth: 1,
+        weekOfMonth: 3,
+        weekday: 'SUNDAY',
+        timezone: 'Asia/Kolkata',
+        label: '3rd Sunday monthly, starting January',
       },
     });
   });
