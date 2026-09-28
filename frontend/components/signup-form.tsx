@@ -17,13 +17,14 @@ type RegistrationConfig = {
   passwordMaxLength: number;
   epinRequired: true;
   sponsorLookupEnabled: true;
+  accountRole: 'MEMBER';
 };
 
 type Sponsor = {
   id: string;
   username: string;
   fullName: string;
-  memberType: string;
+  role: 'MEMBER';
   status: string;
 };
 
@@ -147,7 +148,6 @@ export function SignupForm() {
           dateOfBirth: formString(form, 'dateOfBirth') || undefined,
           state: formString(form, 'state') || undefined,
           city: formString(form, 'city') || undefined,
-          memberType: formString(form, 'memberType') || 'PARTNER',
           sponsorReference: reference || undefined,
           epin: formString(form, 'epin'),
           ...(captcha
@@ -219,7 +219,7 @@ export function SignupForm() {
         <div style={{ margin: '-4px 0 18px', padding: '13px 14px', borderRadius: 13, border: '1px solid rgba(7,150,77,.25)', background: 'var(--mm-green-100)' }}>
           <strong style={{ display: 'block', color: 'var(--mm-green-700)' }}>Sponsor verified ✓</strong>
           <span style={{ display: 'block', marginTop: 5, fontSize: 13 }}><b>{sponsor.fullName}</b> • {sponsor.username}</span>
-          <span style={{ display: 'block', marginTop: 3, color: 'var(--mm-ink-500)', fontSize: 12 }}>{sponsor.memberType} • {sponsor.status}</span>
+          <span style={{ display: 'block', marginTop: 3, color: 'var(--mm-ink-500)', fontSize: 12 }}>{sponsor.role} • {sponsor.status}</span>
         </div>
       ) : null}
 
@@ -264,13 +264,6 @@ export function SignupForm() {
         <input className="mm-input" id="city" name="city" autoComplete="address-level2" />
       </div>
       <div className="mm-field">
-        <label htmlFor="memberType">Member type</label>
-        <select className="mm-input" id="memberType" name="memberType" defaultValue="PARTNER">
-          <option value="PARTNER">Partner</option>
-          <option value="CUSTOMER">Customer</option>
-        </select>
-      </div>
-      <div className="mm-field">
         <label htmlFor="signupPassword">Password{passwordMode === 'MANUAL' ? ' *' : ''}</label>
         <input
           className="mm-input"
@@ -304,7 +297,7 @@ export function SignupForm() {
       {result ? (
         <div style={{ marginTop: 18, padding: 14, borderRadius: 13, background: 'var(--mm-green-100)', color: 'var(--mm-green-700)' }} role="status">
           <strong>Registration submitted successfully.</strong>
-          <span style={{ display: 'block', marginTop: 5 }}>Username: <b>{result.user.username}</b> • Status: {result.user.status}</span>
+          <span style={{ display: 'block', marginTop: 5 }}>Username: <b>{result.user.username}</b> • Role: MEMBER • Status: {result.user.status}</span>
           {result.sponsor ? <span style={{ display: 'block', marginTop: 4 }}>Sponsor: {result.sponsor.fullName} ({result.sponsor.username})</span> : null}
           {result.placement?.slot ? <span style={{ display: 'block', marginTop: 4 }}>Auto placement: Slot {result.placement.slot} • {result.placement.side}</span> : null}
           {result.initialPassword ? <span style={{ display: 'block', marginTop: 7 }}>One-time generated password: <b>{result.initialPassword}</b>. Save it now.</span> : null}
