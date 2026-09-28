@@ -73,7 +73,6 @@ function exportCsv(rows: Row[], filename: string) {
 
 export function OwnerControlPortal({ section }: { section: OwnerControlSection }) {
   const router = useRouter();
-  const [settings, setSettings] = useState<Row>({});
   const [data, setData] = useState<Row[]>([]);
   const [reportRows, setReportRows] = useState<Row[]>([]);
   const [reportName, setReportName] = useState('');
@@ -96,7 +95,6 @@ export function OwnerControlPortal({ section }: { section: OwnerControlSection }
 
   const load = useCallback(async () => {
     try {
-      const portalSettings = await apiJson<Row>(`${API}/settings`);
       if (section === 'reports') {
         setData(await apiJson<Row[]>(`${API}/reports`));
       } else if (section === 'notifications') {
@@ -104,7 +102,6 @@ export function OwnerControlPortal({ section }: { section: OwnerControlSection }
       } else {
         setData(await apiJson<Row[]>(`${API}/support`));
       }
-      setSettings(portalSettings);
     } catch (err) {
       handleApiError(err);
     }
