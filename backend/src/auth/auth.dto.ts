@@ -1,4 +1,13 @@
-import { IsEmail, IsOptional, IsString, MinLength } from 'class-validator';
+import {
+  IsEmail,
+  IsIn,
+  IsOptional,
+  IsString,
+  Length,
+  Matches,
+  MaxLength,
+  MinLength,
+} from 'class-validator';
 
 export class RegisterDto {
   @IsOptional()
@@ -20,11 +29,45 @@ export class RegisterDto {
 
   @IsOptional()
   @IsString()
+  @Length(2, 160)
+  fullName?: string;
+
+  @IsOptional()
+  @IsString()
   firstName?: string;
 
   @IsOptional()
   @IsString()
   lastName?: string;
+
+  @IsOptional()
+  @IsString()
+  @Matches(/^\d{4}-\d{2}-\d{2}$/)
+  dateOfBirth?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  state?: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  city?: string;
+
+  @IsOptional()
+  @IsIn(['PARTNER', 'CUSTOMER'])
+  memberType?: 'PARTNER' | 'CUSTOMER';
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(191)
+  sponsorReference?: string;
+
+  @IsString()
+  @MinLength(1)
+  @MaxLength(80)
+  epin!: string;
 
   @IsOptional()
   @IsString()
