@@ -20,7 +20,10 @@ export default function MemberLoginPage() {
           <h2 className="mm-title" style={{ fontSize: 34 }}>Welcome back</h2>
           <p className="mm-subtitle" style={{ marginBottom: 26 }}>Use your MegaGoldenClub account to continue.</p>
           <LoginForm />
-          <p style={{ marginTop: 24, fontSize: 13, color: 'var(--mm-ink-500)' }}><Link href="/">← Back to MegaGoldenClub Rewards</Link></p>
+          <p style={{ marginTop: 20, marginBottom: 0, fontSize: 13, color: 'var(--mm-ink-500)' }}>
+            New member with an E-PIN? <Link href="/signup">Create an account</Link>
+          </p>
+          <p style={{ marginTop: 12, fontSize: 13, color: 'var(--mm-ink-500)' }}><Link href="/">← Back to MegaGoldenClub Rewards</Link></p>
         </div>
       </section>
     </main>
