@@ -3,9 +3,14 @@ import { AuditService } from '../audit/audit.service';
 import { BinaryPolicyService } from '../binary-policy/binary-policy.service';
 import { FinancialDbService } from '../database/financial-db.service';
 import { PrismaService } from '../database/prisma.service';
+import { AuditAction } from '../generated/prisma/enums';
 import { ProgramOrchestrationService } from '../program/program-orchestration.service';
 import { ProgramPolicyService } from '../program/program-policy.service';
 import { ReferralRewardPolicyService } from '../referral-reward/referral-reward-policy.service';
+import {
+  ownerDrawScheduleLabel,
+  validateOwnerDrawScheduleConfig,
+} from './owner-draw-schedule';
 import type {
   CreateOwnerSeasonDto,
   OwnerSeasonStatusDto,
@@ -23,8 +28,15 @@ type SeasonPolicyRow = {
   binaryPlanVersionId: string | null;
 };
 
+type DrawScheduleRow = {
+  drawStartMonth: number;
+  drawWeekOfMonth: number;
+  drawWeekday: string;
+  drawTimezone: string;
+};
+
 /**
- * Client-revised binary topology enforcement.
+ * Client-revised binary topology and owner-season recurrence enforcement.
  *
  * The underlying policy engine still keeps LEFT/RIGHT aggregates for historical
  * settlement reporting, while the authoritative genealogy is A/B/C/D:
@@ -35,7 +47,7 @@ export class OwnerSeasonBinaryV14ConfigurationService extends OwnerSeasonConfigu
   constructor(
     db: FinancialDbService,
     prisma: PrismaService,
-    audit: AuditService,
+    private readonly v14Audit: AuditService,
     portal: OwnerPortalService,
     programs: ProgramPolicyService,
     private readonly v14BinaryPolicies: BinaryPolicyService,
@@ -47,7 +59,7 @@ export class OwnerSeasonBinaryV14ConfigurationService extends OwnerSeasonConfigu
     super(
       db,
       prisma,
-      audit,
+      v14Audit,
       portal,
       programs,
       v14BinaryPolicies,
@@ -59,7 +71,10 @@ export class OwnerSeasonBinaryV14ConfigurationService extends OwnerSeasonConfigu
   override async createSeason(dto: CreateOwnerSeasonDto, actorUserId: string) {
     const created = await super.createSeason(dto, actorUserId);
     const id = String((created as { id?: unknown }).id ?? '');
-    if (id) await this.enforceBinaryV14(id, actorUserId);
+    if (id) {
+      await this.initializeDrawSchedule(id);
+      await this.enforceBinaryV14(id, actorUserId);
+    }
     return id ? this.v14Portal.getSeason(id) : created;
   }
 
@@ -80,6 +95,13 @@ export class OwnerSeasonBinaryV14ConfigurationService extends OwnerSeasonConfigu
       );
     }
     await super.updateAdvancedConfiguration(id, dto, actorUserId);
+    if (
+      dto.drawStartMonth !== undefined ||
+      dto.drawWeekOfMonth !== undefined ||
+      dto.drawWeekday !== undefined
+    ) {
+      await this.updateDrawSchedule(id, dto, actorUserId);
+    }
     await this.enforceBinaryV14(id, actorUserId);
     return this.getAdvancedConfiguration(id);
   }
@@ -90,6 +112,7 @@ export class OwnerSeasonBinaryV14ConfigurationService extends OwnerSeasonConfigu
     actorUserId: string,
   ) {
     if (dto.status === 'REVIEW' || dto.status === 'ACTIVE') {
+      await this.validateStoredDrawSchedule(id);
       await this.enforceBinaryV14(id, actorUserId);
     }
     return super.changeSeasonStatus(id, dto, actorUserId);
@@ -97,6 +120,7 @@ export class OwnerSeasonBinaryV14ConfigurationService extends OwnerSeasonConfigu
 
   override async getAdvancedConfiguration(id: string) {
     const config = await super.getAdvancedConfiguration(id);
+    const schedule = await this.drawSchedule(id);
     return {
       ...config,
       binaryTopology: {
@@ -113,7 +137,97 @@ export class OwnerSeasonBinaryV14ConfigurationService extends OwnerSeasonConfigu
         ],
         genericCrossPairingAllowed: false,
       },
+      drawSchedule: {
+        startMonth: Number(schedule.drawStartMonth),
+        weekOfMonth: Number(schedule.drawWeekOfMonth),
+        weekday: schedule.drawWeekday,
+        timezone: schedule.drawTimezone,
+        label: ownerDrawScheduleLabel(
+          Number(schedule.drawStartMonth),
+          Number(schedule.drawWeekOfMonth),
+          schedule.drawWeekday,
+        ),
+      },
     };
+  }
+
+  private async initializeDrawSchedule(id: string) {
+    const settings = (await this.v14Portal.settings()) as { timezone?: string };
+    const timezone = String(settings.timezone || 'Asia/Kolkata');
+    validateOwnerDrawScheduleConfig({
+      startMonth: 1,
+      weekOfMonth: 3,
+      weekday: 'SUNDAY',
+      timezone,
+    });
+    await this.v14Db.execute(
+      'UPDATE owner_seasons SET drawTimezone=? WHERE id=?',
+      [timezone, id],
+    );
+  }
+
+  private async updateDrawSchedule(
+    id: string,
+    dto: OwnerSeasonAdvancedConfigDto,
+    actorUserId: string,
+  ) {
+    const current = await this.drawSchedule(id);
+    const next = {
+      startMonth: dto.drawStartMonth ?? Number(current.drawStartMonth),
+      weekOfMonth: dto.drawWeekOfMonth ?? Number(current.drawWeekOfMonth),
+      weekday: dto.drawWeekday ?? current.drawWeekday,
+      timezone: current.drawTimezone,
+    };
+    validateOwnerDrawScheduleConfig(next);
+    await this.v14Db.execute(
+      `UPDATE owner_seasons
+       SET drawStartMonth=?, drawWeekOfMonth=?, drawWeekday=?
+       WHERE id=?`,
+      [next.startMonth, next.weekOfMonth, next.weekday, id],
+    );
+    await this.v14Audit.log({
+      actorUserId,
+      action: AuditAction.UPDATE,
+      entityType: 'OwnerSeasonDrawSchedule',
+      entityId: id,
+      description: 'Versioned owner lucky draw recurrence updated',
+      metadata: {
+        startMonth: next.startMonth,
+        weekOfMonth: next.weekOfMonth,
+        weekday: next.weekday,
+        timezone: next.timezone,
+        label: ownerDrawScheduleLabel(next.startMonth, next.weekOfMonth, next.weekday),
+      },
+    });
+  }
+
+  private async validateStoredDrawSchedule(id: string) {
+    const schedule = await this.drawSchedule(id);
+    try {
+      validateOwnerDrawScheduleConfig({
+        startMonth: Number(schedule.drawStartMonth),
+        weekOfMonth: Number(schedule.drawWeekOfMonth),
+        weekday: schedule.drawWeekday,
+        timezone: schedule.drawTimezone,
+      });
+    } catch (error) {
+      throw new BadRequestException(
+        `Lucky draw recurrence must be valid before review/activation: ${error instanceof Error ? error.message : 'invalid configuration'}`,
+      );
+    }
+  }
+
+  private async drawSchedule(id: string) {
+    const rows = await this.v14Db.transaction(async (connection) =>
+      (await connection.query(
+        `SELECT drawStartMonth, drawWeekOfMonth, drawWeekday, drawTimezone
+         FROM owner_seasons WHERE id=? LIMIT 1`,
+        [id],
+      )) as DrawScheduleRow[],
+    );
+    const schedule = rows[0];
+    if (!schedule) throw new BadRequestException('Season draw schedule was not found');
+    return schedule;
   }
 
   private async enforceBinaryV14(id: string, actorUserId: string) {
