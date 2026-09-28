@@ -48,7 +48,10 @@ type DrawRunRow = {
 };
 
 type ExistingDrawRunRow = DrawRunRow & {
-  exactReplay: number | bigint;
+  entryWindowStartUtc: string;
+  entryWindowEndUtc: string;
+  drawAtUtc: string;
+  claimWindowDays: number;
 };
 
 @Injectable()
@@ -88,26 +91,16 @@ export class OwnerPortalDrawWorkflowService {
     const existing = await this.rows<ExistingDrawRunRow>(
       `SELECT odr.id, odr.seasonId, odr.monthNumber, odr.policyId,
               odr.policyVersionId, odr.drawId, odr.status,
-              CASE
-                WHEN ldi.entryWindowStart = ?
-                 AND ldi.entryWindowEnd = ?
-                 AND ldi.drawAt = ?
-                 AND lfr.claimWindowDays = ?
-                THEN 1 ELSE 0
-              END AS exactReplay
+              DATE_FORMAT(ldi.entryWindowStart, '%Y-%m-%d %H:%i:%s.%f') AS entryWindowStartUtc,
+              DATE_FORMAT(ldi.entryWindowEnd, '%Y-%m-%d %H:%i:%s.%f') AS entryWindowEndUtc,
+              DATE_FORMAT(ldi.drawAt, '%Y-%m-%d %H:%i:%s.%f') AS drawAtUtc,
+              lfr.claimWindowDays
        FROM owner_draw_runs odr
        JOIN lucky_draw_instances ldi ON ldi.id=odr.drawId
        JOIN lucky_draw_fulfillment_rules lfr ON lfr.policyVersionId=odr.policyVersionId
        WHERE odr.seasonId=? AND odr.monthNumber=?
        LIMIT 1`,
-      [
-        new Date(dto.entryWindowStart),
-        new Date(dto.entryWindowEnd),
-        new Date(dto.drawAt),
-        dto.claimWindowDays,
-        seasonId,
-        dto.monthNumber,
-      ],
+      [seasonId, dto.monthNumber],
     );
     if (existing[0]) {
       this.assertExistingDrawReplay(existing[0], dto);
@@ -328,7 +321,18 @@ export class OwnerPortalDrawWorkflowService {
     existing: ExistingDrawRunRow,
     dto: PrepareOwnerDrawDto,
   ) {
-    if (Number(existing.exactReplay) !== 1) {
+    const canonicalIncoming = (value: string) =>
+      new Date(value).toISOString().slice(0, 23).replace('T', ' ');
+    const storedMilliseconds = (value: string) => value.slice(0, 23);
+    const exactReplay =
+      existing.monthNumber === dto.monthNumber &&
+      storedMilliseconds(existing.entryWindowStartUtc) ===
+        canonicalIncoming(dto.entryWindowStart) &&
+      storedMilliseconds(existing.entryWindowEndUtc) ===
+        canonicalIncoming(dto.entryWindowEnd) &&
+      storedMilliseconds(existing.drawAtUtc) === canonicalIncoming(dto.drawAt) &&
+      Number(existing.claimWindowDays) === dto.claimWindowDays;
+    if (!exactReplay) {
       throw new ConflictException(
         `Month ${dto.monthNumber} draw is already prepared with different entry window, draw time, or claim window settings`,
       );
