@@ -1,63 +1,24 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { ApiClientError, apiJson } from '@/lib/client-api';
 import { WorkspaceTabs } from '@/components/workspace-tabs';
+import { OwnerManagementShell } from './owner-management-shell';
 import styles from './owner-portal.module.css';
 
 export type OwnerControlSection = 'reports' | 'notifications' | 'support';
-type Section =
-  | 'dashboard'
-  | 'income'
-  | 'members'
-  | 'binary'
-  | 'placement'
-  | 'seasons'
-  | 'draw'
-  | 'winners'
-  | 'prizes'
-  | 'payments'
-  | 'wallet'
-  | 'epins'
-  | 'auth-codes'
-  | OwnerControlSection
-  | 'settings';
 type Row = Record<string, unknown>;
-type NavItem = { section: Section; label: string; symbol: string; group: string };
 type ReportPayload = { code: string; generatedAt: string; rowCount: number; rows: Row[] };
 
 const API = '/api/backend/admin/owner-portal';
-const NAV: NavItem[] = [
-  { section: 'dashboard', label: 'Dashboard', symbol: '▦', group: 'Main' },
-  { section: 'income', label: '9 Income Types', symbol: '↗', group: 'Main' },
-  { section: 'members', label: 'Members', symbol: '●', group: 'Main' },
-  { section: 'binary', label: 'Binary 2:2 • AB : CD', symbol: '◇', group: 'Main' },
-  { section: 'placement', label: 'Placement / Pairing', symbol: '⌁', group: 'Main' },
-  { section: 'seasons', label: 'Season Management', symbol: '□', group: 'Season & Draw' },
-  { section: 'draw', label: 'Monthly Draw', symbol: '◆', group: 'Season & Draw' },
-  { section: 'winners', label: 'Winners', symbol: '★', group: 'Season & Draw' },
-  { section: 'prizes', label: 'Prize Catalogue', symbol: '▣', group: 'Season & Draw' },
-  { section: 'payments', label: 'Payments / Bills', symbol: '¤', group: 'Finance & Security' },
-  { section: 'wallet', label: 'Wallet / Ledger', symbol: '▤', group: 'Finance & Security' },
-  { section: 'epins', label: 'E-PIN Management', symbol: '⌘', group: 'Finance & Security' },
-  { section: 'auth-codes', label: 'Auth Codes', symbol: '◈', group: 'Finance & Security' },
-  { section: 'reports', label: 'Reports', symbol: '▥', group: 'Control' },
-  { section: 'notifications', label: 'Notifications', symbol: '◉', group: 'Control' },
-  { section: 'support', label: 'Support', symbol: '?', group: 'Control' },
-  { section: 'settings', label: 'Settings', symbol: '⚙', group: 'Control' },
-];
 const TITLES: Record<OwnerControlSection, string> = {
   reports: 'Reports & Analytics',
   notifications: 'Notifications',
   support: 'Support & Help Centre',
 };
 
-function href(section: Section) {
-  return section === 'dashboard' ? '/operations' : `/portal/${section}`;
-}
 function text(value: unknown, fallback = '—') {
   if (value === null || value === undefined || value === '') return fallback;
   return String(value);
@@ -120,7 +81,6 @@ export function OwnerControlPortal({ section }: { section: OwnerControlSection }
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const [mobileMore, setMobileMore] = useState(false);
 
   const handleApiError = useCallback((err: unknown) => {
     if (err instanceof ApiClientError && err.status === 401) {
@@ -155,11 +115,6 @@ export function OwnerControlPortal({ section }: { section: OwnerControlSection }
     return () => window.clearTimeout(timer);
   }, [load]);
 
-  const grouped = useMemo(() => {
-    const groups = new Map<string, NavItem[]>();
-    NAV.forEach((item) => groups.set(item.group, [...(groups.get(item.group) ?? []), item]));
-    return [...groups.entries()];
-  }, []);
   const columns = useMemo(() => reportKeys(reportRows), [reportRows]);
 
   function showTab(id: string) {
@@ -183,15 +138,6 @@ export function OwnerControlPortal({ section }: { section: OwnerControlSection }
       return null;
     } finally {
       setBusy(false);
-    }
-  }
-
-  async function logout() {
-    setBusy(true);
-    try {
-      await fetch('/api/session/logout', { method: 'POST' });
-    } finally {
-      router.push('/login');
     }
   }
 
@@ -224,7 +170,8 @@ export function OwnerControlPortal({ section }: { section: OwnerControlSection }
 
   async function createNotification(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const native = event.nativeEvent as SubmitEvent;
     const action = (native.submitter as HTMLButtonElement | null)?.value ?? 'draft';
     const scheduledAt = formString(form, 'scheduledAt');
@@ -256,7 +203,7 @@ export function OwnerControlPortal({ section }: { section: OwnerControlSection }
     } else {
       await load();
     }
-    event.currentTarget.reset();
+    formElement.reset();
   }
 
   async function sendNotification(row: Row) {
@@ -272,7 +219,8 @@ export function OwnerControlPortal({ section }: { section: OwnerControlSection }
 
   async function createSupport(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     await run(
       () => apiJson(`${API}/support`, {
         method: 'POST',
@@ -286,7 +234,7 @@ export function OwnerControlPortal({ section }: { section: OwnerControlSection }
       }),
       'Support ticket created',
     );
-    event.currentTarget.reset();
+    formElement.reset();
     showTab('support-register');
   }
 
@@ -301,31 +249,11 @@ export function OwnerControlPortal({ section }: { section: OwnerControlSection }
   }
 
   return (
-    <div className={styles.shell}>
-      <aside className={styles.sidebar}>
-        <Link className={styles.brand} href="/operations"><span className={styles.logo}>MG</span><span><span className={styles.brandName}>MEGA<em>GOLDEN</em>CLUB</span><span className={styles.brandSub}>Professional Management Portal</span></span></Link>
-        <nav className={styles.menu}>{grouped.map(([group, items]) => <div key={group}><div className={styles.menuTitle}>{group}</div>{items.map((item) => <Link key={item.section} className={classNames(styles.navItem, section === item.section && styles.activeNav)} href={href(item.section)}><span>{item.symbol}</span><span>{item.label}</span></Link>)}</div>)}</nav>
-        <div className={styles.profile}><span className={styles.avatar}>A</span><div><b>Administrator</b><span>Owner management access</span></div></div>
-      </aside>
-
-      <main className={styles.main}>
-        <header className={styles.topbar}><div className={styles.crumb}><b>{TITLES[section]}</b><span>{text(settings.companyName, 'MegaGoldenClub')} • Professional management portal</span></div><div className={styles.actions}><button className={styles.logout} type="button" onClick={logout} disabled={busy}>LOG OUT</button></div></header>
-        <div className={styles.content}>
-          {error ? <div className={classNames(styles.notice, styles.error)}>{error}</div> : null}
-          {notice ? <div className={classNames(styles.notice, styles.success)}>{notice}</div> : null}
-          {section === 'reports' ? renderReports() : section === 'notifications' ? renderNotifications() : renderSupport()}
-        </div>
-      </main>
-
-      <nav className={styles.bottom}>
-        {(['dashboard', 'reports', 'notifications', 'support', 'settings'] as Section[]).map((key) => {
-          const item = NAV.find((entry) => entry.section === key)!;
-          return <Link key={key} className={section === key ? styles.activeBottom : ''} href={href(key)}><strong>{item.symbol}</strong>{key === 'dashboard' ? 'Home' : item.label.split(' ')[0]}</Link>;
-        })}
-        <button type="button" onClick={() => setMobileMore(true)} className={mobileMore ? styles.activeBottom : ''}><strong>☰</strong>More</button>
-      </nav>
-      {mobileMore ? <><div className={styles.drawerBackdrop} onClick={() => setMobileMore(false)} /><div className={styles.mobileMore}><div className={styles.drawerHead}><b>All management tools</b><button type="button" onClick={() => setMobileMore(false)}>×</button></div>{NAV.map((item) => <Link key={item.section} className={classNames(styles.navItem, section === item.section && styles.activeNav)} href={href(item.section)} onClick={() => setMobileMore(false)}><span>{item.symbol}</span><span>{item.label}</span></Link>)}<button className={classNames(styles.button, styles.dark)} type="button" onClick={logout}>LOG OUT</button></div></> : null}
-    </div>
+    <OwnerManagementShell title={TITLES[section]} currentSection={section}>
+      {error ? <div className={classNames(styles.notice, styles.error)}>{error}</div> : null}
+      {notice ? <div className={classNames(styles.notice, styles.success)}>{notice}</div> : null}
+      {section === 'reports' ? renderReports() : section === 'notifications' ? renderNotifications() : renderSupport()}
+    </OwnerManagementShell>
   );
 
   function renderReports() {
@@ -366,7 +294,7 @@ export function OwnerControlPortal({ section }: { section: OwnerControlSection }
         {(activeTab) => <>
           {activeTab === 'support-create' ? <div className={styles.card}><SectionHead icon="+" title="Create Support Ticket" /><form method="post" onSubmit={createSupport}><div className={styles.fields}><Field label="Member / User ID"><input name="memberReference" className={styles.input} placeholder="Optional existing member" /></Field><Field label="Category"><select name="category" className={styles.select}><option>Payment</option><option>E-PIN</option><option>Binary Placement</option><option>Lucky Draw</option><option>Account</option></select></Field><Field label="Priority"><select name="priority" className={styles.select}><option value="NORMAL">Normal</option><option value="HIGH">High</option><option value="URGENT">Urgent</option></select></Field><Field label="Contact"><input name="contact" className={styles.input} placeholder="Phone / email" /></Field><Field label="Issue Description" full><textarea name="description" className={styles.textarea} required placeholder="Describe the issue" /></Field></div><div className={styles.buttonLine}><button className={styles.button} disabled={busy}>CREATE SUPPORT TICKET</button></div></form></div> : null}
           {activeTab === 'support-register' ? <div className={styles.card}><SectionHead icon="≡" title="Ticket Register" />{data.length ? <div className={styles.tableBox}><table className={styles.table}><thead><tr><th>TICKET</th><th>MEMBER</th><th>CATEGORY</th><th>PRIORITY</th><th>STATUS</th><th>CREATED</th><th>ACTION</th></tr></thead><tbody>{data.map((row) => { const status = text(row.status); return <tr key={text(row.id)}><td><b>{text(row.ticketNumber)}</b></td><td>{text(row.memberUsername, row.memberReference ? text(row.memberReference) : '—')}</td><td>{text(row.category)}</td><td>{text(row.priority)}</td><td className={status === 'RESOLVED' || status === 'CLOSED' ? styles.status : ''}>{status}</td><td>{dateTime(row.createdAt)}</td><td>{status === 'OPEN' ? <button type="button" className={styles.button} onClick={() => void updateSupport(text(row.id), 'IN_PROGRESS')} disabled={busy}>START</button> : status === 'IN_PROGRESS' ? <button type="button" className={classNames(styles.button, styles.green)} onClick={() => void updateSupport(text(row.id), 'RESOLVED')} disabled={busy}>RESOLVE</button> : status === 'RESOLVED' ? <button type="button" className={classNames(styles.button, styles.dark)} onClick={() => void updateSupport(text(row.id), 'CLOSED')} disabled={busy}>CLOSE</button> : '—'}</td></tr>; })}</tbody></table></div> : <Empty />}</div> : null}
-          {activeTab === 'support-help' ? <div className={styles.card}><SectionHead icon="?" title="Common Help Topics" /><div className={styles.notice}>Account registration • E-PIN validation • AB/CD placement • AC + BD pair calculation • EMI receipts • Draw eligibility • Winner verification • Profile/security.</div></div> : null}
+          {activeTab === 'support-help' ? <div className={styles.card}><SectionHead icon="?" title="Common Help Topics" /><div className={styles.notice}>Account registration • E-PIN validation • A/B/C/D placement • A:C + B:D pair calculation • EMI receipts • Draw eligibility • Winner verification • Profile/security.</div></div> : null}
         </>}
       </WorkspaceTabs>
     </>;
