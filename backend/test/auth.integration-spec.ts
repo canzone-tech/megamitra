@@ -260,7 +260,6 @@ describe('MegaGoldenClub auth integration', () => {
         email,
         password,
         fullName: 'Integration Member',
-        memberType: 'PARTNER',
         epin,
       }),
     });
@@ -385,8 +384,15 @@ describe('MegaGoldenClub auth integration', () => {
     expect(correctButLocked.status).toBe(401);
   });
 
-  it('requires E-PIN, exposes safe sponsor lookup, auto-places public signup, and rejects E-PIN replay', async () => {
+  it('uses MEMBER-only registration, safe sponsor lookup, E-PIN replay protection, and seeds AGENT', async () => {
     const suffix = randomUUID().replaceAll('-', '').slice(0, 12);
+    const [memberRole, agentRole] = await Promise.all([
+      prisma.role.findUniqueOrThrow({ where: { name: 'MEMBER' } }),
+      prisma.role.findUniqueOrThrow({ where: { name: 'AGENT' } }),
+    ]);
+    expect(memberRole.status).toBe('ACTIVE');
+    expect(agentRole.status).toBe('ACTIVE');
+
     const sponsor = await prisma.user.create({
       data: {
         username: `sponsor_${suffix}`,
@@ -399,8 +405,9 @@ describe('MegaGoldenClub auth integration', () => {
       },
     });
     createdUserIds.push(sponsor.id);
+    await prisma.userRole.create({ data: { userId: sponsor.id, roleId: memberRole.id } });
     await prisma.$executeRawUnsafe(
-      `INSERT INTO member_profiles (userId, memberType) VALUES (?, 'PARTNER')`,
+      `INSERT INTO member_profiles (userId, memberType) VALUES (?, 'MEMBER')`,
       sponsor.id,
     );
 
@@ -408,6 +415,7 @@ describe('MegaGoldenClub auth integration', () => {
     expect(registrationConfig.status).toBe(200);
     expect(registrationConfig.body.epinRequired).toBe(true);
     expect(registrationConfig.body.sponsorLookupEnabled).toBe(true);
+    expect(registrationConfig.body.accountRole).toBe('MEMBER');
 
     const sponsorLookup = await request(
       `/auth/sponsor?reference=${encodeURIComponent(sponsor.email ?? '')}`,
@@ -417,9 +425,10 @@ describe('MegaGoldenClub auth integration', () => {
       id: sponsor.id,
       username: sponsor.username,
       fullName: 'Sponsor Member',
-      memberType: 'PARTNER',
+      role: 'MEMBER',
       status: 'ACTIVE',
     });
+    expect(sponsorLookup.body.memberType).toBeUndefined();
     expect(sponsorLookup.body.email).toBeUndefined();
     expect(sponsorLookup.body.phone).toBeUndefined();
 
@@ -431,10 +440,27 @@ describe('MegaGoldenClub auth integration', () => {
         password: 'Integration-Pass-123!',
         fullName: 'Missing Epin',
         sponsorReference: sponsor.username,
-        memberType: 'PARTNER',
       }),
     });
     expect(missingEpin.status).toBe(400);
+
+    const deprecatedEpin = `OLD-${suffix}`;
+    await createEpin(deprecatedEpin);
+    const deprecatedMemberType = await request('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({
+        username: `deprecated_${suffix}`,
+        email: `deprecated_${suffix}@example.test`,
+        password: 'Integration-Pass-123!',
+        fullName: 'Deprecated Member Type',
+        sponsorReference: sponsor.username,
+        memberType: 'PARTNER',
+        epin: deprecatedEpin,
+      }),
+    });
+    expect(deprecatedMemberType.status).toBe(400);
+    const deprecatedUser = await prisma.user.findUnique({ where: { username: `deprecated_${suffix}` } });
+    expect(deprecatedUser).toBeNull();
 
     const epin = `PUB-${suffix}`;
     await createEpin(epin);
@@ -446,7 +472,6 @@ describe('MegaGoldenClub auth integration', () => {
         phone: `+9177${suffix.slice(0, 8)}`,
         password: 'Integration-Pass-123!',
         fullName: 'Public Member',
-        memberType: 'PARTNER',
         sponsorReference: sponsor.username,
         epin,
       }),
@@ -456,6 +481,17 @@ describe('MegaGoldenClub auth integration', () => {
     createdUserIds.push(memberUserId);
     expect(registered.body.sponsor).toMatchObject({ id: sponsor.id, username: sponsor.username });
     expect(['A', 'B', 'C', 'D']).toContain(String(registered.body.placement?.slot));
+
+    const createdMemberRole = await prisma.userRole.findFirst({
+      where: { userId: memberUserId },
+      include: { role: true },
+    });
+    expect(createdMemberRole?.role.name).toBe('MEMBER');
+    const profiles = await prisma.$queryRawUnsafe<Array<{ memberType: string }>>(
+      'SELECT memberType FROM member_profiles WHERE userId=? LIMIT 1',
+      memberUserId,
+    );
+    expect(profiles[0]?.memberType).toBe('MEMBER');
 
     const relationship = await prisma.sponsorRelationship.findUnique({
       where: { memberUserId },
@@ -485,7 +521,6 @@ describe('MegaGoldenClub auth integration', () => {
         password: 'Integration-Pass-123!',
         fullName: 'Replay Member',
         sponsorReference: sponsor.username,
-        memberType: 'PARTNER',
         epin,
       }),
     });
@@ -518,7 +553,6 @@ describe('MegaGoldenClub auth integration', () => {
         username: `admin_created_${suffix}`,
         fullName: 'Admin Created Member',
         password: 'Integration-Pass-123!',
-        memberType: 'PARTNER',
         sponsorReference: sponsor.username,
         placement: 'AUTO',
       }),
