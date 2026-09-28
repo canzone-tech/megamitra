@@ -1,53 +1,18 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { ApiClientError, apiJson } from '@/lib/client-api';
+import { OwnerManagementShell } from './owner-management-shell';
 import { WorkspaceTabs } from '@/components/workspace-tabs';
 import styles from './owner-portal.module.css';
 
 export type OwnerFinanceSection = 'payments' | 'wallet' | 'epins' | 'auth-codes';
-type Section =
-  | 'dashboard'
-  | 'income'
-  | 'members'
-  | 'binary'
-  | 'placement'
-  | 'seasons'
-  | 'draw'
-  | 'winners'
-  | 'prizes'
-  | OwnerFinanceSection
-  | 'reports'
-  | 'notifications'
-  | 'support'
-  | 'settings';
 type Row = Record<string, unknown>;
 type Settings = { companyName?: string; currencyCode?: string; timezone?: string };
-type NavItem = { section: Section; label: string; symbol: string; group: string };
 
 const API = '/api/backend/admin/owner-portal';
-const NAV: NavItem[] = [
-  { section: 'dashboard', label: 'Dashboard', symbol: '▦', group: 'Main' },
-  { section: 'income', label: '9 Income Types', symbol: '↗', group: 'Main' },
-  { section: 'members', label: 'Members', symbol: '●', group: 'Main' },
-  { section: 'binary', label: 'Binary 2:2 • AB : CD', symbol: '◇', group: 'Main' },
-  { section: 'placement', label: 'Placement / Pairing', symbol: '⌁', group: 'Main' },
-  { section: 'seasons', label: 'Season Management', symbol: '□', group: 'Season & Draw' },
-  { section: 'draw', label: 'Monthly Draw', symbol: '◆', group: 'Season & Draw' },
-  { section: 'winners', label: 'Winners', symbol: '★', group: 'Season & Draw' },
-  { section: 'prizes', label: 'Prize Catalogue', symbol: '▣', group: 'Season & Draw' },
-  { section: 'payments', label: 'Payments / Bills', symbol: '¤', group: 'Finance & Security' },
-  { section: 'wallet', label: 'Wallet / Ledger', symbol: '▤', group: 'Finance & Security' },
-  { section: 'epins', label: 'E-PIN Management', symbol: '⌘', group: 'Finance & Security' },
-  { section: 'auth-codes', label: 'Auth Codes', symbol: '◈', group: 'Finance & Security' },
-  { section: 'reports', label: 'Reports', symbol: '▥', group: 'Control' },
-  { section: 'notifications', label: 'Notifications', symbol: '◉', group: 'Control' },
-  { section: 'support', label: 'Support', symbol: '?', group: 'Control' },
-  { section: 'settings', label: 'Settings', symbol: '⚙', group: 'Control' },
-];
 const TITLES: Record<OwnerFinanceSection, string> = {
   payments: 'Payments / Bills',
   wallet: 'Wallet / Ledger',
@@ -55,9 +20,6 @@ const TITLES: Record<OwnerFinanceSection, string> = {
   'auth-codes': 'Auth Codes',
 };
 
-function href(section: Section) {
-  return section === 'dashboard' ? '/operations' : `/portal/${section}`;
-}
 function text(value: unknown, fallback = '—') {
   if (value === null || value === undefined || value === '') return fallback;
   return String(value);
@@ -120,7 +82,6 @@ export function OwnerFinancePortal({ section }: { section: OwnerFinanceSection }
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
-  const [mobileMore, setMobileMore] = useState(false);
 
   const handleApiError = useCallback((err: unknown) => {
     if (err instanceof ApiClientError && err.status === 401) {
@@ -166,12 +127,6 @@ export function OwnerFinancePortal({ section }: { section: OwnerFinanceSection }
     return () => window.clearTimeout(timer);
   }, [load]);
 
-  const grouped = useMemo(() => {
-    const groups = new Map<string, NavItem[]>();
-    NAV.forEach((item) => groups.set(item.group, [...(groups.get(item.group) ?? []), item]));
-    return [...groups.entries()];
-  }, []);
-
   const currencyCode = text(settings.currencyCode, 'INR');
 
   function showTab(id: string) {
@@ -195,15 +150,6 @@ export function OwnerFinancePortal({ section }: { section: OwnerFinanceSection }
       return null;
     } finally {
       setBusy(false);
-    }
-  }
-
-  async function logout() {
-    setBusy(true);
-    try {
-      await fetch('/api/session/logout', { method: 'POST' });
-    } finally {
-      router.push('/login');
     }
   }
 
@@ -306,29 +252,11 @@ export function OwnerFinancePortal({ section }: { section: OwnerFinanceSection }
   }
 
   return (
-    <div className={styles.shell}>
-      <aside className={styles.sidebar}>
-        <Link className={styles.brand} href="/operations"><span className={styles.logo}>MG</span><span><span className={styles.brandName}>MEGA<em>GOLDEN</em>CLUB</span><span className={styles.brandSub}>Professional Management Portal</span></span></Link>
-        <nav className={styles.menu}>{grouped.map(([group, items]) => <div key={group}><div className={styles.menuTitle}>{group}</div>{items.map((item) => <Link key={item.section} className={classNames(styles.navItem, section === item.section && styles.activeNav)} href={href(item.section)}><span>{item.symbol}</span><span>{item.label}</span></Link>)}</div>)}</nav>
-        <div className={styles.profile}><span className={styles.avatar}>A</span><div><b>Administrator</b><span>Owner management access</span></div></div>
-      </aside>
-      <main className={styles.main}>
-        <header className={styles.topbar}><div className={styles.crumb}><b>{TITLES[section]}</b><span>{text(settings.companyName, 'MegaGoldenClub')} • Professional management portal</span></div><div className={styles.actions}><button className={styles.logout} type="button" onClick={logout} disabled={busy}>LOG OUT</button></div></header>
-        <div className={styles.content}>
-          {error ? <div className={classNames(styles.notice, styles.error)}>{error}</div> : null}
-          {notice ? <div className={classNames(styles.notice, styles.success)}>{notice}</div> : null}
-          {section === 'payments' ? renderPayments() : section === 'wallet' ? renderWallet() : section === 'epins' ? renderEpins() : renderAuthCodes()}
-        </div>
-      </main>
-      <nav className={styles.bottom}>
-        {(['dashboard', 'payments', 'wallet', 'epins', 'auth-codes'] as Section[]).map((key) => {
-          const item = NAV.find((entry) => entry.section === key)!;
-          return <Link key={key} className={section === key ? styles.activeBottom : ''} href={href(key)}><strong>{item.symbol}</strong>{key === 'dashboard' ? 'Home' : item.label.split(' ')[0]}</Link>;
-        })}
-        <button type="button" onClick={() => setMobileMore(true)} className={mobileMore ? styles.activeBottom : ''}><strong>☰</strong>More</button>
-      </nav>
-      {mobileMore ? <><div className={styles.drawerBackdrop} onClick={() => setMobileMore(false)} /><div className={styles.mobileMore}><div className={styles.drawerHead}><b>All management tools</b><button type="button" onClick={() => setMobileMore(false)}>×</button></div>{NAV.map((item) => <Link key={item.section} className={classNames(styles.navItem, section === item.section && styles.activeNav)} href={href(item.section)} onClick={() => setMobileMore(false)}><span>{item.symbol}</span><span>{item.label}</span></Link>)}<button className={classNames(styles.button, styles.dark)} type="button" onClick={logout}>LOG OUT</button></div></> : null}
-    </div>
+    <OwnerManagementShell title={TITLES[section]} currentSection={section}>
+      {error ? <div className={classNames(styles.notice, styles.error)}>{error}</div> : null}
+      {notice ? <div className={classNames(styles.notice, styles.success)}>{notice}</div> : null}
+      {section === 'payments' ? renderPayments() : section === 'wallet' ? renderWallet() : section === 'epins' ? renderEpins() : renderAuthCodes()}
+    </OwnerManagementShell>
   );
 
   function renderPayments() {
