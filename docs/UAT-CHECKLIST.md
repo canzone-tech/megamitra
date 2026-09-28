@@ -9,7 +9,8 @@ Use this checklist against a release candidate after automated verification is g
 - [ ] `npm run verify` passes on the target-like environment.
 - [ ] `/health/live` returns HTTP 200.
 - [ ] `/health/ready` returns HTTP 200 with MySQL, Redis and MongoDB `up`.
-- [ ] `npm run uat:smoke` passes; authenticated admin/member smoke is run when tokens are available.
+- [ ] `npm run uat:smoke` passes; authenticated admin/member runtime smoke is run when tokens are available.
+- [ ] Integration tests pass authenticated admin/member authorization, self-scoping and core read-model checks even when external UAT tokens are not supplied.
 
 ## Identity and access
 
@@ -28,11 +29,18 @@ Use this checklist against a release candidate after automated verification is g
 - [ ] Confirm an eligible refund and verify allocation/reversal effects.
 - [ ] Verify refund reconciliation-required cases appear in Operations and can be retried through the existing audited action.
 
-## Binary and referral
+## Binary 1:4 and referral
 
-- [ ] Confirm qualifying units reach the correct upline side under the published binary plan.
+- [ ] Confirm a placement parent can hold authoritative slots `A`, `B`, `C` and `D` in deterministic slot order.
+- [ ] Confirm `A/B` aggregate to `LEFT` and `C/D` aggregate to `RIGHT` for settlement/reporting without losing authoritative slot identity.
+- [ ] Confirm a second placement into an already occupied parent slot is rejected.
+- [ ] Confirm auto-placement fills `A -> B -> C -> D` before traversing below existing children.
+- [ ] Confirm ancestry preserves both first-leg slot and derived aggregate side.
+- [ ] Confirm qualifying units reach the correct upline aggregate side from their authoritative first-leg slot.
+- [ ] Confirm the current 1:4 plan matches only the fixed lanes `A:C` and `B:D`; generic cross-pairing is not accepted.
 - [ ] Run/match settlement and verify paid pairs, cap handling and carry-forward display.
 - [ ] Replay settlement/source operations and verify duplicate payout is prevented.
+- [ ] Confirm legacy LEFT/RIGHT compatibility inputs do not override or collapse existing `A/B/C/D` placement authority.
 - [ ] Confirm direct referral reward posting under the published referral policy.
 - [ ] Refund a referred payment and verify configured referral reversal/reconciliation behavior.
 
@@ -65,7 +73,7 @@ Use this checklist against a release candidate after automated verification is g
 ## Member portal
 
 - [ ] Dashboard reflects authoritative wallet balance, outstanding installments and progress.
-- [ ] Binary today/settlement/carry-forward context matches backend records.
+- [ ] Binary today/settlement/carry-forward context matches backend records and the member's authoritative 1:4 genealogy.
 - [ ] Referral rewards show gross/reversed/net effects correctly.
 - [ ] Withdrawal/payout, draw/benefit and entitlement statuses match admin/operations records.
 - [ ] Desktop sidebar/topbar and mobile navigation are usable at the supported breakpoints.
@@ -73,6 +81,7 @@ Use this checklist against a release candidate after automated verification is g
 ## Admin presentation and configuration
 
 - [ ] Business-plan published versions are immutable; new changes require a draft/new version.
+- [ ] Binary business-plan editing preserves the locked 1:4 topology and does not expose it as an arbitrary two-leg ratio.
 - [ ] Theme editor changes sidebar, topbar and color/gradient controls in preview.
 - [ ] Publishing a presentation version changes the intended runtime surface.
 - [ ] Historical published/retired presentation versions remain inspectable.
