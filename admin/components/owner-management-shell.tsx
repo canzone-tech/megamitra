@@ -4,59 +4,13 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import type { ReactNode } from 'react';
+import {
+  OWNER_MANAGEMENT_GROUPS,
+  OWNER_MANAGEMENT_NAV,
+  ownerManagementHref,
+  type OwnerManagementSection,
+} from './owner-management-nav';
 import styles from './owner-portal.module.css';
-
-type Section =
-  | 'dashboard'
-  | 'income'
-  | 'members'
-  | 'binary'
-  | 'placement'
-  | 'seasons'
-  | 'draw'
-  | 'winners'
-  | 'prizes'
-  | 'payments'
-  | 'wallet'
-  | 'epins'
-  | 'auth-codes'
-  | 'reports'
-  | 'notifications'
-  | 'support'
-  | 'settings';
-
-type NavItem = { section: Section; label: string; symbol: string; group: string };
-
-const NAV: NavItem[] = [
-  { section: 'dashboard', label: 'Dashboard', symbol: '▦', group: 'Main' },
-  { section: 'income', label: '9 Income Types', symbol: '↗', group: 'Main' },
-  { section: 'members', label: 'Members', symbol: '●', group: 'Main' },
-  { section: 'binary', label: 'Binary 1:4', symbol: '◇', group: 'Main' },
-  { section: 'placement', label: 'Placement / Pairing', symbol: '⌁', group: 'Main' },
-  { section: 'seasons', label: 'Season Management', symbol: '□', group: 'Season & Draw' },
-  { section: 'draw', label: 'Monthly Draw', symbol: '◆', group: 'Season & Draw' },
-  { section: 'winners', label: 'Winners', symbol: '★', group: 'Season & Draw' },
-  { section: 'prizes', label: 'Prize Catalogue', symbol: '▣', group: 'Season & Draw' },
-  { section: 'payments', label: 'Payments / Bills', symbol: '¤', group: 'Finance & Security' },
-  { section: 'wallet', label: 'Wallet / Ledger', symbol: '▤', group: 'Finance & Security' },
-  { section: 'epins', label: 'E-PIN Management', symbol: '⌘', group: 'Finance & Security' },
-  { section: 'auth-codes', label: 'Auth Codes', symbol: '◈', group: 'Finance & Security' },
-  { section: 'reports', label: 'Reports', symbol: '▥', group: 'Control' },
-  { section: 'notifications', label: 'Notifications', symbol: '◉', group: 'Control' },
-  { section: 'support', label: 'Support', symbol: '?', group: 'Control' },
-  { section: 'settings', label: 'Settings', symbol: '⚙', group: 'Control' },
-];
-
-const GROUPED = NAV.reduce<Array<[string, NavItem[]]>>((groups, item) => {
-  const current = groups.find(([group]) => group === item.group);
-  if (current) current[1].push(item);
-  else groups.push([item.group, [item]]);
-  return groups;
-}, []);
-
-function href(section: Section) {
-  return section === 'dashboard' ? '/operations' : `/portal/${section}`;
-}
 
 function classNames(...values: Array<string | false | null | undefined>) {
   return values.filter(Boolean).join(' ');
@@ -68,7 +22,7 @@ export function OwnerManagementShell({
   children,
 }: {
   title: string;
-  currentSection?: Section;
+  currentSection?: OwnerManagementSection;
   currentPath?: string;
   children: ReactNode;
 }) {
@@ -96,14 +50,14 @@ export function OwnerManagementShell({
           </span>
         </Link>
         <nav className={styles.menu}>
-          {GROUPED.map(([group, items]) => (
+          {OWNER_MANAGEMENT_GROUPS.map(([group, items]) => (
             <div key={group}>
               <div className={styles.menuTitle}>{group}</div>
               {items.map((item) => (
                 <Link
                   key={item.section}
                   className={classNames(styles.navItem, currentSection === item.section && styles.activeNav)}
-                  href={href(item.section)}
+                  href={ownerManagementHref(item.section)}
                 >
                   <span>{item.symbol}</span><span>{item.label}</span>
                 </Link>
@@ -128,10 +82,10 @@ export function OwnerManagementShell({
       </main>
 
       <nav className={styles.bottom}>
-        {(['dashboard', 'income', 'binary', 'seasons', 'draw'] as Section[]).map((key) => {
-          const item = NAV.find((entry) => entry.section === key)!;
+        {(['dashboard', 'income', 'binary', 'seasons', 'draw'] as OwnerManagementSection[]).map((key) => {
+          const item = OWNER_MANAGEMENT_NAV.find((entry) => entry.section === key)!;
           return (
-            <Link key={key} className={currentSection === key ? styles.activeBottom : ''} href={href(key)}>
+            <Link key={key} className={currentSection === key ? styles.activeBottom : ''} href={ownerManagementHref(key)}>
               <strong>{item.symbol}</strong>{key === 'dashboard' ? 'Home' : item.label.split(' ')[0]}
             </Link>
           );
@@ -143,8 +97,8 @@ export function OwnerManagementShell({
         <div className={styles.drawerBackdrop} onClick={() => setMobileMore(false)} />
         <div className={styles.mobileMore}>
           <div className={styles.drawerHead}><b>All management tools</b><button type="button" onClick={() => setMobileMore(false)}>×</button></div>
-          {NAV.map((item) => (
-            <Link key={item.section} className={classNames(styles.navItem, currentSection === item.section && styles.activeNav)} href={href(item.section)} onClick={() => setMobileMore(false)}>
+          {OWNER_MANAGEMENT_NAV.map((item) => (
+            <Link key={item.section} className={classNames(styles.navItem, currentSection === item.section && styles.activeNav)} href={ownerManagementHref(item.section)} onClick={() => setMobileMore(false)}>
               <span>{item.symbol}</span><span>{item.label}</span>
             </Link>
           ))}
