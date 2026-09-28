@@ -103,6 +103,25 @@ export async function loginMember(payload: unknown): Promise<{ response: Respons
   });
   if (!meResponse.ok) return { response: meResponse };
   const user = (await meResponse.json()) as SessionUser;
+
+  if (!user.roles.includes('MEMBER')) {
+    await fetch(`${apiBaseUrl()}/auth/logout`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${tokens.accessToken}` },
+      cache: 'no-store',
+    }).catch(() => undefined);
+    return {
+      response: new Response(
+        JSON.stringify({
+          statusCode: 403,
+          code: 'FORBIDDEN',
+          message: 'Member access is not assigned',
+        }),
+        { status: 403, headers: { 'content-type': 'application/json' } },
+      ),
+    };
+  }
+
   await writeSession(tokens);
   return { response, user };
 }
