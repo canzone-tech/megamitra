@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { createHmac, randomUUID } from 'node:crypto';
 import { AppModule } from '../src/app.module';
+import { PasswordService } from '../src/auth/password.service';
 import { configureApp } from '../src/bootstrap/configure-app';
 import { PrismaService } from '../src/database/prisma.service';
 import {
@@ -50,6 +51,7 @@ describe('MegaGoldenClub auth integration', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let config: ConfigService;
+  let passwords: PasswordService;
   let baseUrl: string;
   const createdUserIds: string[] = [];
   const epinIds: string[] = [];
@@ -100,6 +102,7 @@ describe('MegaGoldenClub auth integration', () => {
     baseUrl = await app.getUrl();
     prisma = app.get(PrismaService);
     config = app.get(ConfigService);
+    passwords = app.get(PasswordService);
 
     const [auth, security, registration] = await Promise.all([
       prisma.systemAuthConfig.findUniqueOrThrow({ where: { id: 1 } }),
@@ -196,6 +199,31 @@ describe('MegaGoldenClub auth integration', () => {
         await prisma.$executeRawUnsafe(
           `DELETE FROM owner_epins WHERE id IN (${epinIds.map(() => '?').join(',')})`,
           ...epinIds,
+        );
+      }
+      if (createdUserIds.length) {
+        const placeholders = createdUserIds.map(() => '?').join(',');
+        await prisma.$executeRawUnsafe(
+          `DELETE FROM binary_ancestry
+           WHERE ancestorUserId IN (${placeholders}) OR descendantUserId IN (${placeholders})`,
+          ...createdUserIds,
+          ...createdUserIds,
+        );
+        await prisma.$executeRawUnsafe(
+          `DELETE FROM binary_placements
+           WHERE memberUserId IN (${placeholders}) OR parentUserId IN (${placeholders})`,
+          ...createdUserIds,
+          ...createdUserIds,
+        );
+        await prisma.$executeRawUnsafe(
+          `DELETE FROM sponsor_relationships
+           WHERE memberUserId IN (${placeholders}) OR sponsorUserId IN (${placeholders})`,
+          ...createdUserIds,
+          ...createdUserIds,
+        );
+        await prisma.$executeRawUnsafe(
+          `DELETE FROM member_profiles WHERE userId IN (${placeholders})`,
+          ...createdUserIds,
         );
       }
       await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
@@ -355,5 +383,146 @@ describe('MegaGoldenClub auth integration', () => {
       body: JSON.stringify({ identifier: username, password }),
     });
     expect(correctButLocked.status).toBe(401);
+  });
+
+  it('requires E-PIN, exposes safe sponsor lookup, auto-places public signup, and rejects E-PIN replay', async () => {
+    const suffix = randomUUID().replaceAll('-', '').slice(0, 12);
+    const sponsor = await prisma.user.create({
+      data: {
+        username: `sponsor_${suffix}`,
+        email: `sponsor_${suffix}@example.test`,
+        phone: `+9198${suffix.slice(0, 8)}`,
+        passwordHash: 'lookup-only',
+        firstName: 'Sponsor',
+        lastName: 'Member',
+        status: UserStatus.ACTIVE,
+      },
+    });
+    createdUserIds.push(sponsor.id);
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO member_profiles (userId, memberType) VALUES (?, 'PARTNER')`,
+      sponsor.id,
+    );
+
+    const registrationConfig = await request('/auth/registration-config');
+    expect(registrationConfig.status).toBe(200);
+    expect(registrationConfig.body.epinRequired).toBe(true);
+    expect(registrationConfig.body.sponsorLookupEnabled).toBe(true);
+
+    const sponsorLookup = await request(
+      `/auth/sponsor?reference=${encodeURIComponent(sponsor.email ?? '')}`,
+    );
+    expect(sponsorLookup.status).toBe(200);
+    expect(sponsorLookup.body).toMatchObject({
+      id: sponsor.id,
+      username: sponsor.username,
+      fullName: 'Sponsor Member',
+      memberType: 'PARTNER',
+      status: 'ACTIVE',
+    });
+    expect(sponsorLookup.body.email).toBeUndefined();
+    expect(sponsorLookup.body.phone).toBeUndefined();
+
+    const missingEpin = await request('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({
+        username: `missing_epin_${suffix}`,
+        email: `missing_epin_${suffix}@example.test`,
+        password: 'Integration-Pass-123!',
+        fullName: 'Missing Epin',
+        sponsorReference: sponsor.username,
+        memberType: 'PARTNER',
+      }),
+    });
+    expect(missingEpin.status).toBe(400);
+
+    const epin = `PUB-${suffix}`;
+    await createEpin(epin);
+    const registered = await request('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({
+        username: `public_${suffix}`,
+        email: `public_${suffix}@example.test`,
+        phone: `+9177${suffix.slice(0, 8)}`,
+        password: 'Integration-Pass-123!',
+        fullName: 'Public Member',
+        memberType: 'PARTNER',
+        sponsorReference: sponsor.username,
+        epin,
+      }),
+    });
+    expect(registered.status).toBe(201);
+    const memberUserId = String(registered.body.user.id);
+    createdUserIds.push(memberUserId);
+    expect(registered.body.sponsor).toMatchObject({ id: sponsor.id, username: sponsor.username });
+    expect(['A', 'B', 'C', 'D']).toContain(String(registered.body.placement?.slot));
+
+    const relationship = await prisma.sponsorRelationship.findUnique({
+      where: { memberUserId },
+    });
+    expect(relationship?.sponsorUserId).toBe(sponsor.id);
+
+    const placements = await prisma.$queryRawUnsafe<Array<{ parentUserId: string; slot: string; side: string }>>(
+      'SELECT parentUserId, slot, side FROM binary_placements WHERE memberUserId=? LIMIT 1',
+      memberUserId,
+    );
+    expect(placements[0]?.parentUserId).toBe(sponsor.id);
+    expect(['A', 'B', 'C', 'D']).toContain(placements[0]?.slot);
+
+    const epinRows = await prisma.$queryRawUnsafe<Array<{ status: string; usedByUserId: string | null }>>(
+      'SELECT status, usedByUserId FROM owner_epins WHERE pinHash=? LIMIT 1',
+      createHmac('sha256', config.getOrThrow<string>('CAPTCHA_HMAC_SECRET'))
+        .update(`owner-portal:epin:${epin}`)
+        .digest('hex'),
+    );
+    expect(epinRows[0]).toMatchObject({ status: 'USED', usedByUserId: memberUserId });
+
+    const replay = await request('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({
+        username: `replay_${suffix}`,
+        email: `replay_${suffix}@example.test`,
+        password: 'Integration-Pass-123!',
+        fullName: 'Replay Member',
+        sponsorReference: sponsor.username,
+        memberType: 'PARTNER',
+        epin,
+      }),
+    });
+    expect(replay.status).toBe(400);
+    const replayUser = await prisma.user.findUnique({ where: { username: `replay_${suffix}` } });
+    expect(replayUser).toBeNull();
+
+    const adminPassword = 'Admin-Epin-Test-123!';
+    const admin = await prisma.user.create({
+      data: {
+        username: `admin_epin_${suffix}`,
+        passwordHash: await passwords.hash(adminPassword),
+        status: UserStatus.ACTIVE,
+        emailVerifiedAt: new Date(),
+      },
+    });
+    createdUserIds.push(admin.id);
+    const superAdminRole = await prisma.role.findUniqueOrThrow({ where: { name: 'SUPER_ADMIN' } });
+    await prisma.userRole.create({ data: { userId: admin.id, roleId: superAdminRole.id } });
+    const adminLogin = await request('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ identifier: admin.username, password: adminPassword }),
+    });
+    expect(adminLogin.status).toBe(200);
+
+    const adminMissingEpin = await request('/admin/owner-portal/core/members', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${adminLogin.body.accessToken}` },
+      body: JSON.stringify({
+        username: `admin_created_${suffix}`,
+        fullName: 'Admin Created Member',
+        password: 'Integration-Pass-123!',
+        memberType: 'PARTNER',
+        sponsorReference: sponsor.username,
+        placement: 'AUTO',
+      }),
+    });
+    expect(adminMissingEpin.status).toBe(400);
   });
 });
