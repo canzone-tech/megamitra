@@ -19,6 +19,7 @@ import {
 import type {
   FulfillOwnerWinnerDto,
   PrepareOwnerDrawDto,
+  VerifyOwnerWinnerDto,
 } from './owner-portal.dto';
 import { OwnerPortalService } from './owner-portal.service';
 
@@ -212,6 +213,76 @@ export class OwnerPortalDrawWorkflowService {
         recurrence: scheduleLabel,
         drawTimezone: season.drawTimezone,
       },
+    });
+    return this.portal.drawRun(runId);
+  }
+
+  async verifyWinner(
+    runId: string,
+    winnerId: string,
+    dto: VerifyOwnerWinnerDto,
+    actorUserId: string,
+  ) {
+    const verificationStatus =
+      dto.eligibilityStatus === 'PASS' &&
+      dto.identityStatus === 'PASS' &&
+      dto.paymentStatus === 'PASS'
+        ? 'VERIFIED'
+        : 'FAILED';
+
+    await this.db.transaction(async (connection) => {
+      const runRows = await connection.query<Array<{ status: string }>>(
+        'SELECT status FROM owner_draw_runs WHERE id=? FOR UPDATE',
+        [runId],
+      );
+      const run = runRows[0];
+      if (!run) throw new NotFoundException('Draw run not found');
+      if (!['SELECTED', 'VERIFICATION'].includes(run.status)) {
+        throw new ConflictException('Winner verification is not available at this stage');
+      }
+
+      const result = (await connection.query(
+        `UPDATE owner_winner_verifications
+         SET eligibilityStatus=?, identityStatus=?, paymentStatus=?, status=?, verifiedByUserId=?, verifiedAt=CURRENT_TIMESTAMP(3)
+         WHERE winnerId=? AND drawRunId=?`,
+        [
+          dto.eligibilityStatus,
+          dto.identityStatus,
+          dto.paymentStatus,
+          verificationStatus,
+          actorUserId,
+          winnerId,
+          runId,
+        ],
+      )) as { affectedRows?: number };
+      if (Number(result.affectedRows ?? 0) === 0) {
+        throw new NotFoundException('Winner record not found for this draw');
+      }
+
+      const verifications = await connection.query<Array<{ status: string }>>(
+        'SELECT status FROM owner_winner_verifications WHERE drawRunId=? FOR UPDATE',
+        [runId],
+      );
+      const allVerified =
+        verifications.length > 0 &&
+        verifications.every((verification) => verification.status === 'VERIFIED');
+      await connection.query(
+        'UPDATE owner_draw_runs SET status=?, verifiedAt=? WHERE id=?',
+        [
+          allVerified ? 'VERIFIED' : 'VERIFICATION',
+          allVerified ? new Date() : null,
+          runId,
+        ],
+      );
+    });
+
+    await this.audit.log({
+      actorUserId,
+      action: AuditAction.UPDATE,
+      entityType: 'OwnerWinnerVerification',
+      entityId: winnerId,
+      description: `Winner verification recorded as ${verificationStatus}`,
+      metadata: dto,
     });
     return this.portal.drawRun(runId);
   }
