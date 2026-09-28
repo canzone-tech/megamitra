@@ -1,1 +1,223 @@
-PLACEHOLDER
+name: Backend CI
+
+on:
+  push:
+    branches:
+      - main
+      - dev/local-foundation
+    paths:
+      - 'backend/**'
+      - 'package.json'
+      - 'scripts/**'
+      - 'admin/package.json'
+      - 'admin/package-lock.json'
+      - 'frontend/package.json'
+      - 'frontend/package-lock.json'
+      - '.github/workflows/backend-ci.yml'
+  pull_request:
+    paths:
+      - 'backend/**'
+      - 'package.json'
+      - 'scripts/**'
+      - 'admin/package.json'
+      - 'admin/package-lock.json'
+      - 'frontend/package.json'
+      - 'frontend/package-lock.json'
+      - '.github/workflows/backend-ci.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify-backend:
+    runs-on: ubuntu-24.04
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root_test_password
+          MYSQL_DATABASE: megamitra
+          MYSQL_USER: megamitra_app
+          MYSQL_PASSWORD: megamitra_test_password
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot_test_password"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+      mongodb:
+        image: mongo:8
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd="mongosh --quiet --eval 'db.runCommand({ ping: 1 }).ok'"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd="redis-cli ping"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      NODE_ENV: test
+      PORT: 3100
+      MYSQL_HOST: 127.0.0.1
+      MYSQL_PORT: 3306
+      MYSQL_DATABASE: megamitra
+      MYSQL_USER: megamitra_app
+      MYSQL_PASSWORD: megamitra_test_password
+      DATABASE_URL: mysql://megamitra_app:megamitra_test_password@127.0.0.1:3306/megamitra
+      MONGODB_URI: mongodb://127.0.0.1:27017/megamitra
+      REDIS_HOST: 127.0.0.1
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ''
+      CAPTCHA_HMAC_SECRET: ci-captcha-secret-00000000000000000000000000000000
+      JWT_ACCESS_SECRET: ci-access-secret-000000000000000000000000000000000
+      JWT_REFRESH_SECRET: ci-refresh-secret-00000000000000000000000000000000
+
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Verify root handoff and brand contract
+        run: node -e "const p=require('../package.json'); if (p.name !== 'megagoldenclub' || p.scripts?.verify !== 'npm --prefix backend run verify') process.exit(1)"
+
+      - name: Install exact dependencies
+        run: npm ci
+
+      - name: Verify dependency overrides
+        run: npm ls deepmerge-ts mariadb mongodb mysql2
+
+      - name: Validate operational scripts
+        run: bash -n scripts/*.sh
+
+      - name: Validate Prisma schema
+        run: npm run prisma:validate
+
+      - name: Generate Prisma client
+        run: npm run prisma:generate
+
+      - name: Apply migrations
+        run: npx prisma migrate deploy
+
+      - name: Verify migration status
+        run: npx prisma migrate status
+
+      - name: Verify MegaGoldenClub branding contract
+        run: bash ../scripts/verify-branding.sh
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test -- --runInBand
+
+      - name: Integration tests
+        run: npm run test:integration
+
+      - name: Build reproducibly
+        run: |
+          rm -rf dist
+          rm -f ./*.tsbuildinfo
+          npm run build
+          test -f dist/main.js
+          rm -rf dist
+          npm run build
+          test -f dist/main.js
+
+      - name: Verify compiled production API
+        run: |
+          test -f dist/main.js
+          LOG_FILE="$(mktemp -t megagoldenclub-api-ci.XXXXXX.log)"
+          API_PID=""
+
+          assert_port_available() {
+            node -e '
+              const net = require("node:net");
+              const port = Number(process.argv[1]);
+              const server = net.createServer();
+              server.once("error", () => process.exit(1));
+              server.listen({ host: "127.0.0.1", port, exclusive: true }, () => {
+                server.close((error) => process.exit(error ? 1 : 0));
+              });
+            ' 3100
+          }
+
+          terminate_api() {
+            if [[ -z "${API_PID}" ]]; then
+              return 0
+            fi
+            kill -TERM -- "-${API_PID}" 2>/dev/null || true
+            for _ in $(seq 1 20); do
+              if ! kill -0 -- "-${API_PID}" 2>/dev/null; then
+                break
+              fi
+              sleep 0.1
+            done
+            kill -KILL -- "-${API_PID}" 2>/dev/null || true
+            wait "${API_PID}" 2>/dev/null || true
+            API_PID=""
+          }
+
+          cleanup() {
+            terminate_api
+            rm -f "${LOG_FILE}"
+          }
+          trap cleanup EXIT INT TERM
+
+          if ! assert_port_available; then
+            echo 'Port 3100 is already in use before compiled API verification'
+            exit 1
+          fi
+
+          setsid npm run start:prod >"${LOG_FILE}" 2>&1 &
+          API_PID=$!
+
+          READY=""
+          for _ in $(seq 1 30); do
+            if ! kill -0 "${API_PID}" 2>/dev/null; then
+              echo 'Compiled MegaGoldenClub API exited during startup'
+              cat "${LOG_FILE}"
+              exit 1
+            fi
+            READY="$(curl -fsS http://127.0.0.1:3100/health/ready 2>/dev/null || true)"
+            if [[ "${READY}" == *'"service":"megagoldenclub-api"'* ]] && \
+               [[ "${READY}" == *'"mysql":"up"'* ]] && \
+               [[ "${READY}" == *'"redis":"up"'* ]] && \
+               [[ "${READY}" == *'"mongodb":"up"'* ]]; then
+              break
+            fi
+            sleep 1
+          done
+
+          if [[ "${READY}" != *'"service":"megagoldenclub-api"'* ]]; then
+            echo 'Compiled MegaGoldenClub API readiness failed'
+            cat "${LOG_FILE}"
+            exit 1
+          fi
+          printf '%s\n' "${READY}"
+
+          cleanup
+          trap - EXIT INT TERM
+          if ! assert_port_available; then
+            echo 'Compiled API cleanup left port 3100 in use'
+            exit 1
+          fi
