@@ -6,6 +6,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { ApiExceptionFilter } from '../http/api-exception.filter';
 import { createRequestHardeningMiddleware } from '../http/request-hardening.middleware';
 import { PermissionsGuard } from '../rbac/permissions.guard';
+import { RolesGuard } from '../rbac/roles.guard';
 import { RateLimitGuard } from '../security/rate-limit.guard';
 
 type ExpressLikeApplication = {
@@ -44,6 +45,7 @@ export function configureApp(app: INestApplication): void {
   app.useGlobalGuards(
     app.get(RateLimitGuard),
     app.get(JwtAuthGuard),
+    app.get(RolesGuard),
     app.get(PermissionsGuard),
   );
   app.enableShutdownHooks();
