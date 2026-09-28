@@ -11,6 +11,7 @@ Use this checklist against a release candidate after automated verification is g
 - [ ] `/health/ready` returns HTTP 200 with MySQL, Redis and MongoDB `up`.
 - [ ] `npm run uat:smoke` passes; authenticated admin/member runtime smoke is run when tokens are available.
 - [ ] Integration tests pass authenticated admin/member authorization, self-scoping and core read-model checks even when external UAT tokens are not supplied.
+- [ ] Owner lucky-draw schedule integration passes January/third-Sunday defaults, admin/member authorization, recurrence enforcement and exact-replay/conflicting-replay behavior.
 
 ## Identity and access
 
@@ -46,6 +47,11 @@ Use this checklist against a release candidate after automated verification is g
 
 ## Lucky draw and prize fulfilment
 
+- [ ] Confirm a new Season defaults to a January start, monthly recurrence and third Sunday in the Season draw timezone.
+- [ ] In DRAFT/REVIEW, change draw start month, week-of-month and weekday and verify the versioned Season calendar updates; after activation confirm the calendar is locked.
+- [ ] Prepare Month 1 on the configured calendar date and verify a wrong month/week/weekday is rejected.
+- [ ] Replay the exact same prepared-draw payload and verify the same draw run is returned without duplication.
+- [ ] Replay the same Season/month with a different entry window, draw time or claim window and verify HTTP 409/conflict rather than silently changing or reusing incompatible settings.
 - [ ] Create/snapshot/draw using the intended published draw policy/version.
 - [ ] Verify winner/claim records and deadlines.
 - [ ] Exercise claim then fulfilment using test references.
