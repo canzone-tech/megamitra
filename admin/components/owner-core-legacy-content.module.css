@@ -1,0 +1,21 @@
+.contentOnly > div {
+  display: block !important;
+  min-height: 0 !important;
+  background: transparent !important;
+}
+
+.contentOnly > div > aside,
+.contentOnly > div > nav,
+.contentOnly > div > main > header {
+  display: none !important;
+}
+
+.contentOnly > div > main {
+  min-width: 0 !important;
+  margin: 0 !important;
+}
+
+.contentOnly > div > main > div {
+  max-width: none !important;
+  padding: 0 !important;
+}
