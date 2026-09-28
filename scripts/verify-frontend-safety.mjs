@@ -23,7 +23,6 @@ const forbiddenCopy = [
   /canonical .*security flow/i,
   /\bJWT\b/i,
   /\b(?:access|refresh|bearer) token\b/i,
-  /Binary 2:2/i,
 ];
 
 const ownerConfigFiles = new Set([
@@ -88,6 +87,9 @@ for (const required of [
   "label: 'Roles & Permissions'",
 ]) {
   if (!navSource.includes(required)) failures.push(`${navPath}: missing canonical navigation entry ${required}`);
+}
+if (/Binary 2:2/i.test(navSource)) {
+  failures.push(`${navPath}: visible owner navigation must never expose legacy Binary 2:2 copy`);
 }
 for (const sharedPortal of [
   'admin/components/owner-finance-portal.tsx',
