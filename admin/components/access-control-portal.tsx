@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { ApiClientError, apiJson } from '@/lib/client-api';
 import { OwnerManagementShell } from './owner-management-shell';
@@ -230,7 +230,7 @@ export function AccessControlPortal({ section }: { section: AccessSection }) {
   }
 
   function RbacWorkspace() {
-    const roleMap = useMemo(() => new Map(roles.map((role) => [role.name, role])), [roles]);
+    const roleMap = new Map(roles.map((role) => [role.name, role]));
     return <>
       <div className={styles.kpis}>
         {['SUPER_ADMIN', 'ADMIN', 'AGENT', 'MEMBER'].map((name) => <div className={styles.kpi} key={name}>
