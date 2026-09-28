@@ -48,10 +48,7 @@ type DrawRunRow = {
 };
 
 type ExistingDrawRunRow = DrawRunRow & {
-  entryWindowStart: Date;
-  entryWindowEnd: Date;
-  drawAt: Date;
-  claimWindowDays: number;
+  exactReplay: number | bigint;
 };
 
 @Injectable()
@@ -91,14 +88,26 @@ export class OwnerPortalDrawWorkflowService {
     const existing = await this.rows<ExistingDrawRunRow>(
       `SELECT odr.id, odr.seasonId, odr.monthNumber, odr.policyId,
               odr.policyVersionId, odr.drawId, odr.status,
-              ldi.entryWindowStart, ldi.entryWindowEnd, ldi.drawAt,
-              lfr.claimWindowDays
+              CASE
+                WHEN ldi.entryWindowStart = ?
+                 AND ldi.entryWindowEnd = ?
+                 AND ldi.drawAt = ?
+                 AND lfr.claimWindowDays = ?
+                THEN 1 ELSE 0
+              END AS exactReplay
        FROM owner_draw_runs odr
        JOIN lucky_draw_instances ldi ON ldi.id=odr.drawId
        JOIN lucky_draw_fulfillment_rules lfr ON lfr.policyVersionId=odr.policyVersionId
        WHERE odr.seasonId=? AND odr.monthNumber=?
        LIMIT 1`,
-      [seasonId, dto.monthNumber],
+      [
+        new Date(dto.entryWindowStart),
+        new Date(dto.entryWindowEnd),
+        new Date(dto.drawAt),
+        dto.claimWindowDays,
+        seasonId,
+        dto.monthNumber,
+      ],
     );
     if (existing[0]) {
       this.assertExistingDrawReplay(existing[0], dto);
@@ -319,15 +328,7 @@ export class OwnerPortalDrawWorkflowService {
     existing: ExistingDrawRunRow,
     dto: PrepareOwnerDrawDto,
   ) {
-    const sameInstant = (stored: Date, incoming: string) =>
-      new Date(stored).getTime() === new Date(incoming).getTime();
-    const exactReplay =
-      existing.monthNumber === dto.monthNumber &&
-      sameInstant(existing.entryWindowStart, dto.entryWindowStart) &&
-      sameInstant(existing.entryWindowEnd, dto.entryWindowEnd) &&
-      sameInstant(existing.drawAt, dto.drawAt) &&
-      Number(existing.claimWindowDays) === dto.claimWindowDays;
-    if (!exactReplay) {
+    if (Number(existing.exactReplay) !== 1) {
       throw new ConflictException(
         `Month ${dto.monthNumber} draw is already prepared with different entry window, draw time, or claim window settings`,
       );
