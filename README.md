@@ -20,7 +20,7 @@ The repository is being bootstrapped from a clean initial state. The following p
 
 ## Core product principles
 
-1. **Binary plan engine** — every member has left/right placement legs; matching, pair value, caps, carry-forward and eligibility are policy-driven.
+1. **Binary 1:4 engine** — authoritative genealogy uses four placement slots A/B/C/D. A/B aggregate to the LEFT settlement lane, C/D aggregate to the RIGHT settlement lane, and the current topology permits fixed qualifying pair lanes A:C and B:D. Pair payout, caps, carry-forward and eligibility remain versioned policy configuration.
 2. **Configuration over hard-coding** — commercial values such as registration fee, monthly amount, program duration, pair payout, referral reward and daily caps are versioned configuration.
 3. **Historical reproducibility** — every earning, reward and eligibility decision records the policy/version applied at that time.
 4. **Financial integrity** — payments, commissions, payouts and wallet movements are represented through auditable relational records and ledger entries in MySQL.
