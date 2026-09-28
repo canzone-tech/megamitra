@@ -12,6 +12,10 @@ import { AuditAction } from '../generated/prisma/enums';
 import { LuckyDrawExecutionService } from '../lucky-draw/lucky-draw-execution.service';
 import { LuckyDrawFulfillmentService } from '../lucky-draw/lucky-draw-fulfillment.service';
 import { LuckyDrawPolicyService } from '../lucky-draw/lucky-draw-policy.service';
+import {
+  evaluateOwnerDrawSchedule,
+  ownerDrawScheduleLabel,
+} from './owner-draw-schedule';
 import type {
   FulfillOwnerWinnerDto,
   PrepareOwnerDrawDto,
@@ -26,6 +30,11 @@ type DrawSeasonRow = {
   name: string;
   status: string;
   programVersionId: string | null;
+  startDate: Date;
+  drawStartMonth: number;
+  drawWeekOfMonth: number;
+  drawWeekday: string;
+  drawTimezone: string;
 };
 
 type DrawRunRow = {
@@ -56,7 +65,8 @@ export class OwnerPortalDrawWorkflowService {
     actorUserId: string,
   ) {
     const seasonRows = await this.rows<DrawSeasonRow>(
-      `SELECT id, code, name, status, programVersionId
+      `SELECT id, code, name, status, programVersionId, startDate,
+              drawStartMonth, drawWeekOfMonth, drawWeekday, drawTimezone
        FROM owner_seasons WHERE id=? LIMIT 1`,
       [seasonId],
     );
@@ -68,6 +78,8 @@ export class OwnerPortalDrawWorkflowService {
     if (!season.programVersionId) {
       throw new ConflictException('Season program version is missing');
     }
+
+    const scheduleLabel = this.assertConfiguredDrawDate(season, dto);
 
     const existing = await this.rows<DrawRunRow>(
       'SELECT id, seasonId, monthNumber, policyId, policyVersionId, drawId, status FROM owner_draw_runs WHERE seasonId=? AND monthNumber=? LIMIT 1',
@@ -97,7 +109,7 @@ export class OwnerPortalDrawWorkflowService {
       {
         code: this.policyCode(`${season.code}M${dto.monthNumber}`, 'DRAW'),
         name: `${season.name} Month ${dto.monthNumber} Draw`,
-        description: `Month ${dto.monthNumber} prize schedule`,
+        description: `Month ${dto.monthNumber} prize schedule • ${scheduleLabel}`,
       },
       actorUserId,
     );
@@ -177,6 +189,8 @@ export class OwnerPortalDrawWorkflowService {
         monthNumber: dto.monthNumber,
         drawId: draw.id,
         claimWindowDays: dto.claimWindowDays,
+        recurrence: scheduleLabel,
+        drawTimezone: season.drawTimezone,
       },
     });
     return this.portal.drawRun(runId);
@@ -245,6 +259,42 @@ export class OwnerPortalDrawWorkflowService {
       actorUserId,
     );
     return this.portal.drawRun(runId);
+  }
+
+  private assertConfiguredDrawDate(
+    season: DrawSeasonRow,
+    dto: PrepareOwnerDrawDto,
+  ) {
+    const schedule = {
+      seasonStartDate: season.startDate,
+      startMonth: Number(season.drawStartMonth),
+      weekOfMonth: Number(season.drawWeekOfMonth),
+      weekday: season.drawWeekday,
+      timezone: season.drawTimezone,
+    };
+    let evaluation;
+    try {
+      evaluation = evaluateOwnerDrawSchedule(schedule, dto.monthNumber, dto.drawAt);
+    } catch (error) {
+      throw new ConflictException(
+        `Season lucky draw schedule is invalid: ${error instanceof Error ? error.message : 'invalid configuration'}`,
+      );
+    }
+    if (!evaluation.matches) {
+      const received = [
+        evaluation.actualYear,
+        String(evaluation.actualMonth).padStart(2, '0'),
+        String(evaluation.actualDay).padStart(2, '0'),
+      ].join('-');
+      throw new BadRequestException(
+        `Month ${dto.monthNumber} draw must follow ${ownerDrawScheduleLabel(schedule.startMonth, schedule.weekOfMonth, schedule.weekday)} in ${schedule.timezone}. Expected calendar month ${evaluation.expectedYear}-${String(evaluation.expectedMonth).padStart(2, '0')}; received ${received} (${evaluation.actualWeekday}, week ${evaluation.actualWeekOfMonth}).`,
+      );
+    }
+    return ownerDrawScheduleLabel(
+      schedule.startMonth,
+      schedule.weekOfMonth,
+      schedule.weekday,
+    );
   }
 
   private async requirePublishedRun(runId: string) {
