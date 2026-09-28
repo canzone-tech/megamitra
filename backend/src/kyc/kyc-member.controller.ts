@@ -1,10 +1,12 @@
 import { Body, Controller, Get, Post } from '@nestjs/common';
 import type { AuthUser } from '../auth/auth-user';
 import { CurrentUser } from '../auth/current-user.decorator';
+import { Roles } from '../rbac/roles.decorator';
 import { SubmitKycDto } from './kyc.dto';
 import { KycService } from './kyc.service';
 
 @Controller('kyc')
+@Roles('MEMBER')
 export class KycMemberController {
   constructor(private readonly kyc: KycService) {}
 
