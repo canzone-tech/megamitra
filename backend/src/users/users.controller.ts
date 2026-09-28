@@ -3,6 +3,7 @@ import type { AuthUser } from '../auth/auth-user';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { Permissions } from '../rbac/permissions.decorator';
 import {
+  CreateManagedStaffDto,
   CreateManagedUserDto,
   ReplaceUserRolesDto,
   UpdateUserStatusDto,
@@ -23,6 +24,12 @@ export class UsersController {
   @Post()
   create(@Body() dto: CreateManagedUserDto, @CurrentUser() actor: AuthUser) {
     return this.users.createManaged(dto, actor.id);
+  }
+
+  @Permissions('users.manage', 'users.roles.manage')
+  @Post('staff')
+  createStaff(@Body() dto: CreateManagedStaffDto, @CurrentUser() actor: AuthUser) {
+    return this.users.createManagedStaff(dto, actor.id);
   }
 
   @Permissions('users.read')
