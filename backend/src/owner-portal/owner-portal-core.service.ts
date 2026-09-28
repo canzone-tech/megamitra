@@ -36,7 +36,7 @@ export class OwnerPortalCoreService {
        LIMIT 1`,
     );
     if (!rows[0]) throw new BadRequestException('Registration policy is unavailable');
-    return rows[0];
+    return { ...rows[0], defaultRoleName: 'MEMBER' };
   }
 
   async createMember(dto: CreateOwnerCoreMemberDto, actorUserId: string) {
@@ -64,11 +64,12 @@ export class OwnerPortalCoreService {
     const member = await this.portal.createMember(
       {
         ...dto,
+        memberType: 'MEMBER',
         password,
         sponsorReference: undefined,
         placementReference: undefined,
         placement: 'AUTO',
-      } as CreateOwnerMemberDto,
+      } as unknown as CreateOwnerMemberDto,
       actorUserId,
     );
     const memberId = String((member as { id?: unknown }).id ?? '');
@@ -126,10 +127,17 @@ export class OwnerPortalCoreService {
   async listMembers(query?: string) {
     const q = query?.trim();
     const values: SqlValue[] = [];
-    let where = '';
+    let where = `WHERE EXISTS (
+      SELECT 1
+      FROM user_roles member_ur
+      INNER JOIN roles member_role ON member_role.id=member_ur.roleId
+      WHERE member_ur.userId=u.id AND member_role.name='MEMBER' AND member_role.status='ACTIVE'
+    )`;
     if (q) {
-      where = `WHERE u.username LIKE ? OR u.email LIKE ? OR u.phone LIKE ?
-        OR CONCAT(COALESCE(u.firstName,''), ' ', COALESCE(u.lastName,'')) LIKE ?`;
+      where += ` AND (
+        u.username LIKE ? OR u.email LIKE ? OR u.phone LIKE ?
+        OR CONCAT(COALESCE(u.firstName,''), ' ', COALESCE(u.lastName,'')) LIKE ?
+      )`;
       const like = `%${q}%`;
       values.push(like, like, like, like);
     }
@@ -137,7 +145,8 @@ export class OwnerPortalCoreService {
     return this.rows<Record<string, unknown>>(
       `SELECT u.id, u.username, u.email, u.phone, u.firstName, u.lastName,
               u.status, u.createdAt,
-              mp.dateOfBirth, mp.state, mp.city, mp.memberType,
+              mp.dateOfBirth, mp.state, mp.city,
+              'MEMBER' AS accountRole,
               sponsor.username AS sponsorUsername,
               parent.username AS placementParentUsername,
               bp.side AS placementSide, bp.slot AS placementSlot,
