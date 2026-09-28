@@ -123,10 +123,10 @@ describe('MegaGoldenClub binary business-domain integration', () => {
     await app?.close();
   });
 
-  it('separates sponsor and placement graphs, publishes immutable policy, and propagates reversible volume', async () => {
+  it('enforces 1:4 slots, keeps sponsor and placement graphs separate, and propagates reversible lane volume', async () => {
     const suffix = randomUUID().replaceAll('-', '').slice(0, 10);
     const users = await Promise.all(
-      ['root', 'left', 'right', 'grand', 'extra'].map((label) =>
+      ['root', 'slot_a', 'slot_b', 'slot_c', 'slot_d', 'grand', 'overflow'].map((label) =>
         prisma.user.create({
           data: {
             username: `${label}_${suffix}`,
@@ -137,12 +137,12 @@ describe('MegaGoldenClub binary business-domain integration', () => {
       ),
     );
     userIds.push(...users.map((user) => user.id));
-    const [root, left, right, grand, extra] = users;
+    const [root, slotA, slotB, slotC, slotD, grand, overflow] = users;
 
     for (const [memberUserId, sponsorUserId] of [
-      [left.id, root.id],
-      [right.id, root.id],
-      [grand.id, left.id],
+      [slotA.id, root.id],
+      [slotC.id, root.id],
+      [grand.id, slotA.id],
     ]) {
       const response = await request(
         '/admin/genealogy/sponsors',
@@ -152,9 +152,11 @@ describe('MegaGoldenClub binary business-domain integration', () => {
     }
 
     const placements = [
-      { memberUserId: left.id, parentUserId: root.id, side: BinaryPlacementSide.LEFT },
-      { memberUserId: right.id, parentUserId: root.id, side: BinaryPlacementSide.RIGHT },
-      { memberUserId: grand.id, parentUserId: left.id, side: BinaryPlacementSide.RIGHT },
+      { memberUserId: slotA.id, parentUserId: root.id, slot: 'A' },
+      { memberUserId: slotB.id, parentUserId: root.id, slot: 'B' },
+      { memberUserId: slotC.id, parentUserId: root.id, slot: 'C' },
+      { memberUserId: slotD.id, parentUserId: root.id, slot: 'D' },
+      { memberUserId: grand.id, parentUserId: slotA.id, slot: 'D' },
     ];
     for (const placement of placements) {
       const response = await request(
@@ -164,14 +166,28 @@ describe('MegaGoldenClub binary business-domain integration', () => {
       expect(response.status).toBe(201);
     }
 
+    const rootGenealogy = await request(`/admin/genealogy/members/${root.id}`, authenticated());
+    expect(rootGenealogy.status).toBe(200);
+    const rootChildren = rootGenealogy.body.binaryChildren as Array<{
+      slot: 'A' | 'B' | 'C' | 'D';
+      side: BinaryPlacementSide;
+    }>;
+    expect(rootChildren.map((child) => child.slot)).toEqual(['A', 'B', 'C', 'D']);
+    expect(rootChildren.map((child) => child.side)).toEqual([
+      BinaryPlacementSide.LEFT,
+      BinaryPlacementSide.LEFT,
+      BinaryPlacementSide.RIGHT,
+      BinaryPlacementSide.RIGHT,
+    ]);
+
     const occupied = await request(
       '/admin/genealogy/placements',
       authenticated({
         method: 'POST',
         body: JSON.stringify({
-          memberUserId: extra.id,
+          memberUserId: overflow.id,
           parentUserId: root.id,
-          side: BinaryPlacementSide.LEFT,
+          slot: 'A',
         }),
       }),
     );
@@ -184,7 +200,7 @@ describe('MegaGoldenClub binary business-domain integration', () => {
         body: JSON.stringify({
           memberUserId: root.id,
           parentUserId: grand.id,
-          side: BinaryPlacementSide.LEFT,
+          slot: 'A',
         }),
       }),
     );
@@ -195,12 +211,19 @@ describe('MegaGoldenClub binary business-domain integration', () => {
     const ancestors = genealogy.body.binaryDescendantLinks as Array<{
       depth: number;
       firstLegSide: BinaryPlacementSide;
+      firstLegSlot: 'A' | 'B' | 'C' | 'D';
     }>;
     expect(ancestors).toHaveLength(2);
-    expect(ancestors[0].depth).toBe(1);
-    expect(ancestors[0].firstLegSide).toBe(BinaryPlacementSide.RIGHT);
-    expect(ancestors[1].depth).toBe(2);
-    expect(ancestors[1].firstLegSide).toBe(BinaryPlacementSide.LEFT);
+    expect(ancestors[0]).toMatchObject({
+      depth: 1,
+      firstLegSide: BinaryPlacementSide.RIGHT,
+      firstLegSlot: 'D',
+    });
+    expect(ancestors[1]).toMatchObject({
+      depth: 2,
+      firstLegSide: BinaryPlacementSide.LEFT,
+      firstLegSlot: 'A',
+    });
 
     const plan = await request(
       '/admin/binary-plans',
@@ -228,7 +251,14 @@ describe('MegaGoldenClub binary business-domain integration', () => {
           settlementTimezone: 'Asia/Kolkata',
           capOverflowMode: BinaryCapOverflowMode.CARRY,
           carryForwardEnabled: true,
-          qualificationRules: { test: true },
+          qualificationRules: {
+            model: '1:4',
+            placementSlots: { A: 'LEFT', B: 'LEFT', C: 'RIGHT', D: 'RIGHT' },
+            pairLanes: [
+              ['A', 'C'],
+              ['B', 'D'],
+            ],
+          },
           settlementRules: { test: true },
         }),
       }),
@@ -284,7 +314,7 @@ describe('MegaGoldenClub binary business-domain integration', () => {
     eventIds.push(volumeEvent.id);
     expect(volumeEvent.uplineCredits).toHaveLength(2);
     expect(volumeEvent.uplineCredits[0]).toMatchObject({
-      ancestorUserId: left.id,
+      ancestorUserId: slotA.id,
       depth: 1,
       side: BinaryPlacementSide.RIGHT,
     });
