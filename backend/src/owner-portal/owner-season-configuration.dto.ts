@@ -5,6 +5,7 @@ import {
   IsInt,
   IsNumberString,
   IsOptional,
+  Max,
   Min,
 } from 'class-validator';
 
@@ -19,6 +20,16 @@ export const OWNER_ALLOCATION_TYPES = [
   'REGISTRATION_FEE',
   'INSTALLMENT',
   'UNAPPLIED',
+] as const;
+
+export const OWNER_DRAW_WEEKDAYS = [
+  'SUNDAY',
+  'MONDAY',
+  'TUESDAY',
+  'WEDNESDAY',
+  'THURSDAY',
+  'FRIDAY',
+  'SATURDAY',
 ] as const;
 
 export class OwnerSeasonAdvancedConfigDto {
@@ -53,6 +64,22 @@ export class OwnerSeasonAdvancedConfigDto {
 
   @IsBoolean()
   drawEligibilityHookEnabled!: boolean;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(12)
+  drawStartMonth?: number;
+
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(5)
+  drawWeekOfMonth?: number;
+
+  @IsOptional()
+  @IsIn(OWNER_DRAW_WEEKDAYS)
+  drawWeekday?: (typeof OWNER_DRAW_WEEKDAYS)[number];
 
   @IsOptional()
   @IsNumberString()
