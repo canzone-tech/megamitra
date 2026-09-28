@@ -24,6 +24,13 @@ type Advanced = {
     pairLanes: string[][];
     genericCrossPairingAllowed: boolean;
   };
+  drawSchedule: {
+    startMonth: number;
+    weekOfMonth: number;
+    weekday: string;
+    timezone: string;
+    label: string;
+  };
   automaticRules: {
     configured: boolean;
     lifecycle: string | null;
@@ -39,6 +46,11 @@ type Advanced = {
 };
 
 const API = '/api/backend/admin/owner-portal';
+const MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+const WEEKDAYS = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
 
 function optionalNumber(value: string): number | undefined {
   const trimmed = value.trim();
@@ -103,6 +115,15 @@ export function OwnerSeasonAdvancedPanel({ embedded = false }: { embedded?: bool
       automaticRules: { ...current.automaticRules, [key]: value },
     } : current);
   }
+  function patchDrawSchedule(
+    key: 'startMonth' | 'weekOfMonth' | 'weekday',
+    value: string | number,
+  ) {
+    setConfig((current) => current ? {
+      ...current,
+      drawSchedule: { ...current.drawSchedule, [key]: value },
+    } : current);
+  }
   function toggleAllocation(value: string, checked: boolean) {
     if (!config) return;
     const current = config.automaticRules.requiredAllocationTypes;
@@ -126,6 +147,9 @@ export function OwnerSeasonAdvancedPanel({ embedded = false }: { embedded?: bool
         referralHookEnabled: String(form.get('referralHookEnabled') ?? 'false') === 'true',
         referralBasisMode: String(form.get('referralBasisMode') ?? 'PAYMENT_AMOUNT'),
         drawEligibilityHookEnabled: String(form.get('drawEligibilityHookEnabled') ?? 'false') === 'true',
+        drawStartMonth: Number(form.get('drawStartMonth') ?? config.drawSchedule.startMonth),
+        drawWeekOfMonth: Number(form.get('drawWeekOfMonth') ?? config.drawSchedule.weekOfMonth),
+        drawWeekday: String(form.get('drawWeekday') ?? config.drawSchedule.weekday),
         minimumPaymentAmount: String(form.get('minimumPaymentAmount') ?? '').trim() || undefined,
         minimumRegistrationAllocation: String(form.get('minimumRegistrationAllocation') ?? '').trim() || undefined,
         minimumInstallmentAllocation: String(form.get('minimumInstallmentAllocation') ?? '').trim() || undefined,
@@ -134,7 +158,7 @@ export function OwnerSeasonAdvancedPanel({ embedded = false }: { embedded?: bool
       setConfig(await apiJson<Advanced>(`${API}/seasons/${encodeURIComponent(seasonId)}/advanced-configuration`, {
         method: 'PUT', body: JSON.stringify(body),
       }));
-      setNotice('Binary 1:4 controls and automatic payment rules saved as the Season draft.');
+      setNotice('Binary 1:4 controls, monthly lucky draw recurrence and automatic payment rules saved as the Season draft.');
     } catch (reason) { fail(reason); }
     finally { setBusy(false); }
   }
@@ -142,6 +166,7 @@ export function OwnerSeasonAdvancedPanel({ embedded = false }: { embedded?: bool
   const editable = Boolean(config && ['DRAFT', 'REVIEW'].includes(config.season.status));
   const rules = config?.automaticRules;
   const binary = config?.binary;
+  const drawSchedule = config?.drawSchedule;
 
   return (
     <section id="advanced-policy" className={embedded ? undefined : extension.extension}>
@@ -149,7 +174,7 @@ export function OwnerSeasonAdvancedPanel({ embedded = false }: { embedded?: bool
         <div className={styles.sectionHead}>
           <div className={styles.sectionTitle}>
             <span className={styles.sectionIcon}>⚙</span>
-            <div><h2>Advanced Season Policy</h2><small>Binary 1:4 fixed topology + payment-event automation</small></div>
+            <div><h2>Advanced Season Policy</h2><small>Binary 1:4 fixed topology + lucky draw calendar + payment-event automation</small></div>
           </div>
           <span className={styles.tag}>{rules?.configured ? `${rules.lifecycle ?? 'DRAFT'} AUTOMATIC RULES` : 'CONFIGURATION REQUIRED'}</span>
         </div>
@@ -165,10 +190,11 @@ export function OwnerSeasonAdvancedPanel({ embedded = false }: { embedded?: bool
           <div className={styles.field}><label>Policy Status</label><input className={styles.input} readOnly value={config ? `${config.season.status} • Binary ${binary?.lifecycle ?? '—'}` : '—'} /></div>
         </div>
 
-        {loading ? <div className={styles.loading}>Loading season policy…</div> : config && binary && rules ? (
+        {loading ? <div className={styles.loading}>Loading season policy…</div> : config && binary && rules && drawSchedule ? (
           <form method="post" onSubmit={save}>
             <WorkspaceTabs ariaLabel="Advanced season policy sections" tabs={[
               { id: 'binary-engine', label: 'Binary 1:4 Controls' },
+              { id: 'draw-calendar', label: 'Lucky Draw Calendar' },
               { id: 'automatic-rules', label: 'Automatic Payment Rules' },
             ]}>
               {(activeTab) => <>
@@ -189,6 +215,24 @@ export function OwnerSeasonAdvancedPanel({ embedded = false }: { embedded?: bool
                   </div>
                 </div>
 
+                <div hidden={activeTab !== 'draw-calendar'}>
+                  <div className={styles.sectionHead}><div className={styles.sectionTitle}><span className={styles.sectionIcon}>◆</span><h2>Monthly Lucky Draw Calendar</h2></div><small>Calendar recurrence locked into the Season version</small></div>
+                  <div className={styles.notice}><b>Default MegaGoldenClub rule:</b> January start • every month • third Sunday. These calendar values are configurable while the Season is DRAFT or REVIEW. Draw time, eligibility window and claim window remain configurable per prepared draw. The legacy Season Setup “Draw Day” value is retained only for historical compatibility; this recurrence is authoritative.</div>
+                  <div className={styles.summary}>
+                    <div><small>START MONTH</small><b>{MONTHS[drawSchedule.startMonth - 1] ?? drawSchedule.startMonth}</b></div>
+                    <div><small>WEEK</small><b>{drawSchedule.weekOfMonth}</b></div>
+                    <div><small>WEEKDAY</small><b>{drawSchedule.weekday}</b></div>
+                    <div><small>TIMEZONE</small><b>{drawSchedule.timezone}</b></div>
+                  </div>
+                  <div className={styles.fields}>
+                    <div className={styles.field}><label>First Draw Month</label><select name="drawStartMonth" className={styles.select} disabled={!editable} value={drawSchedule.startMonth} onChange={(event) => patchDrawSchedule('startMonth', Number(event.target.value))}>{MONTHS.map((month, index) => <option key={month} value={index + 1}>{month}</option>)}</select></div>
+                    <div className={styles.field}><label>Week of Month</label><select name="drawWeekOfMonth" className={styles.select} disabled={!editable} value={drawSchedule.weekOfMonth} onChange={(event) => patchDrawSchedule('weekOfMonth', Number(event.target.value))}><option value={1}>1st</option><option value={2}>2nd</option><option value={3}>3rd</option><option value={4}>4th</option><option value={5}>5th</option></select></div>
+                    <div className={styles.field}><label>Draw Weekday</label><select name="drawWeekday" className={styles.select} disabled={!editable} value={drawSchedule.weekday} onChange={(event) => patchDrawSchedule('weekday', event.target.value)}>{WEEKDAYS.map((weekday) => <option key={weekday} value={weekday}>{weekday.charAt(0) + weekday.slice(1).toLowerCase()}</option>)}</select></div>
+                    <div className={styles.field}><label>Season Draw Timezone</label><input className={styles.input} readOnly value={drawSchedule.timezone} /></div>
+                  </div>
+                  <div className={styles.notice}><b>Effective rule:</b> {drawSchedule.label}. The backend rejects any prepared draw date that does not match this calendar in <b>{drawSchedule.timezone}</b>.</div>
+                </div>
+
                 <div hidden={activeTab !== 'automatic-rules'}>
                   <div className={styles.sectionHead}><div className={styles.sectionTitle}><span className={styles.sectionIcon}>↗</span><h2>Automatic Rules on Confirmed Payment</h2></div><small>Versioned and published with Season activation</small></div>
                   <div className={styles.fields}>
@@ -205,7 +249,7 @@ export function OwnerSeasonAdvancedPanel({ embedded = false }: { embedded?: bool
               </>}
             </WorkspaceTabs>
 
-            <div className={styles.notice} style={{ marginTop: 14 }}>Season activation is blocked until the automatic-rule draft exists and every Season month has a prize schedule. Membership, Binary, Referral and Automatic Rules publish together.</div>
+            <div className={styles.notice} style={{ marginTop: 14 }}>Season activation is blocked until the automatic-rule draft exists and every Season month has a prize schedule. Membership, Binary, Referral, Lucky Draw recurrence and Automatic Rules are governed together.</div>
             <div className={styles.buttonLine}><button className={styles.button} disabled={busy || !editable}>{busy ? 'SAVING…' : 'SAVE ADVANCED SEASON POLICY'}</button></div>
           </form>
         ) : <div className={styles.empty}>Create a Season draft before configuring advanced rules.</div>}
