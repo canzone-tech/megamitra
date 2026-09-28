@@ -9,23 +9,41 @@ MegaGoldenClub combines:
 
 The source flyer/plan is treated as the first configuration, not as hard-coded software behavior.
 
-## Binary genealogy
+## Binary 1:4 genealogy
 
-Each binary-network member has two placement legs:
+The authoritative genealogy topology is 1:4. Each placement parent can directly hold four ordered slots:
 
 ```text
-             MEMBER
-            /      \
-         LEFT      RIGHT
+                    MEMBER
+          /           |           |           \
+       A              B           C             D
+     LEFT           LEFT        RIGHT         RIGHT
 ```
 
-A qualifying pair is formed according to the published pair policy. The initial plan concept is 1 qualifying unit on the left plus 1 qualifying unit on the right, but the engine must support policy-driven ratios and qualification rules.
+Slots `A/B/C/D` are the placement authority. `LEFT/RIGHT` remains a derived aggregate dimension used by the existing volume, settlement and historical reporting engine:
+
+- `A` -> `LEFT`
+- `B` -> `LEFT`
+- `C` -> `RIGHT`
+- `D` -> `RIGHT`
+
+The current MegaGoldenClub 1:4 business topology has two fixed qualifying pair lanes:
+
+- `A:C`
+- `B:D`
+
+Generic cross-pairing is not part of the current plan. The genealogy topology and lane identity must not be redefined by a generic left/right ratio editor. Commercial behavior such as payout amount, caps, carry-forward and eligibility remains versioned configuration.
+
+Auto-placement traverses the genealogy breadth-first and fills the first available slot in deterministic order `A -> B -> C -> D` before continuing below existing children.
 
 ### Binary data that must be persisted
+
 - sponsor relationship
 - placement parent
-- placement side: LEFT / RIGHT
+- authoritative placement slot: `A / B / C / D`
+- derived aggregate settlement side: `LEFT / RIGHT`
 - genealogy ancestry / traversal support
+- first-leg slot and first-leg aggregate side for ancestry propagation
 - qualifying volume events
 - consumed/matched volume
 - carry-forward volume
@@ -34,12 +52,14 @@ A qualifying pair is formed according to the published pair policy. The initial 
 - policy version used
 - adjustments / reversals
 
-Genealogy placement history must be auditable and must not be casually rewritten after financial events depend on it.
+Genealogy placement history must be auditable and must not be casually rewritten after financial events depend on it. Legacy LEFT/RIGHT compatibility must never override an already-persisted authoritative slot.
 
 ## Versioned policy engines
 
 ### Program policy
+
 Configurable fields include:
+
 - program code/name
 - registration/joining fee
 - recurring installment amount
@@ -50,6 +70,7 @@ Configurable fields include:
 - active/paused/closed state
 
 ### Referral policy
+
 - fixed amount or percentage
 - qualifying-event definition
 - eligibility requirements
@@ -57,19 +78,31 @@ Configurable fields include:
 - effective dates
 
 ### Binary / pair policy
-- qualifying unit definition
-- left/right pairing ratio
-- pair value
-- per-pair payout
+
+The 1:4 topology contract is fixed at the platform layer for the current MegaGoldenClub plan:
+
+- four placement slots `A/B/C/D`
+- `A/B = LEFT`, `C/D = RIGHT`
+- qualifying lanes `A:C` and `B:D`
+- one qualifying unit per lane side for the current 1:4 model
+- generic cross-pairing disabled
+
+Versioned policy configuration controls commercial and settlement behavior such as:
+
+- qualifying unit definition within the supported topology contract
+- pair value / pair payout amount
 - daily/monthly pair caps
 - carry-forward enabled/disabled
 - carry-forward expiry
 - flush behavior
 - inactive-member behavior
-- qualification rules
+- qualification rules that do not change the authoritative topology
+- settlement timezone and currency
 
 ### Eligibility policy
+
 Used by commissions, rewards, draws and payouts. Rule inputs may include:
+
 - account status
 - KYC status
 - payment/installment status
@@ -79,6 +112,7 @@ Used by commissions, rewards, draws and payouts. Rule inputs may include:
 - configurable business qualifications
 
 ### Lucky-draw policy
+
 - campaign
 - round/month
 - draw date and cutoff
@@ -99,12 +133,13 @@ DRAFT -> PUBLISHED -> RETIRED
 Publishing creates an immutable business reference. Existing historical records continue to reference the version that was effective when they were created.
 
 Changes such as:
+
 - pair payout 100 -> 125
 - daily cap 50 -> 40
 - referral reward 250 -> 300
 - duration 18 -> 24 months
 
-must be possible through configuration/version publishing rather than source-code deployment.
+must be possible through configuration/version publishing rather than source-code deployment. Changes to the locked 1:4 topology itself are not ordinary business-policy edits and require an explicit platform contract revision and migration strategy.
 
 ## Suggested backend modules
 
@@ -147,9 +182,13 @@ SystemConfiguration
 6. Carry-forward is a state derived from verified volume and prior consumption.
 7. Financial outcomes are written transactionally with the ledger where money is credited/debited.
 8. Reprocessing the same event must not duplicate earnings.
+9. Authoritative placement capacity is four direct slots per parent, not two aggregate sides.
+10. Slot-to-side mapping is deterministic: `A/B -> LEFT`, `C/D -> RIGHT`.
+11. Current 1:4 pair matching is lane-bound to `A:C` and `B:D`; generic cross-pairing is rejected.
+12. Placement and ancestry records retain slot identity even when downstream settlement aggregates by LEFT/RIGHT.
 
 ## Admin configuration principle
 
 > Code defines the rule capabilities; administrators configure and publish the actual business plan.
 
-The admin UI must therefore expose controlled versioned editors rather than raw database fields.
+The admin UI must therefore expose controlled versioned editors rather than raw database fields. It may configure commercial values and supported policy rules, but it must not present the locked 1:4 topology as an arbitrary generic left/right ratio.
