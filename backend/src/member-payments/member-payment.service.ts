@@ -14,7 +14,6 @@ import {
   randomBytes,
   randomUUID,
 } from 'node:crypto';
-import type { PoolConnection } from 'mariadb';
 import { AuditService } from '../audit/audit.service';
 import { FinancialDbService } from '../database/financial-db.service';
 import { PrismaService } from '../database/prisma.service';
@@ -1065,7 +1064,7 @@ export class MemberPaymentService {
 
   private positiveMoney(raw: string, field: string) {
     const amount = Number(raw);
-    if (!Number.isFinite(amount) || amount <= 0 || Math.round(amount * 100) !== amount * 100) {
+    if (!Number.isFinite(amount) || amount <= 0 || Math.abs(Math.round(amount * 100) - amount * 100) > 1e-8) {
       throw new BadRequestException(`${field} must be a positive amount with at most 2 decimals`);
     }
     return amount;
@@ -1073,7 +1072,7 @@ export class MemberPaymentService {
 
   private nonNegativeMoney(raw: string, field: string) {
     const amount = Number(raw);
-    if (!Number.isFinite(amount) || amount < 0 || Math.round(amount * 100) !== amount * 100) {
+    if (!Number.isFinite(amount) || amount < 0 || Math.abs(Math.round(amount * 100) - amount * 100) > 1e-8) {
       throw new BadRequestException(`${field} must be a non-negative amount with at most 2 decimals`);
     }
     return amount;
