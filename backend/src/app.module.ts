@@ -15,6 +15,7 @@ import { HealthModule } from './health/health.module';
 import { KycModule } from './kyc/kyc.module';
 import { LedgerModule } from './ledger/ledger.module';
 import { LuckyDrawModule } from './lucky-draw/lucky-draw.module';
+import { MemberPaymentModule } from './member-payments/member-payment.module';
 import { OperationalReadModule } from './operations/operational-read.module';
 import { OwnerPortalModule } from './owner-portal/owner-portal.module';
 import { PlatformConfigModule } from './platform-config/platform-config.module';
@@ -56,6 +57,7 @@ import { WithdrawalModule } from './withdrawal/withdrawal.module';
     BinarySettlementModule,
     ReferralRewardModule,
     ProgramModule,
+    MemberPaymentModule,
     LuckyDrawModule,
     OperationalReadModule,
     LedgerModule,
