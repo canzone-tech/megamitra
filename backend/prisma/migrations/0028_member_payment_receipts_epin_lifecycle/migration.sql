@@ -21,6 +21,12 @@ INSERT INTO `owner_payment_settings` (`id`, `enabled`) VALUES (1, FALSE);
 ALTER TABLE `owner_seasons`
   ADD COLUMN `registrationClosesAt` DATETIME(3) NULL AFTER `endDate`;
 
+ALTER TABLE `member_profiles`
+  ADD COLUMN `lifecycleStatus` VARCHAR(20) NOT NULL DEFAULT 'ACTIVE' AFTER `memberType`,
+  ADD COLUMN `cancelledAt` DATETIME(3) NULL AFTER `lifecycleStatus`,
+  ADD COLUMN `cancellationReason` VARCHAR(500) NULL AFTER `cancelledAt`,
+  ADD INDEX `member_profiles_lifecycle_idx` (`lifecycleStatus`, `createdAt`);
+
 CREATE TABLE `member_payment_submissions` (
   `id` CHAR(36) NOT NULL,
   `receiptNumber` VARCHAR(40) NOT NULL,
