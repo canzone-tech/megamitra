@@ -11,6 +11,8 @@ export type ReferralEligibilityRules = {
   requireReferredPhoneVerified?: boolean;
   minimumBasisAmount?: string;
   maximumBasisAmount?: string;
+  ownerSeasonCode?: string;
+  qualifyingReferralRequired?: boolean;
 };
 
 type EligibilityUser = {
@@ -45,6 +47,8 @@ export class ReferralEligibilityService {
     'requireReferredPhoneVerified',
     'minimumBasisAmount',
     'maximumBasisAmount',
+    'ownerSeasonCode',
+    'qualifyingReferralRequired',
   ]);
 
   validateRules(raw: unknown): ReferralEligibilityRules {
@@ -73,6 +77,7 @@ export class ReferralEligibilityService {
       'requireSponsorPhoneVerified',
       'requireReferredEmailVerified',
       'requireReferredPhoneVerified',
+      'qualifyingReferralRequired',
     ] as const) {
       const value = input[key];
       if (value !== undefined) {
@@ -81,6 +86,13 @@ export class ReferralEligibilityService {
         }
         rules[key] = value;
       }
+    }
+
+    if (input.ownerSeasonCode !== undefined) {
+      if (typeof input.ownerSeasonCode !== 'string' || !input.ownerSeasonCode.trim()) {
+        throw new BadRequestException('ownerSeasonCode must be a non-empty string');
+      }
+      rules.ownerSeasonCode = input.ownerSeasonCode.trim();
     }
 
     if (input.minimumBasisAmount !== undefined) {
@@ -100,7 +112,9 @@ export class ReferralEligibilityService {
       rules.maximumBasisAmount !== undefined &&
       new Prisma.Decimal(rules.maximumBasisAmount).lessThan(rules.minimumBasisAmount)
     ) {
-      throw new BadRequestException('maximumBasisAmount must be greater than or equal to minimumBasisAmount');
+      throw new BadRequestException(
+        'maximumBasisAmount must be greater than or equal to minimumBasisAmount',
+      );
     }
     return rules;
   }
