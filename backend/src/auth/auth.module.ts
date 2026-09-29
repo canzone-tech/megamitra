@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { JwtModule } from '@nestjs/jwt';
 import { CaptchaModule } from '../captcha/captcha.module';
 import { GenealogyModule } from '../genealogy/genealogy.module';
+import { ReferralRewardModule } from '../referral-reward/referral-reward.module';
 import { RolesGuard } from '../rbac/roles.guard';
 import { AuthController } from './auth.controller';
 import { AuthEmailTemplateController } from './auth-email-template.controller';
@@ -15,7 +16,7 @@ import { SmtpMailService } from './smtp-mail.service';
 import { SuperAdminLifecycleService } from './super-admin-lifecycle.service';
 
 @Module({
-  imports: [JwtModule.register({}), CaptchaModule, GenealogyModule],
+  imports: [JwtModule.register({}), CaptchaModule, GenealogyModule, ReferralRewardModule],
   controllers: [AuthController, AuthEmailTemplateController],
   providers: [
     AuthService,
