@@ -856,6 +856,16 @@ export class MemberPaymentService {
     });
   }
 
+  private findEnrollment(
+    userId: string,
+    required: true,
+    includeCompleted?: boolean,
+  ): Promise<EnrollmentRow>;
+  private findEnrollment(
+    userId: string,
+    required: false,
+    includeCompleted?: boolean,
+  ): Promise<EnrollmentRow | null>;
   private async findEnrollment(
     userId: string,
     required: boolean,
@@ -937,7 +947,18 @@ export class MemberPaymentService {
     return season;
   }
 
-  private async resolveRegistrationClose(season: SeasonCommercialRow, required = true) {
+  private resolveRegistrationClose(
+    season: SeasonCommercialRow,
+    required?: true,
+  ): Promise<Date>;
+  private resolveRegistrationClose(
+    season: SeasonCommercialRow,
+    required: false,
+  ): Promise<Date | null>;
+  private async resolveRegistrationClose(
+    season: SeasonCommercialRow,
+    required = true,
+  ): Promise<Date | null> {
     if (season.registrationClosesAt) return new Date(season.registrationClosesAt);
     const drawRows = await this.rows<{ drawAt: Date }>(
       `SELECT ldi.drawAt
@@ -969,7 +990,7 @@ export class MemberPaymentService {
        WHERE u.status='ACTIVE'
          AND (u.id=? OR u.username=? OR LOWER(u.email)=LOWER(?) OR u.phone=?)
          AND EXISTS (
-           SELECT 1 FROM user_roles ur JOIN roles r ON r.id=ur.roleId
+           SELECT 1 FROM user_roles ur JOIN roles r ON r.id=ur.userId
            WHERE ur.userId=u.id AND r.name='MEMBER' AND r.status='ACTIVE'
          )
        LIMIT 1`,
