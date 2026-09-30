@@ -116,7 +116,7 @@ export function PublicPaymentReceipt({ token }: { token: string }) {
           <div className="mm-card-body">
             <div className="mm-portal-metrics">
               <div className="mm-portal-metric"><span>Receipt number</span><strong>{receipt.receiptNumber}</strong><small>Permanent reference</small></div>
-              <div className="mm-portal-metric"><span>Member / customer</span><strong>{memberName}</strong><small>Member ID: {receipt.username}</small></div>
+              <div className="mm-portal-metric"><span>Member / customer</span><strong>{memberName}</strong><small>Member ID: {receipt.memberId} • Username: {receipt.username}</small></div>
               <div className="mm-portal-metric"><span>Purpose</span><strong>{receipt.purpose.replace('_', ' ')}</strong><small>{receipt.seasonName} ({receipt.seasonCode})</small></div>
               <div className="mm-portal-metric"><span>Amount</span><strong>{money(receipt.amount, receipt.currencyCode)}</strong><small>QR / UPI submission</small></div>
               <div className="mm-portal-metric"><span>UTR / reference</span><strong>{receipt.providerReference}</strong><small>Payment reference submitted by member</small></div>
