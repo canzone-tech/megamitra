@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import { AccessControlPortal } from '@/components/access-control-portal';
+import { MemberPaymentVerificationPortal } from '@/components/member-payment-verification-portal';
 import { MemberRegistrationAutofillGuard } from '@/components/member-registration-autofill-guard';
 import { OwnerControlPortal, type OwnerControlSection } from '@/components/owner-control-portal';
 import { OwnerCoreLegacyContent } from '@/components/owner-core-legacy-content';
@@ -22,6 +23,7 @@ const SECTIONS = new Set([
   'winners',
   'prizes',
   'payments',
+  'member-payments',
   'wallet',
   'epins',
   'auth-codes',
@@ -68,6 +70,7 @@ export default async function OwnerPortalSectionPage({ params }: PageProps) {
   const { section } = await params;
   if (!SECTIONS.has(section)) notFound();
   if (section === 'settings') return <SettingsGovernancePortal />;
+  if (section === 'member-payments') return <MemberPaymentVerificationPortal />;
   if (section === 'staff' || section === 'rbac') return <AccessControlPortal section={section} />;
   if (section === 'members') {
     return (
