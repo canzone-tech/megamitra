@@ -8,22 +8,20 @@ BACKUP_ROOT="${1:-${ROOT_DIR}/backups}"
 STAMP="$(date -u +%Y%m%dT%H%M%SZ)"
 TARGET="${BACKUP_ROOT%/}/${STAMP}"
 
-if [[ ! -f "${ENV_FILE}" ]]; then
-  echo "ERROR: ${ENV_FILE} is missing"
-  exit 1
+COMPOSE=(docker compose -f "${ROOT_DIR}/docker-compose.yml")
+if [[ -f "${ENV_FILE}" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "${ENV_FILE}"
+  set +a
+  COMPOSE=(docker compose --env-file "${ENV_FILE}" -f "${ROOT_DIR}/docker-compose.yml")
 fi
-
-set -a
-# shellcheck disable=SC1090
-source "${ENV_FILE}"
-set +a
 
 : "${MYSQL_DATABASE:?MYSQL_DATABASE is required}"
 : "${MONGODB_DATABASE:?MONGODB_DATABASE is required}"
 
 umask 077
 mkdir -p "${TARGET}"
-COMPOSE=(docker compose --env-file "${ENV_FILE}" -f "${ROOT_DIR}/docker-compose.yml")
 
 printf '%s\n' "==> Backing up authoritative MySQL data"
 "${COMPOSE[@]}" exec -T mysql sh -c \
