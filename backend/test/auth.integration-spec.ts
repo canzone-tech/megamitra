@@ -11,6 +11,10 @@ import {
   UserStatus,
   UsernameCreationMode,
 } from '../src/generated/prisma/enums';
+import {
+  createPaidRegistrationFixture,
+  type PaidRegistrationFixture,
+} from './paid-registration.fixture';
 
 type AuthConfigSnapshot = {
   loginWithUsername: boolean;
@@ -53,6 +57,7 @@ describe('MegaGoldenClub auth integration', () => {
   let config: ConfigService;
   let passwords: PasswordService;
   let baseUrl: string;
+  let paidRegistration: PaidRegistrationFixture;
   const createdUserIds: string[] = [];
   const epinIds: string[] = [];
 
@@ -76,23 +81,8 @@ describe('MegaGoldenClub auth integration', () => {
   }
 
   async function createEpin(raw: string) {
-    const id = randomUUID();
+    const id = await paidRegistration.createEpin(raw);
     epinIds.push(id);
-    const pinHash = createHmac(
-      'sha256',
-      config.getOrThrow<string>('CAPTCHA_HMAC_SECRET'),
-    )
-      .update(`owner-portal:epin:${raw}`)
-      .digest('hex');
-    await prisma.$executeRawUnsafe(
-      `INSERT INTO owner_epins
-         (id, pinHash, displaySuffix, status, expiresAt, createdAt, updatedAt)
-       VALUES (?, ?, ?, 'ACTIVE', ?, CURRENT_TIMESTAMP(3), CURRENT_TIMESTAMP(3))`,
-      id,
-      pinHash,
-      raw.slice(-6),
-      new Date(Date.now() + 60 * 60 * 1000),
-    );
   }
 
   beforeAll(async () => {
@@ -183,6 +173,9 @@ describe('MegaGoldenClub auth integration', () => {
         },
       }),
     ]);
+
+    paidRegistration = await createPaidRegistrationFixture(prisma, config, 'auth');
+    createdUserIds.push(paidRegistration.sponsorUserId);
   });
 
   afterAll(async () => {
@@ -195,6 +188,9 @@ describe('MegaGoldenClub auth integration', () => {
           ],
         },
       });
+      if (paidRegistration) {
+        await paidRegistration.cleanupUserEnrollments(createdUserIds);
+      }
       if (epinIds.length) {
         await prisma.$executeRawUnsafe(
           `DELETE FROM owner_epins WHERE id IN (${epinIds.map(() => '?').join(',')})`,
@@ -225,6 +221,9 @@ describe('MegaGoldenClub auth integration', () => {
           `DELETE FROM member_profiles WHERE userId IN (${placeholders})`,
           ...createdUserIds,
         );
+      }
+      if (paidRegistration) {
+        await paidRegistration.cleanupDomain();
       }
       await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
       await Promise.all([
@@ -260,6 +259,7 @@ describe('MegaGoldenClub auth integration', () => {
         email,
         password,
         fullName: 'Integration Member',
+        sponsorReference: paidRegistration.sponsorUsername,
         epin,
       }),
     });
