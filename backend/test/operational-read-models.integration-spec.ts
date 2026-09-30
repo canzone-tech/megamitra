@@ -99,8 +99,17 @@ describe('MegaGoldenClub operational read models integration', () => {
       where: { id: { in: userIds } },
       data: { passwordHash },
     });
-    const superAdmin = await prisma.role.findUniqueOrThrow({ where: { name: 'SUPER_ADMIN' } });
-    await prisma.userRole.create({ data: { userId: admin.id, roleId: superAdmin.id } });
+    const [superAdmin, memberRole] = await Promise.all([
+      prisma.role.findUniqueOrThrow({ where: { name: 'SUPER_ADMIN' } }),
+      prisma.role.findUniqueOrThrow({ where: { name: 'MEMBER' } }),
+    ]);
+    await prisma.userRole.createMany({
+      data: [
+        { userId: admin.id, roleId: superAdmin.id },
+        { userId: memberA.id, roleId: memberRole.id },
+        { userId: memberB.id, roleId: memberRole.id },
+      ],
+    });
 
     const [adminToken, memberAToken, memberBToken] = await Promise.all([
       login(admin.username, password),
@@ -274,6 +283,7 @@ describe('MegaGoldenClub operational read models integration', () => {
 
     const forbiddenAdmin = await request('/admin/operations/summary', memberAToken);
     expect(forbiddenAdmin.status).toBe(403);
+    expect((await request('/member/dashboard', adminToken)).status).toBe(403);
 
     const summary = await request('/admin/operations/summary', adminToken);
     expect(summary.status).toBe(200);
