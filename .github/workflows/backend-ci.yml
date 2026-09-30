@@ -17,52 +17,24 @@ jobs:
   verify-backend:
     runs-on: ubuntu-24.04
     timeout-minutes: 30
-    services:
-      mysql:
-        image: mysql:8.4
-        env:
-          MYSQL_ROOT_PASSWORD: root_test_password
-          MYSQL_DATABASE: megamitra
-          MYSQL_USER: megamitra_app
-          MYSQL_PASSWORD: megamitra_test_password
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot_test_password"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=10
-      mongodb:
-        image: mongo:8
-        ports:
-          - 27017:27017
-        options: >-
-          --health-cmd="mongosh --quiet --eval 'db.runCommand({ ping: 1 }).ok'"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=10
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd="redis-cli ping"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=10
 
     env:
       NODE_ENV: test
       PORT: 3100
+      MYSQL_ROOT_PASSWORD: root_test_password
       MYSQL_HOST: 127.0.0.1
       MYSQL_PORT: 3306
+      MYSQL_DOCKER_PORT: 3306
       MYSQL_DATABASE: megamitra
       MYSQL_USER: megamitra_app
       MYSQL_PASSWORD: megamitra_test_password
       DATABASE_URL: mysql://megamitra_app:megamitra_test_password@127.0.0.1:3306/megamitra
+      MONGODB_DATABASE: megamitra
+      MONGODB_PORT: 27017
       MONGODB_URI: mongodb://127.0.0.1:27017/megamitra
       REDIS_HOST: 127.0.0.1
       REDIS_PORT: 6379
+      REDIS_DOCKER_PORT: 6379
       REDIS_PASSWORD: ''
       CAPTCHA_HMAC_SECRET: ci-captcha-secret-00000000000000000000000000000000
       JWT_ACCESS_SECRET: ci-access-secret-000000000000000000000000000000000
@@ -85,6 +57,11 @@ jobs:
 
       - name: Verify root handoff and brand contract
         run: node -e "const p=require('../package.json'); if (p.name !== 'megagoldenclub' || p.scripts?.verify !== 'npm --prefix backend run verify') process.exit(1)"
+
+      - name: Start CI data services
+        run: |
+          docker compose -f ../docker-compose.yml up -d --wait --wait-timeout 120
+          docker compose -f ../docker-compose.yml ps
 
       - name: Install exact dependencies
         run: npm ci
@@ -247,3 +224,7 @@ jobs:
             echo 'Compiled API cleanup left port 3100 in use'
             exit 1
           fi
+
+      - name: Stop CI data services
+        if: always()
+        run: docker compose -f ../docker-compose.yml down -v --remove-orphans
