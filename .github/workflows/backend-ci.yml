@@ -111,7 +111,15 @@ jobs:
           npm run build
           test -f dist/main.js
 
-      - name: Verify compiled production API
+      - name: Build production frontends for browser UAT
+        working-directory: .
+        run: |
+          npm --prefix admin ci --include=dev --no-audit --no-fund
+          npm --prefix frontend ci --include=dev --no-audit --no-fund
+          npm --prefix admin run build
+          npm --prefix frontend run build
+
+      - name: Verify compiled production API and browser UAT
         run: |
           test -f dist/main.js
           LOG_FILE="$(mktemp -t megagoldenclub-api-ci.XXXXXX.log)"
@@ -218,6 +226,12 @@ jobs:
           UAT_MEMBER_TOKEN="${UAT_MEMBER_TOKEN_VALUE}" \
           ./scripts/uat-smoke.sh
 
+          echo 'Running authenticated desktop/mobile browser UAT'
+          UAT_ADMIN_TOKEN="${UAT_ADMIN_TOKEN_VALUE}" \
+          UAT_MEMBER_TOKEN="${UAT_MEMBER_TOKEN_VALUE}" \
+          BROWSER_UAT_ARTIFACT_DIR="${RUNNER_TEMP}/megagoldenclub-browser-uat" \
+          node ../scripts/verify-browser-uat.mjs
+
           terminate_api
           if ! cleanup_uat_fixture; then
             echo 'Authenticated UAT fixture cleanup failed'
@@ -229,6 +243,15 @@ jobs:
             echo 'Compiled API cleanup left port 3100 in use'
             exit 1
           fi
+
+      - name: Upload browser UAT evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: megagoldenclub-browser-uat-${{ github.sha }}
+          path: ${{ runner.temp }}/megagoldenclub-browser-uat
+          if-no-files-found: ignore
+          retention-days: 14
 
       - name: Stop CI data services
         if: always()
