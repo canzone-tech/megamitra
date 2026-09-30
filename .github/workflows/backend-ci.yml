@@ -133,6 +133,10 @@ jobs:
         run: |
           test -f dist/main.js
           LOG_FILE="$(mktemp -t megagoldenclub-api-ci.XXXXXX.log)"
+          UAT_FIXTURE_FILE="$(mktemp -t megagoldenclub-uat-auth-ci.XXXXXX)"
+          UAT_FIXTURE_READY=""
+          UAT_ADMIN_TOKEN_VALUE=""
+          UAT_MEMBER_TOKEN_VALUE=""
           API_PID=""
 
           assert_port_available() {
@@ -163,14 +167,40 @@ jobs:
             API_PID=""
           }
 
+          cleanup_uat_fixture() {
+            if [[ -z "${UAT_FIXTURE_READY}" ]]; then
+              rm -f "${UAT_FIXTURE_FILE}"
+              return 0
+            fi
+            npx ts-node scripts/uat-auth-fixture.ts cleanup "${UAT_FIXTURE_FILE}"
+            UAT_FIXTURE_READY=""
+            UAT_ADMIN_TOKEN_VALUE=""
+            UAT_MEMBER_TOKEN_VALUE=""
+            rm -f "${UAT_FIXTURE_FILE}"
+          }
+
           cleanup() {
             terminate_api
-            rm -f "${LOG_FILE}"
+            if [[ -n "${UAT_FIXTURE_READY}" ]]; then
+              npx ts-node scripts/uat-auth-fixture.ts cleanup "${UAT_FIXTURE_FILE}" >/dev/null 2>&1 || true
+              UAT_FIXTURE_READY=""
+            fi
+            rm -f "${UAT_FIXTURE_FILE}" "${LOG_FILE}"
           }
           trap cleanup EXIT INT TERM
 
           if ! assert_port_available; then
             echo 'Port 3100 is already in use before compiled API verification'
+            exit 1
+          fi
+
+          echo 'Creating ephemeral authenticated UAT principals'
+          npx ts-node scripts/uat-auth-fixture.ts create "${UAT_FIXTURE_FILE}"
+          UAT_FIXTURE_READY=1
+          UAT_ADMIN_TOKEN_VALUE="$(node -e 'const fs=require("fs"); const state=JSON.parse(fs.readFileSync(process.argv[1], "utf8")); process.stdout.write(state.admin.accessToken || "")' "${UAT_FIXTURE_FILE}")"
+          UAT_MEMBER_TOKEN_VALUE="$(node -e 'const fs=require("fs"); const state=JSON.parse(fs.readFileSync(process.argv[1], "utf8")); process.stdout.write(state.member.accessToken || "")' "${UAT_FIXTURE_FILE}")"
+          if [[ -z "${UAT_ADMIN_TOKEN_VALUE}" || -z "${UAT_MEMBER_TOKEN_VALUE}" ]]; then
+            echo 'Authenticated UAT fixture did not produce both access tokens'
             exit 1
           fi
 
@@ -201,7 +231,17 @@ jobs:
           fi
           printf '%s\n' "${READY}"
 
-          cleanup
+          MEGAGOLDENCLUB_UAT_BASE_URL=http://127.0.0.1:3100 \
+          UAT_ADMIN_TOKEN="${UAT_ADMIN_TOKEN_VALUE}" \
+          UAT_MEMBER_TOKEN="${UAT_MEMBER_TOKEN_VALUE}" \
+          ./scripts/uat-smoke.sh
+
+          terminate_api
+          if ! cleanup_uat_fixture; then
+            echo 'Authenticated UAT fixture cleanup failed'
+            exit 1
+          fi
+          rm -f "${LOG_FILE}"
           trap - EXIT INT TERM
           if ! assert_port_available; then
             echo 'Compiled API cleanup left port 3100 in use'
