@@ -74,6 +74,8 @@ The command writes a timestamped directory under `../backups/` by default with:
 - `manifest.txt`
 - `SHA256SUMS`
 
+The backup/restore commands use the repository-root `.env` when present and otherwise accept the same required database settings from the invoking process environment. The manifest records the source git commit and database names. Restore rejects a backup whose manifest database identities do not match the configured MySQL and MongoDB targets.
+
 A local backup is not complete until the directory is encrypted and copied to protected off-host storage. Retention and encryption keys must be managed outside the repository.
 
 Run scheduled backup jobs only after checking available disk space and monitoring command exit status. Perform a restore drill regularly on an isolated environment.
@@ -88,9 +90,13 @@ From `backend/`:
 MEGAGOLDENCLUB_RESTORE_CONFIRM=YES npm run restore:data -- /absolute/path/to/backup
 ```
 
-The restore command verifies checksums, restores MySQL and MongoDB, clears Redis to prevent stale non-authoritative state, and runs `prisma migrate status`.
+The restore command verifies checksums and manifest database identity, restores MySQL and MongoDB, clears Redis to prevent stale non-authoritative state, and runs `prisma migrate status`.
 
-After restore, return to the repository root and run:
+Backend CI also runs an automated recovery regression only in its ephemeral `NODE_ENV=test` data services. It seeds isolated MySQL/MongoDB/Redis canaries, takes a real backup, mutates the canaries, restores the backup, proves MySQL and MongoDB returned to the backed-up values, proves Redis was cleared, and removes the canaries. The drill requires the explicit `MEGAGOLDENCLUB_RESTORE_DRILL_CONFIRM=YES` guard and refuses to run outside `NODE_ENV=test`.
+
+The automated CI drill protects backup/restore code paths but does **not** replace an operational disaster-recovery exercise using an encrypted off-host backup and production-like isolated infrastructure.
+
+After an operational restore, return to the repository root and run:
 
 ```bash
 npm run verify
