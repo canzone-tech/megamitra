@@ -25,7 +25,7 @@ mkdir -p "${TARGET}"
 
 printf '%s\n' "==> Backing up authoritative MySQL data"
 "${COMPOSE[@]}" exec -T mysql sh -c \
-  'exec mysqldump --single-transaction --quick --routines --triggers --events --set-gtid-purged=OFF -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE"' \
+  'exec mysqldump --single-transaction --quick --routines --triggers --events --set-gtid-purged=OFF --no-tablespaces -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE"' \
   > "${TARGET}/mysql.sql"
 
 printf '%s\n' "==> Backing up MongoDB presentation documents"
