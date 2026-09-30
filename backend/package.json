@@ -21,6 +21,7 @@
     "super-admin:reset-break-glass": "ts-node scripts/reset-super-admin-password.ts",
     "backup:data": "./scripts/backup-data.sh",
     "restore:data": "./scripts/restore-data.sh",
+    "verify:recovery-drill": "./scripts/verify-backup-restore-drill.sh",
     "uat:smoke": "./scripts/uat-smoke.sh",
     "verify": "node ../scripts/verify-super-admin-lifecycle.mjs && ./scripts/verify-local.sh"
   },
