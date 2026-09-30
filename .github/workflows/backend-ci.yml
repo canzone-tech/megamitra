@@ -96,6 +96,11 @@ jobs:
       - name: Integration tests
         run: npm run test:integration
 
+      - name: Isolated backup restore recovery drill
+        env:
+          MEGAGOLDENCLUB_RESTORE_DRILL_CONFIRM: 'YES'
+        run: npm run verify:recovery-drill
+
       - name: Build reproducibly
         run: |
           rm -rf dist
