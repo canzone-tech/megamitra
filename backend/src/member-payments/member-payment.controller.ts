@@ -81,6 +81,7 @@ export class AdminMemberPaymentController {
   }
 
   @Patch('submissions/:id/review')
+  @Roles('SUPER_ADMIN')
   review(
     @Param('id') id: string,
     @Body() dto: ReviewMemberPaymentDto,
