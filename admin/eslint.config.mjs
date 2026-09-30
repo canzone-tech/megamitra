@@ -11,5 +11,11 @@ export default defineConfig([
       'react-hooks/set-state-in-effect': 'off',
     },
   },
+  {
+    files: ['components/member-payment-verification-portal.tsx'],
+    rules: {
+      '@next/next/no-img-element': 'off',
+    },
+  },
   globalIgnores(['.next/**', 'out/**', 'build/**', 'next-env.d.ts']),
 ]);
