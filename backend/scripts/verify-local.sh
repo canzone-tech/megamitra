@@ -81,6 +81,10 @@ bash "${ROOT_DIR}/scripts/verify-frontends.sh"
 PORT_VALUE="$(grep -E '^PORT=' .env | tail -n1 | cut -d= -f2- || true)"
 PORT_VALUE="${PORT_VALUE:-3100}"
 LOG_FILE="$(mktemp -t megagoldenclub-api.XXXXXX.log)"
+UAT_FIXTURE_FILE="$(mktemp -t megagoldenclub-uat-auth.XXXXXX)"
+UAT_FIXTURE_READY=""
+UAT_ADMIN_TOKEN_VALUE=""
+UAT_MEMBER_TOKEN_VALUE=""
 API_PID=""
 
 assert_port_available() {
@@ -112,14 +116,40 @@ terminate_api() {
   API_PID=""
 }
 
+cleanup_uat_fixture() {
+  if [[ -z "${UAT_FIXTURE_READY}" ]]; then
+    rm -f "${UAT_FIXTURE_FILE}"
+    return 0
+  fi
+  npx ts-node scripts/uat-auth-fixture.ts cleanup "${UAT_FIXTURE_FILE}"
+  UAT_FIXTURE_READY=""
+  UAT_ADMIN_TOKEN_VALUE=""
+  UAT_MEMBER_TOKEN_VALUE=""
+  rm -f "${UAT_FIXTURE_FILE}"
+}
+
 cleanup() {
   terminate_api
-  rm -f "${LOG_FILE}"
+  if [[ -n "${UAT_FIXTURE_READY}" ]]; then
+    npx ts-node scripts/uat-auth-fixture.ts cleanup "${UAT_FIXTURE_FILE}" >/dev/null 2>&1 || true
+    UAT_FIXTURE_READY=""
+  fi
+  rm -f "${UAT_FIXTURE_FILE}" "${LOG_FILE}"
 }
 trap cleanup EXIT INT TERM
 
 if ! assert_port_available; then
   echo "ERROR: port ${PORT_VALUE} is already in use before compiled API verification"
+  exit 1
+fi
+
+echo "==> Creating ephemeral authenticated UAT principals"
+npx ts-node scripts/uat-auth-fixture.ts create "${UAT_FIXTURE_FILE}"
+UAT_FIXTURE_READY=1
+UAT_ADMIN_TOKEN_VALUE="$(node -e 'const fs=require("fs"); const state=JSON.parse(fs.readFileSync(process.argv[1], "utf8")); process.stdout.write(state.admin.accessToken || "")' "${UAT_FIXTURE_FILE}")"
+UAT_MEMBER_TOKEN_VALUE="$(node -e 'const fs=require("fs"); const state=JSON.parse(fs.readFileSync(process.argv[1], "utf8")); process.stdout.write(state.member.accessToken || "")' "${UAT_FIXTURE_FILE}")"
+if [[ -z "${UAT_ADMIN_TOKEN_VALUE}" || -z "${UAT_MEMBER_TOKEN_VALUE}" ]]; then
+  echo "ERROR: authenticated UAT fixture did not produce both access tokens"
   exit 1
 fi
 
@@ -151,10 +181,19 @@ if [[ "${HEALTH}" != *'"service":"megagoldenclub-api"'* ]]; then
 fi
 
 printf '%s\n' "${HEALTH}"
-MEGAGOLDENCLUB_UAT_BASE_URL="http://127.0.0.1:${PORT_VALUE}" ./scripts/uat-smoke.sh
+MEGAGOLDENCLUB_UAT_BASE_URL="http://127.0.0.1:${PORT_VALUE}" \
+UAT_ADMIN_TOKEN="${UAT_ADMIN_TOKEN_VALUE}" \
+UAT_MEMBER_TOKEN="${UAT_MEMBER_TOKEN_VALUE}" \
+./scripts/uat-smoke.sh
 
 echo "==> Verifying compiled API cleanup"
-cleanup
+terminate_api
+echo "==> Cleaning authenticated UAT principals"
+if ! cleanup_uat_fixture; then
+  echo "ERROR: authenticated UAT fixture cleanup failed"
+  exit 1
+fi
+rm -f "${LOG_FILE}"
 trap - EXIT INT TERM
 if ! assert_port_available; then
   echo "ERROR: verification left port ${PORT_VALUE} in use"
