@@ -21,7 +21,6 @@ type Submission = {
   reviewedAt: string | null;
   reviewNote: string | null;
   epinQuantity: number | null;
-  memberId: string;
   username: string;
   firstName: string | null;
   lastName: string | null;
@@ -29,21 +28,17 @@ type Submission = {
   seasonName: string;
   reviewedByUsername: string | null;
 };
-
 type PaymentSettings = {
-  id: number;
   upiId: string | null;
   payeeName: string | null;
   qrImageDataUrl: string | null;
   instructions: string | null;
   enabled: boolean | number;
-  updatedAt: string;
 };
 
 function classNames(...values: Array<string | false | null | undefined>) {
   return values.filter(Boolean).join(' ');
 }
-
 function money(value: string, currencyCode: string) {
   const amount = Number(value);
   try {
@@ -52,19 +47,16 @@ function money(value: string, currencyCode: string) {
     return `${currencyCode} ${Number.isFinite(amount) ? amount.toFixed(2) : value}`;
   }
 }
-
-function dateTime(value: string | null | undefined) {
+function dateTime(value?: string | null) {
   if (!value) return '—';
   const date = new Date(value);
   return Number.isFinite(date.getTime()) ? date.toLocaleString() : value;
 }
-
 function statusLabel(status: string) {
   if (status === 'PENDING_VERIFICATION' || status === 'PROCESSING') return 'PENDING VERIFICATION';
   if (status === 'CONFIRMED') return 'CONFIRMED / PAID';
   return status;
 }
-
 function detailsObject(value: Submission['details']): Record<string, unknown> {
   if (!value) return {};
   if (typeof value === 'object') return value;
@@ -75,17 +67,16 @@ function detailsObject(value: Submission['details']): Record<string, unknown> {
     return {};
   }
 }
-
 async function fileToDataUrl(file: File): Promise<string> {
   if (!file.type.startsWith('image/')) throw new Error('QR image must be an image');
-  const raw = await new Promise<string>((resolve, reject) => {
+  const result = await new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result ?? ''));
     reader.onerror = () => reject(new Error('Unable to read QR image'));
     reader.readAsDataURL(file);
   });
-  if (raw.length > 120_000) throw new Error('QR image is too large. Please use a smaller image.');
-  return raw;
+  if (result.length > 120_000) throw new Error('QR image is too large. Please use a smaller image.');
+  return result;
 }
 
 export function MemberPaymentVerificationPortal() {
@@ -136,18 +127,10 @@ export function MemberPaymentVerificationPortal() {
   }, [load]);
 
   async function review(row: Submission, decision: 'APPROVE' | 'REJECT') {
-    const note = window.prompt(
-      decision === 'REJECT' ? 'Rejection note (recommended)' : 'Verification note (optional)',
-      '',
-    );
+    const note = window.prompt(decision === 'REJECT' ? 'Rejection note (required)' : 'Verification note (optional)', '');
     if (note === null) return;
-    if (decision === 'REJECT' && !note.trim()) {
-      setError('Add a rejection note before rejecting the payment.');
-      return;
-    }
-    setBusyId(row.id);
-    setError('');
-    setNotice('');
+    if (decision === 'REJECT' && !note.trim()) return setError('Add a rejection note before rejecting the payment.');
+    setBusyId(row.id); setError(''); setNotice('');
     try {
       await apiJson(`/api/backend/admin/member-payments/submissions/${encodeURIComponent(row.id)}/review`, {
         method: 'PATCH',
@@ -157,19 +140,13 @@ export function MemberPaymentVerificationPortal() {
         ? `${row.receiptNumber} confirmed. The same public receipt now shows CONFIRMED / PAID.`
         : `${row.receiptNumber} rejected. The same public receipt now shows REJECTED.`);
       await load();
-    } catch (reason) {
-      handleError(reason);
-    } finally {
-      setBusyId('');
-    }
+    } catch (reason) { handleError(reason); } finally { setBusyId(''); }
   }
 
   async function saveSettings(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    setBusySettings(true);
-    setError('');
-    setNotice('');
+    setBusySettings(true); setError(''); setNotice('');
     try {
       await apiJson('/api/backend/admin/member-payments/settings', {
         method: 'PUT',
@@ -183,31 +160,22 @@ export function MemberPaymentVerificationPortal() {
       });
       setNotice('Member QR / UPI payment settings updated.');
       await load();
-    } catch (reason) {
-      handleError(reason);
-    } finally {
-      setBusySettings(false);
-    }
+    } catch (reason) { handleError(reason); } finally { setBusySettings(false); }
   }
 
   return (
     <OwnerManagementShell title="Member Payment Verification" currentSection="member-payments">
-      <div className={styles.hero}>
-        <h1>Member Payment Verification</h1>
-        <p>Review QR / UPI installment and E-PIN purchase submissions. Approval and rejection are restricted to Super Admin.</p>
-        <span className={styles.pill}>UTR + SCREENSHOT • AUDITED REVIEW</span>
-      </div>
-
+      <div className={styles.hero}><h1>Member Payment Verification</h1><p>Review QR / UPI installment and E-PIN purchase submissions. Approval and rejection are restricted to Super Admin.</p><span className={styles.pill}>UTR + SCREENSHOT • AUDITED REVIEW</span></div>
       {error ? <div className={classNames(styles.notice, styles.error)} role="alert">{error}</div> : null}
       {notice ? <div className={classNames(styles.notice, styles.success)} role="status">{notice}</div> : null}
 
       <div className={styles.card}>
         <div className={styles.sectionHead}><div className={styles.sectionTitle}><span className={styles.sectionIcon}>₹</span><h2>QR / UPI Settings</h2></div><small>Super Admin only</small></div>
-        {settings ? <form onSubmit={saveSettings}>
+        {settings ? <form method="post" onSubmit={saveSettings}>
           <div className={styles.fields}>
             <div className={styles.field}><label>UPI ID</label><input className={styles.input} name="upiId" defaultValue={settings.upiId ?? ''} /></div>
             <div className={styles.field}><label>Payee name</label><input className={styles.input} name="payeeName" defaultValue={settings.payeeName ?? ''} /></div>
-            <div className={styles.field}><label>QR image</label><input className={styles.input} type="file" accept="image/*" onChange={(event) => { const file = event.target.files?.[0]; if (!file) return; void fileToDataUrl(file).then(setQrImageDataUrl).catch(handleError); }} /></div>
+            <div className={styles.field}><label>QR image</label><input className={styles.input} type="file" accept="image/*" onChange={(event) => { const file = event.target.files?.[0]; if (file) void fileToDataUrl(file).then(setQrImageDataUrl).catch(handleError); }} /></div>
             <div className={styles.field}><label>Enabled</label><input name="enabled" type="checkbox" defaultChecked={Boolean(settings.enabled)} /></div>
             <div className={classNames(styles.field, styles.full)}><label>Member instructions</label><textarea className={styles.input} name="instructions" defaultValue={settings.instructions ?? ''} rows={3} /></div>
           </div>
@@ -222,7 +190,6 @@ export function MemberPaymentVerificationPortal() {
           <div className={styles.field}><label>Status</label><select className={styles.select} value={status} onChange={(event) => setStatus(event.target.value)}><option value="PENDING_VERIFICATION">Pending verification</option><option value="CONFIRMED">Confirmed / paid</option><option value="REJECTED">Rejected</option><option value="">All</option></select></div>
           <div className={styles.field}><label>Purpose</label><select className={styles.select} value={purpose} onChange={(event) => setPurpose(event.target.value)}><option value="">All purposes</option><option value="INSTALLMENT">Installment</option><option value="EPIN_PURCHASE">E-PIN purchase</option></select></div>
         </div>
-
         {rows.length ? <div className={styles.tableBox}><table className={styles.table}><thead><tr><th>RECEIPT / MEMBER</th><th>PURPOSE / SESSION</th><th>AMOUNT / UTR</th><th>PROOF</th><th>STATUS</th><th>ACTION</th></tr></thead><tbody>{rows.map((row) => {
           const details = detailsObject(row.details);
           const memberName = [row.firstName, row.lastName].filter(Boolean).join(' ') || row.username;
