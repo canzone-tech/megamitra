@@ -990,7 +990,7 @@ export class MemberPaymentService {
        WHERE u.status='ACTIVE'
          AND (u.id=? OR u.username=? OR LOWER(u.email)=LOWER(?) OR u.phone=?)
          AND EXISTS (
-           SELECT 1 FROM user_roles ur JOIN roles r ON r.id=ur.userId
+           SELECT 1 FROM user_roles ur JOIN roles r ON r.id=ur.roleId
            WHERE ur.userId=u.id AND r.name='MEMBER' AND r.status='ACTIVE'
          )
        LIMIT 1`,
