@@ -59,6 +59,8 @@ request 401 /auth/me
 if [[ -n "${UAT_ADMIN_TOKEN:-}" ]]; then
   printf '%s\n' "==> UAT smoke: admin operations read"
   request 200 /admin/operations/summary "${UAT_ADMIN_TOKEN}"
+  printf '%s\n' "==> UAT smoke: admin denied from member operational reads"
+  request 403 /member/dashboard "${UAT_ADMIN_TOKEN}"
 else
   printf '%s\n' "==> UAT admin token not supplied; authenticated admin smoke skipped"
 fi
@@ -66,6 +68,8 @@ fi
 if [[ -n "${UAT_MEMBER_TOKEN:-}" ]]; then
   printf '%s\n' "==> UAT smoke: member dashboard read"
   request 200 /member/dashboard "${UAT_MEMBER_TOKEN}"
+  printf '%s\n' "==> UAT smoke: member denied from admin operations"
+  request 403 /admin/operations/summary "${UAT_MEMBER_TOKEN}"
 else
   printf '%s\n' "==> UAT member token not supplied; authenticated member smoke skipped"
 fi
