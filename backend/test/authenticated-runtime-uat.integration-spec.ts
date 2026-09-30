@@ -1,4 +1,5 @@
 import type { INestApplication } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
 import { randomUUID } from 'node:crypto';
 import { AppModule } from '../src/app.module';
@@ -10,6 +11,10 @@ import {
   UserStatus,
   UsernameCreationMode,
 } from '../src/generated/prisma/enums';
+import {
+  createPaidRegistrationFixture,
+  type PaidRegistrationFixture,
+} from './paid-registration.fixture';
 
 type RegistrationConfigSnapshot = {
   publicRegistrationEnabled: boolean;
@@ -45,8 +50,10 @@ type PlacementRow = {
 describe('MegaGoldenClub authenticated runtime UAT', () => {
   let app: INestApplication;
   let prisma: PrismaService;
+  let config: ConfigService;
   let passwords: PasswordService;
   let baseUrl: string;
+  let paidRegistration: PaidRegistrationFixture;
   let originalLoginWithUsername: boolean;
   let originalCaptchaOnLoginEnabled: boolean;
   let originalCaptchaOnRegistrationEnabled: boolean;
@@ -179,6 +186,7 @@ describe('MegaGoldenClub authenticated runtime UAT', () => {
     await app.listen(0, '127.0.0.1');
     baseUrl = await app.getUrl();
     prisma = app.get(PrismaService);
+    config = app.get(ConfigService);
     passwords = app.get(PasswordService);
 
     const [authConfig, registration] = await Promise.all([
@@ -230,6 +238,9 @@ describe('MegaGoldenClub authenticated runtime UAT', () => {
         },
       }),
     ]);
+
+    paidRegistration = await createPaidRegistrationFixture(prisma, config, 'uat');
+    createdUserIds.push(paidRegistration.sponsorUserId);
   });
 
   afterAll(async () => {
@@ -248,6 +259,9 @@ describe('MegaGoldenClub authenticated runtime UAT', () => {
         },
       });
       await prisma.authSession.deleteMany({ where: { userId: { in: createdUserIds } } });
+      if (paidRegistration) {
+        await paidRegistration.cleanupUserEnrollments(createdUserIds);
+      }
 
       if (generatedEpinIds.length) {
         const epinPlaceholders = generatedEpinIds.map(() => '?').join(',');
@@ -281,6 +295,9 @@ describe('MegaGoldenClub authenticated runtime UAT', () => {
           `DELETE FROM member_profiles WHERE userId IN (${placeholders})`,
           ...createdUserIds,
         );
+      }
+      if (paidRegistration) {
+        await paidRegistration.cleanupDomain();
       }
       await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
 
@@ -424,18 +441,31 @@ describe('MegaGoldenClub authenticated runtime UAT', () => {
       expect(epins).toHaveLength(7);
       generatedEpinIds.push(...epins.map((epin) => epin.id));
 
+      const publicEpins = await Promise.all(
+        Array.from({ length: 5 }, async (_, index) => {
+          const pin = `UAT-PUB-${suffix}-${index + 1}`;
+          const id = await paidRegistration.createEpin(pin);
+          generatedEpinIds.push(id);
+          return { id, pin };
+        }),
+      );
+
       const sponsorUsername = `uat_sponsor_${suffix}`;
       const sponsorPassword = 'Uat-Sponsor-Pass-123!';
       const sponsorRegistration = await registerPublicMember({
         username: sponsorUsername,
         email: `${sponsorUsername}@example.test`,
         password: sponsorPassword,
-        epin: epins[0].pin,
+        epin: publicEpins[0].pin,
         fullName: 'Runtime Sponsor',
+        sponsorReference: paidRegistration.sponsorUsername,
       });
       const sponsorUserId = String(sponsorRegistration.body.user.id);
-      expect(sponsorRegistration.body.sponsor).toBeNull();
-      expect(sponsorRegistration.body.placement).toBeNull();
+      expect(sponsorRegistration.body.sponsor).toMatchObject({
+        id: paidRegistration.sponsorUserId,
+        username: paidRegistration.sponsorUsername,
+      });
+      expect(sponsorRegistration.body.placement).toEqual({ slot: 'A', side: 'LEFT' });
 
       await prisma.user.update({
         where: { id: sponsorUserId },
@@ -466,7 +496,7 @@ describe('MegaGoldenClub authenticated runtime UAT', () => {
           username,
           email: `${username}@example.test`,
           password: `Uat-Child-${index + 1}-Pass-123!`,
-          epin: epins[index + 1].pin,
+          epin: publicEpins[index + 1].pin,
           fullName: `Runtime Child ${index + 1}`,
           sponsorReference: sponsorUsername,
         });
@@ -505,8 +535,8 @@ describe('MegaGoldenClub authenticated runtime UAT', () => {
       >(
         `SELECT id, status, usedByUserId
          FROM owner_epins
-         WHERE id IN (${epins.slice(0, 5).map(() => '?').join(',')})`,
-        ...epins.slice(0, 5).map((epin) => epin.id),
+         WHERE id IN (${publicEpins.map(() => '?').join(',')})`,
+        ...publicEpins.map((epin) => epin.id),
       );
       expect(usedPublicEpins).toHaveLength(5);
       expect(usedPublicEpins.every((epin) => epin.status === 'USED' && epin.usedByUserId)).toBe(
