@@ -14,10 +14,6 @@ if [[ "${MEGAGOLDENCLUB_RESTORE_CONFIRM:-}" != "YES" ]]; then
   echo "ERROR: restore is destructive. Re-run with MEGAGOLDENCLUB_RESTORE_CONFIRM=YES"
   exit 1
 fi
-if [[ ! -f "${ENV_FILE}" ]]; then
-  echo "ERROR: ${ENV_FILE} is missing"
-  exit 1
-fi
 for required in mysql.sql mongodb.archive.gz manifest.txt SHA256SUMS; do
   if [[ ! -f "${BACKUP_DIR}/${required}" ]]; then
     echo "ERROR: missing ${BACKUP_DIR}/${required}"
@@ -25,17 +21,43 @@ for required in mysql.sql mongodb.archive.gz manifest.txt SHA256SUMS; do
   fi
 done
 
-set -a
-# shellcheck disable=SC1090
-source "${ENV_FILE}"
-set +a
+COMPOSE=(docker compose -f "${ROOT_DIR}/docker-compose.yml")
+if [[ -f "${ENV_FILE}" ]]; then
+  set -a
+  # shellcheck disable=SC1090
+  source "${ENV_FILE}"
+  set +a
+  COMPOSE=(docker compose --env-file "${ENV_FILE}" -f "${ROOT_DIR}/docker-compose.yml")
+fi
+
+: "${MYSQL_DATABASE:?MYSQL_DATABASE is required}"
+: "${MONGODB_DATABASE:?MONGODB_DATABASE is required}"
 
 (
   cd "${BACKUP_DIR}"
   sha256sum -c SHA256SUMS
 )
 
-COMPOSE=(docker compose --env-file "${ENV_FILE}" -f "${ROOT_DIR}/docker-compose.yml")
+manifest_value() {
+  local key="$1"
+  sed -n "s/^${key}=//p" "${BACKUP_DIR}/manifest.txt" | tail -n 1
+}
+
+MANIFEST_MYSQL_DATABASE="$(manifest_value mysqlDatabase)"
+MANIFEST_MONGODB_DATABASE="$(manifest_value mongodbDatabase)"
+MANIFEST_GIT_COMMIT="$(manifest_value gitCommit)"
+MANIFEST_CREATED_AT="$(manifest_value createdAtUtc)"
+
+if [[ -z "${MANIFEST_MYSQL_DATABASE}" || "${MANIFEST_MYSQL_DATABASE}" != "${MYSQL_DATABASE}" ]]; then
+  echo "ERROR: backup MySQL database '${MANIFEST_MYSQL_DATABASE:-missing}' does not match configured '${MYSQL_DATABASE}'"
+  exit 1
+fi
+if [[ -z "${MANIFEST_MONGODB_DATABASE}" || "${MANIFEST_MONGODB_DATABASE}" != "${MONGODB_DATABASE}" ]]; then
+  echo "ERROR: backup MongoDB database '${MANIFEST_MONGODB_DATABASE:-missing}' does not match configured '${MONGODB_DATABASE}'"
+  exit 1
+fi
+
+printf '%s\n' "==> Backup provenance: created=${MANIFEST_CREATED_AT:-unknown} gitCommit=${MANIFEST_GIT_COMMIT:-unknown}"
 "${COMPOSE[@]}" up -d mysql mongodb redis
 
 printf '%s\n' "==> Restoring MySQL system of record"
