@@ -673,12 +673,8 @@ export class MemberPaymentService {
         throw new ConflictException('Only a pending payment submission can be reviewed');
       }
       const superAdmin = actor.roles.includes('SUPER_ADMIN');
-      const admin = actor.roles.includes('ADMIN');
-      if (submission.purpose === 'INSTALLMENT' && !superAdmin) {
-        throw new ForbiddenException('Installment verification is restricted to SUPER_ADMIN');
-      }
-      if (submission.purpose === 'EPIN_PURCHASE' && !superAdmin && !admin) {
-        throw new ForbiddenException('E-PIN payment verification requires ADMIN or SUPER_ADMIN');
+      if (!superAdmin) {
+        throw new ForbiddenException('Payment verification is restricted to SUPER_ADMIN');
       }
       await connection.query(
         `UPDATE member_payment_submissions
