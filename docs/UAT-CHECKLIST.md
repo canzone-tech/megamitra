@@ -12,6 +12,7 @@ Use this checklist against a release candidate after automated verification is g
 - [ ] `npm run uat:smoke` passes; authenticated admin/member runtime smoke is run when tokens are available.
 - [ ] Integration tests pass authenticated admin/member authorization, self-scoping and core read-model checks even when external UAT tokens are not supplied.
 - [ ] Owner lucky-draw schedule integration passes January/third-Sunday defaults, admin/member authorization, recurrence enforcement and exact-replay/conflicting-replay behavior.
+- [ ] Backend CI authenticated browser UAT renders protected admin/member production builds at desktop and mobile widths, checks page-level horizontal overflow, exercises the admin mobile More drawer, verifies member mobile navigation actions remain visible, and uploads screenshots/metrics for the exact release commit.
 
 ## Identity and access
 
@@ -82,7 +83,7 @@ Use this checklist against a release candidate after automated verification is g
 - [ ] Binary today/settlement/carry-forward context matches backend records and the member's authoritative 1:4 genealogy.
 - [ ] Referral rewards show gross/reversed/net effects correctly.
 - [ ] Withdrawal/payout, draw/benefit and entitlement statuses match admin/operations records.
-- [ ] Desktop sidebar/topbar and mobile navigation are usable at the supported breakpoints.
+- [ ] Desktop sidebar/topbar and mobile navigation are usable at the supported breakpoints; use the automated browser artifact as baseline evidence, then complete a human interaction/readability pass before release sign-off.
 
 ## Admin presentation and configuration
 
