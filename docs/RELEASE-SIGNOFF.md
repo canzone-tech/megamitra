@@ -1,0 +1,93 @@
+# MegaGoldenClub Release Sign-Off
+
+Use one completed copy of this record per production release candidate. Do not pre-check manual gates from CI output. Attach or link evidence without copying secrets, JWTs, provider credentials, KYC data or payout destination details into the record.
+
+## Candidate identity
+
+- Release commit: `<40-character git SHA>`
+- Release Evidence workflow run: `<run URL or ID>`
+- Release evidence artifact: `megagoldenclub-release-evidence-<commit>`
+- Candidate prepared by: `<name>`
+- Environment: `<target-like / staging / production>`
+- Date/time (UTC): `<timestamp>`
+
+## Automated evidence
+
+- [ ] Backend CI is `success` for the exact release commit.
+- [ ] Frontend CI is `success` for the exact release commit.
+- [ ] Release Evidence workflow is `success` for the exact release commit.
+- [ ] `release-evidence.json` references the same commit and the expected browser-UAT artifact.
+
+Record run/artifact IDs:
+
+- Backend CI: `<run ID>`
+- Frontend CI: `<run ID>`
+- Browser UAT artifact: `<artifact ID>`
+- Release Evidence artifact: `<artifact ID>`
+
+## Target-host verification
+
+- [ ] The exact release commit was pulled on the target-like host.
+- [ ] Root `npm run verify` completed successfully.
+
+Evidence:
+
+- Operator: `<name>`
+- Host/environment reference: `<non-secret reference>`
+- Date/time (UTC): `<timestamp>`
+- Result/log reference: `<reference>`
+
+## Human browser review
+
+Use the authenticated browser-UAT screenshots/metrics as baseline evidence, then interact with the supported admin/member surfaces.
+
+- [ ] Admin desktop navigation/content is readable and usable.
+- [ ] Admin mobile navigation drawer is readable and usable.
+- [ ] Member desktop dashboard/navigation is readable and usable.
+- [ ] Member mobile navigation remains reachable and usable.
+- [ ] Appearance/theme controls render and behave as intended.
+
+Reviewer: `<name>`  
+Evidence/reference: `<reference>`
+
+## External providers
+
+For each provider that will be enabled in this release, record UAT approval. Mark a provider `N/A` only when it will remain disabled.
+
+| Provider function | Provider/reference | Status (`APPROVED` / `N/A`) | Evidence |
+| --- | --- | --- | --- |
+| Payment collection |  |  |  |
+| Payout |  |  |  |
+| SMTP/email |  |  |  |
+| Product/prize fulfilment |  |  |  |
+
+- [ ] Every enabled provider above is UAT-approved.
+
+## Recovery readiness
+
+- [ ] An encrypted off-host backup is available under the operating retention policy.
+- [ ] An operational restore exercise from off-host backup has succeeded in production-like isolated infrastructure.
+- [ ] Post-restore root `npm run verify` passed for that exercise.
+- [ ] Critical wallet/ledger totals, policy versions, payout records, entitlements, draw claims, audits and presentation version were sampled after restore.
+
+Recovery exercise/reference: `<reference>`  
+Recovery owner: `<name>`
+
+## Stateful UAT and open blockers
+
+- [ ] Applicable scenarios in `docs/UAT-CHECKLIST.md` are completed with evidence.
+- [ ] No unresolved issue is being treated as implicitly approved.
+
+Open blockers / approved exceptions:
+
+`<none, or references with owner and disposition>`
+
+## Final decision
+
+- Release sign-off owner: `<name>`
+- Rollback/recovery owner: `<name>`
+- Decision: `<APPROVED / HOLD>`
+- Date/time (UTC): `<timestamp>`
+- Change/release reference: `<reference>`
+
+Approval here is a human operational decision. CI evidence supports the decision but does not make it automatically.
