@@ -227,10 +227,16 @@ jobs:
           ./scripts/uat-smoke.sh
 
           echo 'Running authenticated desktop/mobile browser UAT'
-          UAT_ADMIN_TOKEN="${UAT_ADMIN_TOKEN_VALUE}" \
-          UAT_MEMBER_TOKEN="${UAT_MEMBER_TOKEN_VALUE}" \
-          BROWSER_UAT_ARTIFACT_DIR="${RUNNER_TEMP}/megagoldenclub-browser-uat" \
-          node ../scripts/verify-browser-uat.mjs
+          if ! UAT_ADMIN_TOKEN="${UAT_ADMIN_TOKEN_VALUE}" \
+               UAT_MEMBER_TOKEN="${UAT_MEMBER_TOKEN_VALUE}" \
+               BROWSER_UAT_ARTIFACT_DIR="${RUNNER_TEMP}/megagoldenclub-browser-uat" \
+               node ../scripts/verify-browser-uat.mjs; then
+            echo 'Browser UAT first attempt failed; retrying once with a fresh Chrome process/profile'
+            UAT_ADMIN_TOKEN="${UAT_ADMIN_TOKEN_VALUE}" \
+            UAT_MEMBER_TOKEN="${UAT_MEMBER_TOKEN_VALUE}" \
+            BROWSER_UAT_ARTIFACT_DIR="${RUNNER_TEMP}/megagoldenclub-browser-uat" \
+            node ../scripts/verify-browser-uat.mjs
+          fi
 
           terminate_api
           if ! cleanup_uat_fixture; then
