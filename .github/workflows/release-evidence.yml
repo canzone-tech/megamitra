@@ -1,0 +1,190 @@
+name: Release Evidence
+
+on:
+  push:
+    branches:
+      - main
+      - dev/local-foundation
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  collect-release-evidence:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Collect exact-SHA release evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVIDENCE_DIR: ${{ runner.temp }}/megagoldenclub-release-evidence
+        run: |
+          set -euo pipefail
+          mkdir -p "${EVIDENCE_DIR}"
+
+          backend_id=""
+          backend_run_number=""
+          backend_url=""
+          frontend_id=""
+          frontend_run_number=""
+          frontend_url=""
+
+          for _ in $(seq 1 180); do
+            runs="$(gh api -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' \
+              "/repos/${GITHUB_REPOSITORY}/actions/runs?head_sha=${GITHUB_SHA}&event=push&per_page=100")"
+
+            backend="$(jq -r --arg name 'Backend CI' --arg sha "${GITHUB_SHA}" '
+              [.workflow_runs[] | select(.name == $name and .head_sha == $sha and .event == "push")]
+              | sort_by(.id) | last
+              | if . == null then "" else [.id, .status, (.conclusion // ""), .run_number, .html_url] | @tsv end
+            ' <<<"${runs}")"
+            frontend="$(jq -r --arg name 'Frontend CI' --arg sha "${GITHUB_SHA}" '
+              [.workflow_runs[] | select(.name == $name and .head_sha == $sha and .event == "push")]
+              | sort_by(.id) | last
+              | if . == null then "" else [.id, .status, (.conclusion // ""), .run_number, .html_url] | @tsv end
+            ' <<<"${runs}")"
+
+            backend_status="missing"; backend_conclusion=""
+            frontend_status="missing"; frontend_conclusion=""
+            if [[ -n "${backend}" ]]; then
+              IFS=$'\t' read -r backend_id backend_status backend_conclusion backend_run_number backend_url <<<"${backend}"
+            fi
+            if [[ -n "${frontend}" ]]; then
+              IFS=$'\t' read -r frontend_id frontend_status frontend_conclusion frontend_run_number frontend_url <<<"${frontend}"
+            fi
+
+            echo "Release evidence waiting: Backend CI=${backend_status}/${backend_conclusion:-pending} Frontend CI=${frontend_status}/${frontend_conclusion:-pending}"
+
+            if [[ "${backend_status}" == "completed" && "${backend_conclusion}" != "success" ]]; then
+              echo "Backend CI failed for exact SHA ${GITHUB_SHA}: ${backend_conclusion}"
+              exit 1
+            fi
+            if [[ "${frontend_status}" == "completed" && "${frontend_conclusion}" != "success" ]]; then
+              echo "Frontend CI failed for exact SHA ${GITHUB_SHA}: ${frontend_conclusion}"
+              exit 1
+            fi
+            if [[ "${backend_status}" == "completed" && "${backend_conclusion}" == "success" && \
+                  "${frontend_status}" == "completed" && "${frontend_conclusion}" == "success" ]]; then
+              break
+            fi
+            sleep 10
+          done
+
+          if [[ -z "${backend_id}" || -z "${frontend_id}" || \
+                "${backend_status}" != "completed" || "${backend_conclusion}" != "success" || \
+                "${frontend_status}" != "completed" || "${frontend_conclusion}" != "success" ]]; then
+            echo "Timed out waiting for Backend CI and Frontend CI success on ${GITHUB_SHA}"
+            exit 1
+          fi
+
+          artifacts="$(gh api -H 'Accept: application/vnd.github+json' -H 'X-GitHub-Api-Version: 2022-11-28' \
+            "/repos/${GITHUB_REPOSITORY}/actions/runs/${backend_id}/artifacts?per_page=100")"
+          browser_name="megagoldenclub-browser-uat-${GITHUB_SHA}"
+          browser="$(jq -c --arg name "${browser_name}" '[.artifacts[] | select(.name == $name and (.expired | not))] | first // empty' <<<"${artifacts}")"
+          if [[ -z "${browser}" ]]; then
+            echo "Required browser UAT artifact missing from Backend CI run ${backend_id}"
+            exit 1
+          fi
+
+          browser_id="$(jq -r '.id' <<<"${browser}")"
+          browser_size="$(jq -r '.size_in_bytes' <<<"${browser}")"
+          browser_expires="$(jq -r '.expires_at' <<<"${browser}")"
+          generated_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+          jq -n \
+            --arg repository "${GITHUB_REPOSITORY}" \
+            --arg sha "${GITHUB_SHA}" \
+            --arg generatedAt "${generated_at}" \
+            --arg collectorUrl "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
+            --arg backendUrl "${backend_url}" \
+            --arg frontendUrl "${frontend_url}" \
+            --arg browserName "${browser_name}" \
+            --arg browserExpires "${browser_expires}" \
+            --argjson collectorRunId "${GITHUB_RUN_ID}" \
+            --argjson backendRunId "${backend_id}" \
+            --argjson backendRunNumber "${backend_run_number}" \
+            --argjson frontendRunId "${frontend_id}" \
+            --argjson frontendRunNumber "${frontend_run_number}" \
+            --argjson browserArtifactId "${browser_id}" \
+            --argjson browserSize "${browser_size}" \
+            '{
+              schemaVersion: 1,
+              product: "MegaGoldenClub",
+              repository: $repository,
+              commitSha: $sha,
+              generatedAt: $generatedAt,
+              collectorRun: {id: $collectorRunId, url: $collectorUrl},
+              automatedCandidateStatus: "PASS",
+              productionApproval: "PENDING_MANUAL_SIGNOFF",
+              automatedGates: {
+                backendCI: {status: "PASS", runId: $backendRunId, runNumber: $backendRunNumber, url: $backendUrl},
+                frontendCI: {status: "PASS", runId: $frontendRunId, runNumber: $frontendRunNumber, url: $frontendUrl},
+                backendRegressionCoverage: {
+                  status: "PASS_VIA_BACKEND_CI",
+                  includes: [
+                    "unit and integration suites",
+                    "isolated backup/restore recovery drill",
+                    "compiled API readiness and authenticated UAT smoke",
+                    "authenticated desktop/mobile browser UAT"
+                  ]
+                },
+                browserUatEvidence: {
+                  status: "PASS",
+                  artifactId: $browserArtifactId,
+                  artifactName: $browserName,
+                  sizeInBytes: $browserSize,
+                  expiresAt: $browserExpires,
+                  runId: $backendRunId
+                }
+              },
+              manualReleaseGates: [
+                {id: "local-root-verify", status: "REQUIRED", requirement: "Pull this exact commit on the target-like host and run root npm run verify successfully."},
+                {id: "human-visual-uat", status: "REQUIRED", requirement: "Review browser-UAT evidence and complete a human interaction/readability pass on supported breakpoints."},
+                {id: "provider-uat", status: "REQUIRED_IF_PROVIDER_ENABLED", requirement: "Any selected payment, payout, SMTP or fulfilment provider must be configured and UAT-approved before enabling it in production."},
+                {id: "off-host-recovery", status: "REQUIRED", requirement: "Complete an operational restore exercise from an encrypted off-host backup into production-like isolated infrastructure."},
+                {id: "release-ownership", status: "REQUIRED", requirement: "Identify rollback/recovery owner and release sign-off owner before production deployment."}
+              ]
+            }' >"${EVIDENCE_DIR}/release-evidence.json"
+
+          cat >"${EVIDENCE_DIR}/release-evidence.md" <<EOF2
+          # MegaGoldenClub Release Evidence
+
+          - Commit: \`${GITHUB_SHA}\`
+          - Generated: ${generated_at}
+          - Automated candidate status: **PASS**
+          - Production approval: **PENDING MANUAL SIGN-OFF**
+
+          ## Automated gates
+
+          | Gate | Result | Evidence |
+          | --- | --- | --- |
+          | Backend CI | PASS | [run ${backend_run_number}](${backend_url}) |
+          | Frontend CI | PASS | [run ${frontend_run_number}](${frontend_url}) |
+          | Authenticated browser UAT | PASS | Artifact \`${browser_name}\` (ID ${browser_id}) |
+          | Recovery/API/auth regression coverage | PASS via Backend CI | Same exact Backend CI run |
+
+          ## Manual release gates still required
+
+          - **local-root-verify — REQUIRED:** pull this exact commit on the target-like host and run root \`npm run verify\` successfully.
+          - **human-visual-uat — REQUIRED:** review browser-UAT evidence and complete a human interaction/readability pass.
+          - **provider-uat — REQUIRED IF ENABLED:** UAT-approve every payment, payout, SMTP or fulfilment provider that will be enabled.
+          - **off-host-recovery — REQUIRED:** complete an operational restore exercise from encrypted off-host backup into production-like isolated infrastructure.
+          - **release-ownership — REQUIRED:** identify rollback/recovery owner and release sign-off owner.
+
+          This evidence intentionally does not mark manual/provider/off-host checks complete. Complete \`docs/RELEASE-SIGNOFF.md\` before production approval.
+          EOF2
+
+          cat "${EVIDENCE_DIR}/release-evidence.md" >>"${GITHUB_STEP_SUMMARY}"
+          echo "MegaGoldenClub release evidence: PASS for ${GITHUB_SHA}"
+
+      - name: Upload release evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: megagoldenclub-release-evidence-${{ github.sha }}
+          path: ${{ runner.temp }}/megagoldenclub-release-evidence
+          if-no-files-found: error
+          retention-days: 90

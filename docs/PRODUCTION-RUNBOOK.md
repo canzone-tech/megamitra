@@ -4,13 +4,31 @@ This runbook covers deployment and recovery controls after business milestone 00
 
 ## Release gate
 
-A release candidate must be built from the intended commit on `dev/local-foundation` and must have green backend and frontend CI. On the deployment host, run from the repository root:
+A release candidate must be built from the intended commit on `dev/local-foundation` and must have green Backend CI, Frontend CI and Release Evidence workflows for that exact commit. The Release Evidence workflow waits for Backend CI and Frontend CI on the same SHA, requires the authenticated browser-UAT artifact from Backend CI, and uploads exact-SHA JSON/Markdown evidence.
+
+The Release Evidence artifact proves the automated candidate gates only. It intentionally records production approval as pending manual sign-off and does not mark target-host verification, human visual review, provider UAT, off-host recovery exercise or release ownership complete.
+
+On the deployment host, pull the exact candidate commit and run from the repository root:
 
 ```bash
 npm run verify
 ```
 
-Do not deploy when migrations, lint, tests, production builds, frontend route smoke, API readiness, or UAT smoke fail.
+Record the operator, environment, exact commit and result in the release sign-off record. Do not deploy when migrations, lint, tests, production builds, frontend route smoke, API readiness, authenticated UAT smoke, browser UAT, release-evidence collection or target-host verification fail.
+
+## Release evidence and sign-off
+
+For each release candidate, retain the `megagoldenclub-release-evidence-<commit>` artifact produced by the Release Evidence workflow. Its `release-evidence.json` and `release-evidence.md` files tie Backend CI, Frontend CI and the browser-UAT artifact to one exact commit.
+
+Complete `docs/RELEASE-SIGNOFF.md` for the same commit. Automated evidence may be referenced by run/artifact ID, but manual checks must be completed and signed by a human operator. At minimum, record:
+
+- root `npm run verify` on the target-like host;
+- human interaction/readability review of the supported admin/member breakpoints using the browser-UAT screenshots as baseline evidence;
+- provider UAT for each payment, payout, SMTP or fulfilment provider that will actually be enabled;
+- an operational restore exercise from an encrypted off-host backup into production-like isolated infrastructure;
+- rollback/recovery owner and release sign-off owner.
+
+Do not treat an unchecked, not-applicable-without-reason or missing manual gate as implicitly approved.
 
 ## Production environment
 
@@ -106,15 +124,17 @@ Do not reopen traffic until verification passes and critical balances, policy ve
 
 ## Deployment order
 
-1. Confirm backend and frontend CI green for the exact commit.
-2. Take and export a fresh backup.
-3. Put write traffic into the deployment maintenance procedure used by the hosting environment.
-4. Pull the exact release commit and install exact dependencies.
-5. Run `npx prisma migrate deploy` once from the release artifact.
-6. Start/restart API, admin and member/public applications.
-7. Wait for `/health/ready` to return HTTP 200 with MySQL, Redis and MongoDB `up`.
-8. Run `npm run uat:smoke` from `backend/` against the deployed API. Supply `UAT_ADMIN_TOKEN` and `UAT_MEMBER_TOKEN` when authenticated smoke is required.
-9. Complete the stateful checks in `docs/UAT-CHECKLIST.md` before production sign-off.
+1. Confirm Backend CI, Frontend CI and Release Evidence are green for the exact commit; retain the exact-SHA release-evidence artifact.
+2. Pull the exact release commit on the target-like host and run root `npm run verify`; record the result in `docs/RELEASE-SIGNOFF.md`.
+3. Complete the remaining applicable human/provider/recovery ownership gates in `docs/RELEASE-SIGNOFF.md`.
+4. Take and export a fresh backup.
+5. Put write traffic into the deployment maintenance procedure used by the hosting environment.
+6. Install exact dependencies from the release artifact/commit.
+7. Run `npx prisma migrate deploy` once from the release artifact.
+8. Start/restart API, admin and member/public applications.
+9. Wait for `/health/ready` to return HTTP 200 with MySQL, Redis and MongoDB `up`.
+10. Run `npm run uat:smoke` from `backend/` against the deployed API. Supply `UAT_ADMIN_TOKEN` and `UAT_MEMBER_TOKEN` when authenticated smoke is required.
+11. Complete the stateful checks in `docs/UAT-CHECKLIST.md` and record final release approval before opening normal traffic.
 
 ## Rollback
 

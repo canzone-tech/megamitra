@@ -6,6 +6,7 @@ Use this checklist against a release candidate after automated verification is g
 
 - [ ] Backend CI is green for the exact release commit.
 - [ ] Frontend CI is green for the exact release commit.
+- [ ] Release Evidence is green for the exact release commit and its `megagoldenclub-release-evidence-<commit>` artifact references the same Backend CI, Frontend CI and browser-UAT evidence.
 - [ ] `npm run verify` passes on the target-like environment.
 - [ ] `/health/live` returns HTTP 200.
 - [ ] `/health/ready` returns HTTP 200 with MySQL, Redis and MongoDB `up`.
@@ -118,4 +119,5 @@ Run concurrent duplicate requests only in an isolated/test environment.
 - [ ] Restore that backup into an isolated environment using the documented confirmation flag.
 - [ ] Run `npm run verify` after restore.
 - [ ] Sample wallet/ledger totals, policy versions, payout records, entitlements, draw claims, audits and presentation version after restore.
+- [ ] Complete `docs/RELEASE-SIGNOFF.md` for the same exact commit and reference the Release Evidence artifact plus target-host `npm run verify` result.
 - [ ] Confirm rollback/recovery owner and release sign-off owner are identified before production deployment.
