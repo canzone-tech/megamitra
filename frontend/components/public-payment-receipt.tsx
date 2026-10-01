@@ -22,6 +22,13 @@ type PublicReceipt = {
   seasonName: string;
 };
 
+type DrawToken = {
+  token: string;
+  installmentSequence: number | null;
+  status: string;
+  drawId: string | null;
+};
+
 function money(value: string, currencyCode: string) {
   const amount = Number(value);
   try {
@@ -50,6 +57,22 @@ function detailsObject(value: PublicReceipt['details']): Record<string, unknown>
   } catch {
     return {};
   }
+}
+
+function drawTokens(details: Record<string, unknown>): DrawToken[] {
+  if (!Array.isArray(details.drawTokens)) return [];
+  return details.drawTokens.flatMap((value) => {
+    if (!value || typeof value !== 'object') return [];
+    const item = value as Record<string, unknown>;
+    const token = typeof item.token === 'string' ? item.token : '';
+    if (!/^[1-9][0-9]{4}$/.test(token)) return [];
+    return [{
+      token,
+      installmentSequence: typeof item.installmentSequence === 'number' ? item.installmentSequence : null,
+      status: typeof item.status === 'string' ? item.status : 'AVAILABLE',
+      drawId: typeof item.drawId === 'string' ? item.drawId : null,
+    }];
+  });
 }
 
 function statusLabel(status: string) {
@@ -82,6 +105,7 @@ export function PublicPaymentReceipt({ token }: { token: string }) {
   }, [load]);
 
   const details = receipt ? detailsObject(receipt.details) : {};
+  const tokens = drawTokens(details);
   const memberName = receipt
     ? [receipt.firstName, receipt.lastName].filter(Boolean).join(' ') || receipt.username
     : '';
@@ -123,10 +147,12 @@ export function PublicPaymentReceipt({ token }: { token: string }) {
               <div className="mm-portal-metric"><span>Status</span><strong>{statusLabel(receipt.status)}</strong><small>{receipt.status === 'CONFIRMED' ? 'Payment verified' : receipt.status === 'REJECTED' ? 'Payment rejected' : 'Awaiting Super Admin verification'}</small></div>
               <div className="mm-portal-metric"><span>Submitted</span><strong>{dateTime(receipt.submittedAt)}</strong><small>Submission timestamp</small></div>
               <div className="mm-portal-metric"><span>Reviewed</span><strong>{dateTime(receipt.reviewedAt)}</strong><small>Verification timestamp</small></div>
+              {receipt.purpose === 'INSTALLMENT' && receipt.status === 'CONFIRMED' && tokens.length ? <div className="mm-portal-metric"><span>Lucky draw token{tokens.length > 1 ? 's' : ''}</span><strong>{tokens.map((item) => item.token).join(' • ')}</strong><small>5-digit permanent unique token{tokens.length > 1 ? 's' : ''}; never reused in another draw</small></div> : null}
             </div>
 
             <div className="mm-list">
               {receipt.purpose === 'INSTALLMENT' ? <div><strong>Installment details</strong><br />{String(details.installmentCount ?? '—')} installment(s) • {String(details.installmentAmount ?? '—')} each • {String(details.allocationMode ?? 'NEXT_UNPAID_SEQUENTIAL')}</div> : <div><strong>E-PIN details</strong><br />Quantity {String(details.quantity ?? '—')} • Value per PIN {String(details.valuePerPin ?? '—')} {receipt.currencyCode} • Session-bound after verification</div>}
+              {receipt.purpose === 'INSTALLMENT' && tokens.length ? <div><strong>Draw entry tokens</strong><br />{tokens.map((item) => `Installment ${item.installmentSequence ?? '—'}: ${item.token}${item.status === 'USED' ? ' • USED' : ''}`).join(' | ')}</div> : null}
             </div>
           </div>
         </section> : null}
