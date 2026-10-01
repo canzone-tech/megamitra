@@ -122,6 +122,19 @@ Used by commissions, rewards, draws and payouts. Rule inputs may include:
 - consolation-prize rules
 - winner state and fulfilment state
 
+### Lucky-draw token identity
+
+Lucky-draw entry tokens are permanent business identifiers, separate from the long random security token used by a public receipt URL.
+
+- Every production lucky-draw token is exactly five decimal digits.
+- The first digit is never zero; the valid namespace is `10000` through `99999`.
+- A token is globally unique across all sessions and all draws, not merely unique within one draw.
+- Once issued, a token is never recycled, even after use, cancellation, refund, rejection, archival or historical cleanup.
+- A confirmed installment payment receives one token per confirmed installment allocation. An advance/bulk payment therefore receives multiple different tokens rather than reusing one token across future draws.
+- When an owner monthly draw consumes the token corresponding to that installment sequence, the token becomes `USED` and remains permanently recorded.
+- Historical/generic draw entries that do not have an available installment token receive a fresh token from the same global namespace, so no draw can reuse an earlier number.
+- The five-digit namespace contains 90,000 possible values. Exhaustion is a hard error; the system must never silently recycle a prior token or expand the format without an explicit business-contract revision.
+
 ## Policy lifecycle
 
 Policies use explicit lifecycle states such as:
@@ -186,6 +199,9 @@ SystemConfiguration
 10. Slot-to-side mapping is deterministic: `A/B -> LEFT`, `C/D -> RIGHT`.
 11. Current 1:4 pair matching is lane-bound to `A:C` and `B:D`; generic cross-pairing is rejected.
 12. Placement and ancestry records retain slot identity even when downstream settlement aggregates by LEFT/RIGHT.
+13. Lucky-draw tokens match `^[1-9][0-9]{4}$` and are globally unique for their entire lifetime.
+14. A lucky-draw token is consumed at most once and is never deleted/recycled by application workflows.
+15. Bulk installment confirmation creates distinct tokens for distinct installment allocations; one token is never reused for multiple scheduled draws.
 
 ## Admin configuration principle
 
