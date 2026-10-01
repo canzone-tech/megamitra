@@ -1,0 +1,112 @@
+import { Injectable } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { AuditService } from '../audit/audit.service';
+import type { AuthUser } from '../auth/auth-user';
+import { FinancialDbService } from '../database/financial-db.service';
+import { PrismaService } from '../database/prisma.service';
+import { LuckyDrawTokenService } from '../lucky-draw/lucky-draw-token.service';
+import { ProgramPaymentService } from '../program/program-payment.service';
+import type { ReviewMemberPaymentDto } from './member-payment.dto';
+import { MemberPaymentService } from './member-payment.service';
+
+type ReceiptRecord = Record<string, unknown> & {
+  id?: string;
+  purpose?: string;
+  status?: string;
+  details?: unknown;
+};
+
+type ReceiptToken = {
+  token: string;
+  installmentSequence: number | null;
+  status: string;
+  drawId: string | null;
+  entryId: string | null;
+};
+
+@Injectable()
+export class TokenizedMemberPaymentService extends MemberPaymentService {
+  constructor(
+    prisma: PrismaService,
+    db: FinancialDbService,
+    programPayments: ProgramPaymentService,
+    config: ConfigService,
+    audit: AuditService,
+    private readonly drawTokens: LuckyDrawTokenService,
+  ) {
+    super(prisma, db, programPayments, config, audit);
+  }
+
+  async reviewSubmission(
+    submissionId: string,
+    dto: ReviewMemberPaymentDto,
+    actor: AuthUser,
+  ) {
+    return super.reviewSubmission(submissionId, dto, actor);
+  }
+
+  async adminReceipt(id: string) {
+    const receipt = (await super.adminReceipt(id)) as ReceiptRecord;
+    return this.withDrawTokens(receipt, await this.tokensForReceipt(receipt, id));
+  }
+
+  async publicReceipt(publicToken: string) {
+    const receipt = (await super.publicReceipt(publicToken)) as ReceiptRecord;
+    const tokens =
+      receipt.purpose === 'INSTALLMENT' && receipt.status === 'CONFIRMED'
+        ? await this.drawTokens.tokensForPublicReceipt(publicToken)
+        : [];
+    return this.withDrawTokens(receipt, tokens);
+  }
+
+  async memberSubmissions(userId: string) {
+    const receipts = (await super.memberSubmissions(userId)) as ReceiptRecord[];
+    return Promise.all(
+      receipts.map(async (receipt) => {
+        const id = typeof receipt.id === 'string' ? receipt.id : null;
+        return this.withDrawTokens(
+          receipt,
+          id ? await this.tokensForReceipt(receipt, id) : [],
+        );
+      }),
+    );
+  }
+
+  private async tokensForReceipt(receipt: ReceiptRecord, submissionId: string) {
+    if (receipt.purpose !== 'INSTALLMENT' || receipt.status !== 'CONFIRMED') return [];
+    return this.drawTokens.tokensForSubmission(submissionId);
+  }
+
+  private withDrawTokens(receipt: ReceiptRecord, tokens: ReceiptToken[]) {
+    if (receipt.purpose !== 'INSTALLMENT') return receipt;
+    return {
+      ...receipt,
+      details: {
+        ...this.detailsObject(receipt.details),
+        drawTokens: tokens.map((item) => ({
+          token: item.token,
+          installmentSequence: item.installmentSequence,
+          status: item.status,
+          drawId: item.drawId,
+        })),
+      },
+    };
+  }
+
+  private detailsObject(value: unknown): Record<string, unknown> {
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      return value as Record<string, unknown>;
+    }
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value) as unknown;
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          return parsed as Record<string, unknown>;
+        }
+      } catch {
+        // Preserve receipt rendering even if historical metadata is malformed.
+      }
+    }
+    return {};
+  }
+}
