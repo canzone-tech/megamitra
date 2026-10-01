@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { loadEnvFile } from 'node:process';
 import { FinancialDbService } from '../src/database/financial-db.service';
 import {
   generateLuckyDrawToken,
@@ -7,11 +8,38 @@ import {
 
 const DATABASE_TEST_TIMEOUT_MS = 20_000;
 
+function ensureDatabaseEnvLoaded() {
+  const hasRequiredDatabaseEnv =
+    Boolean(process.env.MYSQL_USER) &&
+    process.env.MYSQL_PASSWORD !== undefined &&
+    Boolean(process.env.MYSQL_DATABASE);
+
+  if (!hasRequiredDatabaseEnv) {
+    loadEnvFile('.env');
+  }
+
+  if (
+    !process.env.MYSQL_USER ||
+    process.env.MYSQL_PASSWORD === undefined ||
+    !process.env.MYSQL_DATABASE
+  ) {
+    throw new Error(
+      'MegaGoldenClub lucky draw token contract requires MYSQL_USER, MYSQL_PASSWORD, and MYSQL_DATABASE',
+    );
+  }
+}
+
 describe('MegaGoldenClub lucky draw token registry contract', () => {
-  const db = new FinancialDbService();
+  let db!: FinancialDbService;
   const canaryTokens: string[] = [];
 
+  beforeAll(() => {
+    ensureDatabaseEnvLoaded();
+    db = new FinancialDbService();
+  });
+
   afterAll(async () => {
+    if (!db) return;
     if (canaryTokens.length > 0) {
       // Isolated test cleanup only. Production/application workflows never delete issued tokens.
       const placeholders = canaryTokens.map(() => '?').join(',');
