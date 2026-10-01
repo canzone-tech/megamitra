@@ -94,25 +94,41 @@ The command writes a timestamped directory under `../backups/` by default with:
 
 The backup/restore commands use the repository-root `.env` when present and otherwise accept the same required database settings from the invoking process environment. The manifest records the source git commit and database names. Restore rejects a backup whose manifest database identities do not match the configured MySQL and MongoDB targets.
 
-A local backup is not complete until the directory is encrypted and copied to protected off-host storage. Retention and encryption keys must be managed outside the repository.
+A local backup is not complete until it is exported in encrypted form and copied/retained in protected off-host storage. Use `docs/OFFHOST-RECOVERY.md` as the authoritative operator procedure. The repository provides provider-neutral encrypted handoff commands:
 
-Run scheduled backup jobs only after checking available disk space and monitoring command exit status. Perform a restore drill regularly on an isolated environment.
+```bash
+MEGAGOLDENCLUB_BACKUP_KEY_FILE=/secure/megagoldenclub-backup.key \
+  npm run backup:export-offhost -- /absolute/path/to/backup /mounted/off-host/path
+```
+
+The export validates the inner backup checksums, encrypts the expected backup files using AES-256-CBC with PBKDF2 and salt, writes a sibling SHA-256 file for the encrypted archive, and refuses overwrite. The key file must have mode `600` or `400` and must be managed outside the repository and outside the backup-storage failure/security boundary.
+
+Retention, storage-provider access controls, immutability/versioning and encryption-key recovery remain deployment/operations responsibilities. Run scheduled backup jobs only after checking available disk space and monitoring command exit status. Perform a restore drill regularly on isolated production-like infrastructure.
 
 ## Restore drill / disaster recovery
 
 Restore is destructive. Stop application traffic first and use an isolated host for drills whenever possible.
 
-From `backend/`:
+For an off-host recovery exercise, first retrieve both the encrypted archive and its `.sha256` file from the real remote storage boundary, then import it:
 
 ```bash
-MEGAGOLDENCLUB_RESTORE_CONFIRM=YES npm run restore:data -- /absolute/path/to/backup
+MEGAGOLDENCLUB_BACKUP_KEY_FILE=/secure/megagoldenclub-backup.key \
+  npm run backup:import-offhost -- /recovery/incoming/backup.tar.gz.enc /recovery/work
+```
+
+The import validates the encrypted archive SHA-256 before decryption, rejects unexpected archive entries, validates the inner `SHA256SUMS`, and produces `/recovery/work/imported`.
+
+Then restore from the verified imported directory:
+
+```bash
+MEGAGOLDENCLUB_RESTORE_CONFIRM=YES npm run restore:data -- /recovery/work/imported
 ```
 
 The restore command verifies checksums and manifest database identity, restores MySQL and MongoDB, clears Redis to prevent stale non-authoritative state, and runs `prisma migrate status`.
 
-Backend CI also runs an automated recovery regression only in its ephemeral `NODE_ENV=test` data services. It seeds isolated MySQL/MongoDB/Redis canaries, takes a real backup, mutates the canaries, restores the backup, proves MySQL and MongoDB returned to the backed-up values, proves Redis was cleared, and removes the canaries. The drill requires the explicit `MEGAGOLDENCLUB_RESTORE_DRILL_CONFIRM=YES` guard and refuses to run outside `NODE_ENV=test`.
+Backend CI also runs an automated recovery regression only in its ephemeral `NODE_ENV=test` data services. It seeds isolated MySQL/MongoDB/Redis canaries, takes a real backup, exports it through the encrypted off-host format, deletes the original local backup to simulate primary-host loss, imports only the encrypted archive, restores it, proves MySQL and MongoDB returned to the backed-up values, proves Redis was cleared, and removes the canaries. The drill requires the explicit `MEGAGOLDENCLUB_RESTORE_DRILL_CONFIRM=YES` guard and refuses to run outside `NODE_ENV=test`.
 
-The automated CI drill protects backup/restore code paths but does **not** replace an operational disaster-recovery exercise using an encrypted off-host backup and production-like isolated infrastructure.
+The automated CI drill protects backup/encryption/import/restore code paths but does **not** replace an operational disaster-recovery exercise using an encrypted archive retrieved from the real off-host storage boundary and restored into production-like isolated infrastructure.
 
 After an operational restore, return to the repository root and run:
 
@@ -120,14 +136,14 @@ After an operational restore, return to the repository root and run:
 npm run verify
 ```
 
-Do not reopen traffic until verification passes and critical balances, policy versions, presentation versions, payout states and audit records are sampled against the backup manifest/date.
+Do not reopen traffic until verification passes and critical balances, policy versions, presentation versions, payout states, entitlements, lucky-draw token/claim state and audit records are sampled against the backup manifest/date. Record the remote object reference and encrypted archive SHA-256 without recording encryption-key material.
 
 ## Deployment order
 
 1. Confirm Backend CI, Frontend CI and Release Evidence are green for the exact commit; retain the exact-SHA release-evidence artifact.
 2. Pull the exact release commit on the target-like host and run root `npm run verify`; record the result in `docs/RELEASE-SIGNOFF.md`.
 3. Complete the remaining applicable human/provider/recovery ownership gates in `docs/RELEASE-SIGNOFF.md`.
-4. Take and export a fresh backup.
+4. Take a fresh backup, export it with `backup:export-offhost`, and record the protected off-host object/checksum reference.
 5. Put write traffic into the deployment maintenance procedure used by the hosting environment.
 6. Install exact dependencies from the release artifact/commit.
 7. Run `npx prisma migrate deploy` once from the release artifact.
