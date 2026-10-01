@@ -1,6 +1,6 @@
 # MegaGoldenClub Release Sign-Off
 
-Use one completed copy of this record per production release candidate. Do not pre-check manual gates from CI output. Attach or link evidence without copying secrets, JWTs, provider credentials, KYC data or payout destination details into the record.
+Use one completed copy of this record per production release candidate. Do not pre-check manual gates from CI output. Attach or link evidence without copying secrets, JWTs, provider credentials, KYC data, payout destination details or backup encryption keys into the record.
 
 ## Candidate identity
 
@@ -66,13 +66,27 @@ For each provider that will be enabled in this release, record UAT approval. Mar
 
 ## Recovery readiness
 
-- [ ] An encrypted off-host backup is available under the operating retention policy.
-- [ ] An operational restore exercise from off-host backup has succeeded in production-like isolated infrastructure.
-- [ ] Post-restore root `npm run verify` passed for that exercise.
-- [ ] Critical wallet/ledger totals, policy versions, payout records, entitlements, draw claims, audits and presentation version were sampled after restore.
+Follow `docs/OFFHOST-RECOVERY.md`. Backend CI proves the repository's encrypted export/import/restore regression only; production recovery approval still requires evidence retrieved from the real off-host storage boundary.
 
-Recovery exercise/reference: `<reference>`  
-Recovery owner: `<name>`
+- [ ] A fresh local backup was exported through `npm run backup:export-offhost` and its encrypted archive/checksum pair is retained under the operating retention policy.
+- [ ] The encryption key is held separately from the repository and off-host backup storage boundary; no key material is present in this sign-off record.
+- [ ] The encrypted archive was retrieved from the real off-host storage boundary into isolated production-like infrastructure.
+- [ ] `npm run backup:import-offhost` validated the encrypted archive checksum, archive contents and inner backup checksums.
+- [ ] An operational restore exercise from that imported backup succeeded in isolated production-like infrastructure.
+- [ ] Post-restore root `npm run verify` passed for that exercise.
+- [ ] Critical wallet/ledger totals, policy versions, payout records, entitlements, lucky-draw token/claim state, audits and presentation version were sampled after restore.
+
+Recovery evidence:
+
+- Off-host storage/object reference: `<non-secret reference>`
+- Encrypted archive SHA-256: `<sha256>`
+- Source backup/release commit: `<40-character git SHA>`
+- Retrieval/restore host reference: `<non-secret reference>`
+- Restore operator: `<name>`
+- Restore date/time (UTC): `<timestamp>`
+- Root verify result/log reference: `<reference>`
+- Critical-record sample evidence/reference: `<reference>`
+- Recovery owner: `<name>`
 
 ## Stateful UAT and open blockers
 
