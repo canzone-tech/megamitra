@@ -2,6 +2,8 @@
 
 Use this checklist against a release candidate after automated verification is green. Record tester, environment, release commit, date/time and evidence for each completed scenario. Use test accounts and non-production provider references unless the release procedure explicitly authorizes production validation.
 
+`docs/STATEFUL-UAT-COVERAGE.md` is the release-grade map from each stateful business journey to its automated evidence and remaining human/provider/open-rule gate. Do not mark a manual or provider-dependent row complete solely because CI is green.
+
 ## Automated baseline
 
 - [ ] Backend CI is green for the exact release commit.
@@ -13,6 +15,8 @@ Use this checklist against a release candidate after automated verification is g
 - [ ] `npm run uat:smoke` passes; authenticated admin/member runtime smoke is run when tokens are available.
 - [ ] Integration tests pass authenticated admin/member authorization, self-scoping and core read-model checks even when external UAT tokens are not supplied.
 - [ ] Owner lucky-draw schedule integration passes January/third-Sunday defaults, admin/member authorization, recurrence enforcement and exact-replay/conflicting-replay behavior.
+- [ ] Lucky-draw token contract verification confirms the immutable migration contract remains five non-zero-leading digits with global `token` primary-key uniqueness; migration deployment succeeds separately on the release database.
+- [ ] Public receipt surface verification passes confirmed-only token rendering, pending/rejected token messaging, mobile layout and print layout contracts.
 - [ ] Backend CI authenticated browser UAT renders protected admin/member production builds at desktop and mobile widths, checks page-level horizontal overflow, exercises the admin mobile More drawer, verifies member mobile navigation actions remain visible, and uploads screenshots/metrics for the exact release commit.
 
 ## Identity and access
@@ -24,11 +28,17 @@ Use this checklist against a release candidate after automated verification is g
 - [ ] Member tokens cannot access admin-only operations.
 - [ ] Admin permissions restrict KYC, payout, entitlement, business-plan and presentation actions as configured.
 
-## Program, payment and refund
+## Program, payment, receipt, E-PIN and refund
 
+- [ ] Register a MEMBER with a valid sponsor and E-PIN; verify the pin is consumed once and the intended session/enrollment activation state is created.
 - [ ] Create/enrol a member under the intended published program version.
-- [ ] Confirm a payment and verify allocations/installment progress.
-- [ ] Replay the same idempotency/source key and verify no duplicate financial/business record is created.
+- [ ] Submit an installment payment with test UTR/reference and screenshot; verify the public receipt is immediately available as `PENDING VERIFICATION` and does not expose a lucky-draw token.
+- [ ] Confirm the installment submission as Super Admin and verify the same receipt becomes confirmed/paid, allocations/installment progress advance, and each confirmed installment allocation has one distinct five-digit non-zero-leading token.
+- [ ] Reject a separate test installment submission and verify the same receipt becomes `REJECTED` without issuing a lucky-draw token.
+- [ ] Open the confirmed public receipt without login and verify member ID, payment purpose, session, amount, UTR/reference, timestamps, installment allocation and token state; exercise mobile readability and Print/Save PDF.
+- [ ] Replay the same idempotency/source key and verify no duplicate financial/business record or duplicate token is created.
+- [ ] Submit a test E-PIN purchase request as MEMBER, verify it as Super Admin and confirm session-bound pins are assigned to the member.
+- [ ] Reassign one unused E-PIN and verify a used E-PIN cannot be reactivated, reassigned or reused.
 - [ ] Confirm an eligible refund and verify allocation/reversal effects.
 - [ ] Verify refund reconciliation-required cases appear in Operations and can be retried through the existing audited action.
 
@@ -55,6 +65,7 @@ Use this checklist against a release candidate after automated verification is g
 - [ ] Replay the exact same prepared-draw payload and verify the same draw run is returned without duplication.
 - [ ] Replay the same Season/month with a different entry window, draw time or claim window and verify HTTP 409/conflict rather than silently changing or reusing incompatible settings.
 - [ ] Create/snapshot/draw using the intended published draw policy/version.
+- [ ] Verify a member receives at most one entry for the scheduled draw and the bound five-digit token has not appeared in any earlier/future draw entry.
 - [ ] Verify winner/claim records and deadlines.
 - [ ] Exercise claim then fulfilment using test references.
 - [ ] Exercise cancel/reversal where permitted and verify ledger/audit visibility.
@@ -106,7 +117,7 @@ Use this checklist against a release candidate after automated verification is g
 
 Run concurrent duplicate requests only in an isolated/test environment.
 
-- [ ] Duplicate payment confirmation does not double-allocate.
+- [ ] Duplicate payment confirmation does not double-allocate or issue duplicate installment tokens.
 - [ ] Duplicate binary settlement/match does not double-pay.
 - [ ] Duplicate referral consumption does not double-reward.
 - [ ] Duplicate entitlement generation does not double-grant.
@@ -115,6 +126,7 @@ Run concurrent duplicate requests only in an isolated/test environment.
 
 ## Recovery and release readiness
 
+- [ ] Review `docs/STATEFUL-UAT-COVERAGE.md` for the exact candidate and record all `AUTOMATED + HUMAN`, `PROVIDER` and `OPEN RULE` dispositions in release evidence/sign-off.
 - [ ] Create a backup with `npm run backup:data` and copy it off-host/encrypted for the drill.
 - [ ] Restore that backup into an isolated environment using the documented confirmation flag.
 - [ ] Run `npm run verify` after restore.
