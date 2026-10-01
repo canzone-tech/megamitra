@@ -1,7 +1,10 @@
 import { ConflictException, Injectable } from '@nestjs/common';
-import { randomInt } from 'node:crypto';
 import type { PoolConnection } from 'mariadb';
 import { FinancialDbService } from '../database/financial-db.service';
+import {
+  generateLuckyDrawToken,
+  LUCKY_DRAW_TOKEN_COLLISION_RETRIES,
+} from './lucky-draw-token.util';
 
 type SubmissionRow = {
   id: string;
@@ -55,10 +58,6 @@ type TokenInsert = {
 
 @Injectable()
 export class LuckyDrawTokenService {
-  private readonly tokenSpaceStart = 10_000;
-  private readonly tokenSpaceEndExclusive = 100_000;
-  private readonly collisionRetries = 128;
-
   constructor(private readonly db: FinancialDbService) {}
 
   async ensureConfirmedInstallmentSubmission(submissionId: string) {
@@ -245,8 +244,8 @@ export class LuckyDrawTokenService {
   }
 
   private async insertUniqueToken(connection: PoolConnection, input: TokenInsert) {
-    for (let attempt = 0; attempt < this.collisionRetries; attempt += 1) {
-      const token = randomInt(this.tokenSpaceStart, this.tokenSpaceEndExclusive).toString();
+    for (let attempt = 0; attempt < LUCKY_DRAW_TOKEN_COLLISION_RETRIES; attempt += 1) {
+      const token = generateLuckyDrawToken();
       try {
         await connection.query(
           `INSERT INTO lucky_draw_tokens
