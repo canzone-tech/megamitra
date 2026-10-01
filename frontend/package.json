@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3102",
+    "prebuild": "node ../scripts/verify-public-receipt.mjs",
     "build": "next build",
     "start": "next start -p 3102",
     "lint": "eslint . --max-warnings=0",

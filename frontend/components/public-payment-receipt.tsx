@@ -81,6 +81,18 @@ function statusLabel(status: string) {
   return status;
 }
 
+function statusTone(status: string) {
+  if (status === 'CONFIRMED') return 'success';
+  if (status === 'REJECTED') return 'danger';
+  return 'warning';
+}
+
+function tokenStatusLabel(token: DrawToken) {
+  if (token.status === 'USED') return 'Used in scheduled draw';
+  if (token.status === 'RETIRED') return 'Retired — never reusable';
+  return 'Available for scheduled draw';
+}
+
 export function PublicPaymentReceipt({ token }: { token: string }) {
   const [receipt, setReceipt] = useState<PublicReceipt | null>(null);
   const [error, setError] = useState('');
@@ -109,53 +121,129 @@ export function PublicPaymentReceipt({ token }: { token: string }) {
   const memberName = receipt
     ? [receipt.firstName, receipt.lastName].filter(Boolean).join(' ') || receipt.username
     : '';
+  const installmentAmount = receipt && typeof details.installmentAmount === 'string'
+    ? money(details.installmentAmount, receipt.currencyCode)
+    : '—';
+  const installmentCount = typeof details.installmentCount === 'number'
+    ? details.installmentCount
+    : Number(details.installmentCount ?? 0);
 
   return (
-    <div className="mm-member-shell">
-      <header className="mm-site-header">
+    <div className="mm-receipt-page">
+      <header className="mm-site-header mm-receipt-header">
         <Link className="mm-brand" href="/">
           <span className="mm-brand-mark">M</span>
           <span>Mega<span className="mm-brand-accent">GoldenClub</span></span>
         </Link>
-        {receipt ? <span className="mm-portal-pill">Read-only public receipt</span> : null}
+        {receipt ? <span className="mm-receipt-public-pill">Read-only public receipt</span> : null}
       </header>
-      <main className="mm-member-main">
-        <div className="mm-member-hero">
+
+      <main className="mm-receipt-main">
+        <section className="mm-receipt-hero">
           <div>
             <p className="mm-eyebrow">Payment receipt</p>
-            <h1 className="mm-title">{receipt?.receiptNumber ?? 'Receipt verification'}</h1>
-            <p className="mm-subtitle">This public link always shows the current verification state of the same payment submission.</p>
+            <h1>{receipt?.receiptNumber ?? 'Receipt verification'}</h1>
+            <p>This public link always shows the current verification state of the same payment submission.</p>
           </div>
-          {receipt ? <button className="mm-button blue" type="button" onClick={() => window.print()}>Print</button> : null}
-        </div>
+          {receipt ? (
+            <button className="mm-button blue mm-receipt-print" type="button" onClick={() => window.print()}>
+              Print / Save PDF
+            </button>
+          ) : null}
+        </section>
 
-        {loading ? <section className="mm-card"><div className="mm-card-body">Loading receipt…</div></section> : null}
+        {loading ? <section className="mm-card mm-receipt-loading">Loading receipt…</section> : null}
         {error ? <div className="mm-error" role="alert">{error}</div> : null}
 
-        {receipt ? <section className="mm-card">
-          <div className="mm-card-head">
-            <h2>{receipt.purpose === 'INSTALLMENT' ? 'Installment payment' : 'E-PIN purchase'}</h2>
-            <span className="mm-chip">{statusLabel(receipt.status)}</span>
-          </div>
-          <div className="mm-card-body">
-            <div className="mm-portal-metrics">
-              <div className="mm-portal-metric"><span>Receipt number</span><strong>{receipt.receiptNumber}</strong><small>Permanent reference</small></div>
-              <div className="mm-portal-metric"><span>Member / customer</span><strong>{memberName}</strong><small>Member ID: {receipt.memberId} • Username: {receipt.username}</small></div>
-              <div className="mm-portal-metric"><span>Purpose</span><strong>{receipt.purpose.replace('_', ' ')}</strong><small>{receipt.seasonName} ({receipt.seasonCode})</small></div>
-              <div className="mm-portal-metric"><span>Amount</span><strong>{money(receipt.amount, receipt.currencyCode)}</strong><small>QR / UPI submission</small></div>
-              <div className="mm-portal-metric"><span>UTR / reference</span><strong>{receipt.providerReference}</strong><small>Payment reference submitted by member</small></div>
-              <div className="mm-portal-metric"><span>Status</span><strong>{statusLabel(receipt.status)}</strong><small>{receipt.status === 'CONFIRMED' ? 'Payment verified' : receipt.status === 'REJECTED' ? 'Payment rejected' : 'Awaiting Super Admin verification'}</small></div>
-              <div className="mm-portal-metric"><span>Submitted</span><strong>{dateTime(receipt.submittedAt)}</strong><small>Submission timestamp</small></div>
-              <div className="mm-portal-metric"><span>Reviewed</span><strong>{dateTime(receipt.reviewedAt)}</strong><small>Verification timestamp</small></div>
-              {receipt.purpose === 'INSTALLMENT' && receipt.status === 'CONFIRMED' && tokens.length ? <div className="mm-portal-metric"><span>Lucky draw token{tokens.length > 1 ? 's' : ''}</span><strong>{tokens.map((item) => item.token).join(' • ')}</strong><small>5-digit permanent unique token{tokens.length > 1 ? 's' : ''}; never reused in another draw</small></div> : null}
+        {receipt ? (
+          <article className="mm-card mm-receipt-document">
+            <div className="mm-receipt-document-head">
+              <div>
+                <span className="mm-receipt-overline">Official payment record</span>
+                <h2>{receipt.purpose === 'INSTALLMENT' ? 'Installment Payment Receipt' : 'E-PIN Purchase Receipt'}</h2>
+                <p>{receipt.seasonName} • {receipt.seasonCode}</p>
+              </div>
+              <span className={`mm-receipt-status ${statusTone(receipt.status)}`}>
+                {statusLabel(receipt.status)}
+              </span>
             </div>
 
-            <div className="mm-list">
-              {receipt.purpose === 'INSTALLMENT' ? <div><strong>Installment details</strong><br />{String(details.installmentCount ?? '—')} installment(s) • {String(details.installmentAmount ?? '—')} each • {String(details.allocationMode ?? 'NEXT_UNPAID_SEQUENTIAL')}</div> : <div><strong>E-PIN details</strong><br />Quantity {String(details.quantity ?? '—')} • Value per PIN {String(details.valuePerPin ?? '—')} {receipt.currencyCode} • Session-bound after verification</div>}
-              {receipt.purpose === 'INSTALLMENT' && tokens.length ? <div><strong>Draw entry tokens</strong><br />{tokens.map((item) => `Installment ${item.installmentSequence ?? '—'}: ${item.token}${item.status === 'USED' ? ' • USED' : ''}`).join(' | ')}</div> : null}
-            </div>
-          </div>
-        </section> : null}
+            {receipt.purpose === 'INSTALLMENT' ? (
+              <section className="mm-receipt-token-panel" aria-labelledby="lucky-draw-token-heading">
+                <div className="mm-receipt-token-copy">
+                  <span className="mm-receipt-overline">Lucky draw identity</span>
+                  <h3 id="lucky-draw-token-heading">5-digit permanent draw token{tokens.length > 1 ? 's' : ''}</h3>
+                  <p>Every issued token is unique across all sessions and draws and is never recycled.</p>
+                </div>
+
+                {receipt.status === 'CONFIRMED' && tokens.length > 0 ? (
+                  <div className="mm-receipt-token-grid">
+                    {tokens.map((item) => (
+                      <div className="mm-receipt-token-card" key={item.token}>
+                        <span>Installment {item.installmentSequence ?? '—'}</span>
+                        <strong className="mm-receipt-token-number">{item.token}</strong>
+                        <small>{tokenStatusLabel(item)}</small>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className={`mm-receipt-token-message ${receipt.status === 'REJECTED' ? 'danger' : ''}`}>
+                    {receipt.status === 'REJECTED'
+                      ? 'Rejected installment submissions do not receive a lucky draw token.'
+                      : receipt.status === 'CONFIRMED'
+                        ? 'No draw token is available for this confirmed receipt. Please contact support with the receipt number.'
+                        : 'A lucky draw token is issued only after Super Admin verifies and confirms this installment payment.'}
+                  </div>
+                )}
+              </section>
+            ) : null}
+
+            <section className="mm-receipt-info-grid" aria-label="Receipt information">
+              <div><span>Receipt number</span><strong>{receipt.receiptNumber}</strong><small>Permanent payment reference</small></div>
+              <div><span>Member / customer</span><strong>{memberName}</strong><small>Member ID: {receipt.memberId} • Username: {receipt.username}</small></div>
+              <div><span>Payment purpose</span><strong>{receipt.purpose.replace('_', ' ')}</strong><small>{receipt.seasonName} ({receipt.seasonCode})</small></div>
+              <div><span>Amount</span><strong>{money(receipt.amount, receipt.currencyCode)}</strong><small>QR / UPI submission</small></div>
+              <div><span>UTR / transaction reference</span><strong>{receipt.providerReference}</strong><small>Reference submitted by member</small></div>
+              <div><span>Status</span><strong>{statusLabel(receipt.status)}</strong><small>{receipt.status === 'CONFIRMED' ? 'Payment verified' : receipt.status === 'REJECTED' ? 'Payment rejected' : 'Awaiting Super Admin verification'}</small></div>
+              <div><span>Submitted</span><strong>{dateTime(receipt.submittedAt)}</strong><small>Submission timestamp</small></div>
+              <div><span>Reviewed</span><strong>{dateTime(receipt.reviewedAt)}</strong><small>Verification timestamp</small></div>
+            </section>
+
+            <section className="mm-receipt-payment-summary">
+              <h3>{receipt.purpose === 'INSTALLMENT' ? 'Installment allocation' : 'E-PIN purchase details'}</h3>
+              {receipt.purpose === 'INSTALLMENT' ? (
+                <div className="mm-receipt-summary-row">
+                  <div><span>Installments in this payment</span><strong>{Number.isFinite(installmentCount) && installmentCount > 0 ? installmentCount : '—'}</strong></div>
+                  <div><span>Amount per installment</span><strong>{installmentAmount}</strong></div>
+                  <div><span>Allocation</span><strong>{String(details.allocationMode ?? 'NEXT_UNPAID_SEQUENTIAL').replaceAll('_', ' ')}</strong></div>
+                </div>
+              ) : (
+                <div className="mm-receipt-summary-row">
+                  <div><span>Quantity</span><strong>{String(details.quantity ?? '—')}</strong></div>
+                  <div><span>Value per E-PIN</span><strong>{String(details.valuePerPin ?? '—')} {receipt.currencyCode}</strong></div>
+                  <div><span>Assignment</span><strong>Session-bound after verification</strong></div>
+                </div>
+              )}
+
+              {receipt.purpose === 'INSTALLMENT' && tokens.length > 0 ? (
+                <div className="mm-receipt-allocation-list">
+                  {tokens.map((item) => (
+                    <div key={`allocation-${item.token}`}>
+                      <span>Installment {item.installmentSequence ?? '—'}</span>
+                      <strong>Token {item.token}</strong>
+                      <small>{tokenStatusLabel(item)}</small>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </section>
+
+            <footer className="mm-receipt-footer">
+              <strong>MegaGoldenClub</strong>
+              <span>This is a system-generated read-only receipt. Use the receipt number and public link for verification.</span>
+            </footer>
+          </article>
+        ) : null}
       </main>
     </div>
   );
