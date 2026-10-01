@@ -24,6 +24,7 @@
     "backup:import-offhost": "bash ./scripts/import-offhost-backup.sh",
     "restore:data": "./scripts/restore-data.sh",
     "verify:recovery-drill": "bash ./scripts/verify-backup-restore-drill.sh",
+    "verify:production-config": "node ./scripts/verify-production-config.mjs",
     "uat:smoke": "./scripts/uat-smoke.sh",
     "verify": "node ../scripts/verify-super-admin-lifecycle.mjs && ./scripts/verify-local.sh"
   },
