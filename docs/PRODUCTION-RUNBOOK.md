@@ -23,22 +23,33 @@ For each release candidate, retain the `megagoldenclub-release-evidence-<commit>
 Complete `docs/RELEASE-SIGNOFF.md` for the same commit. Automated evidence may be referenced by run/artifact ID, but manual checks must be completed and signed by a human operator. At minimum, record:
 
 - root `npm run verify` on the target-like host;
+- production configuration validation against the actual target environment file;
 - human interaction/readability review of the supported admin/member breakpoints using the browser-UAT screenshots as baseline evidence;
-- provider UAT for each payment, payout, SMTP or fulfilment provider that will actually be enabled;
+- provider/operator-process UAT for each real money/email/fulfilment process that will actually be enabled;
 - an operational restore exercise from an encrypted off-host backup into production-like isolated infrastructure;
 - rollback/recovery owner and release sign-off owner.
 
-Do not treat an unchecked, not-applicable-without-reason or missing manual gate as implicitly approved.
+Use `docs/GO-LIVE-READINESS.md` as the finite ledger of repository-controlled versus external/manual/business-owner gates. Do not treat an unchecked, not-applicable-without-reason or missing manual gate as implicitly approved.
 
 ## Production environment
 
 Use unique production secrets for CAPTCHA HMAC, JWT access and refresh signing. Do not reuse development or CI values. Set `NODE_ENV=production`.
 
-When the API is behind a reverse proxy, set `TRUST_PROXY_HOPS` to the exact number of trusted proxy hops. Do not use a broad trust-proxy value. Enable `SECURITY_HSTS_ENABLED=true` only after HTTPS is enforced end-to-end at the public edge.
+Before production sign-off, validate the actual deployment environment file from the repository root:
 
-Rate limiting is Redis-coordinated and non-authoritative. Production defaults may be overridden with the `RATE_LIMIT_*` environment variables after reviewing expected traffic. Keep `RATE_LIMIT_ENABLED=true` in production.
+```bash
+npm --prefix backend run verify:production-config -- /absolute/path/to/production.env --check-files
+```
 
-SMTP and external payout/payment/fulfilment provider credentials remain provider-specific deployment inputs. Do not enable a provider integration until that provider is selected, configured and UAT-approved.
+The validator does not print secret values. It rejects development/CI placeholders, mismatched MySQL identity between `DATABASE_URL` and `MYSQL_*`, missing Redis authentication, insecure public HTTP/loopback URLs, disabled HSTS/rate limiting, test-only rate limiting, invalid proxy-hop bounds, malformed MongoDB configuration, incomplete/insecure SMTP configuration when present, and a missing/insecure backup-key file when `--check-files` is used. Add `--require-smtp` when email-based authentication features will be enabled in the target environment.
+
+A validator `PASS` is necessary but not sufficient for production approval: domain/TLS/edge routing, monitoring/alerts, retention controls, provider/process UAT and the real off-host restore exercise remain operational gates.
+
+When the API is behind a reverse proxy, set `TRUST_PROXY_HOPS` to the exact number of trusted proxy hops. Do not use a broad trust-proxy value. Production release requires HTTPS at the public edge and `SECURITY_HSTS_ENABLED=true` after HTTPS is enforced end-to-end.
+
+Rate limiting is Redis-coordinated and non-authoritative. Production defaults may be overridden with the `RATE_LIMIT_*` environment variables after reviewing expected traffic. Keep `RATE_LIMIT_ENABLED=true` and `RATE_LIMIT_TEST_ENABLED=false` in production.
+
+The current payment contract is QR/UPI plus UTR/screenshot verification rather than an automatic payment-gateway adapter. Withdrawal payout records support an audited provider/reference process but no automatic payout adapter is selected. SMTP is the current optional external adapter. Product/prize fulfilment state is implemented without assuming a courier/vendor adapter. Do not invent or enable a new provider integration until it is selected, configured and UAT-approved; see `docs/GO-LIVE-READINESS.md`.
 
 ## SUPER_ADMIN lifecycle
 
@@ -142,15 +153,16 @@ Do not reopen traffic until verification passes and critical balances, policy ve
 
 1. Confirm Backend CI, Frontend CI and Release Evidence are green for the exact commit; retain the exact-SHA release-evidence artifact.
 2. Pull the exact release commit on the target-like host and run root `npm run verify`; record the result in `docs/RELEASE-SIGNOFF.md`.
-3. Complete the remaining applicable human/provider/recovery ownership gates in `docs/RELEASE-SIGNOFF.md`.
-4. Take a fresh backup, export it with `backup:export-offhost`, and record the protected off-host object/checksum reference.
-5. Put write traffic into the deployment maintenance procedure used by the hosting environment.
-6. Install exact dependencies from the release artifact/commit.
-7. Run `npx prisma migrate deploy` once from the release artifact.
-8. Start/restart API, admin and member/public applications.
-9. Wait for `/health/ready` to return HTTP 200 with MySQL, Redis and MongoDB `up`.
-10. Run `npm run uat:smoke` from `backend/` against the deployed API. Supply `UAT_ADMIN_TOKEN` and `UAT_MEMBER_TOKEN` when authenticated smoke is required.
-11. Complete the stateful checks in `docs/UAT-CHECKLIST.md` and record final release approval before opening normal traffic.
+3. Run `verify:production-config` against the actual production environment with `--check-files` and record the non-secret PASS evidence; add `--require-smtp` if email-based auth will be enabled.
+4. Complete the remaining applicable human/provider/process/recovery/business-owner gates in `docs/GO-LIVE-READINESS.md` and `docs/RELEASE-SIGNOFF.md`.
+5. Take a fresh backup, export it with `backup:export-offhost`, and record the protected off-host object/checksum reference.
+6. Put write traffic into the deployment maintenance procedure used by the hosting environment.
+7. Install exact dependencies from the release artifact/commit.
+8. Run `npx prisma migrate deploy` once from the release artifact.
+9. Start/restart API, admin and member/public applications.
+10. Wait for `/health/ready` to return HTTP 200 with MySQL, Redis and MongoDB `up`.
+11. Run `npm run uat:smoke` from `backend/` against the deployed API. Supply `UAT_ADMIN_TOKEN` and `UAT_MEMBER_TOKEN` when authenticated smoke is required.
+12. Complete the stateful checks in `docs/UAT-CHECKLIST.md` and record final release approval before opening normal traffic.
 
 ## Rollback
 
