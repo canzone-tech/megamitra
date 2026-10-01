@@ -2,6 +2,8 @@
 
 Use one completed copy of this record per production release candidate. Do not pre-check manual gates from CI output. Attach or link evidence without copying secrets, JWTs, provider credentials, KYC data, payout destination details or backup encryption keys into the record.
 
+Review `docs/GO-LIVE-READINESS.md` first. It is the finite ledger that separates repository-controlled gates from human, provider/process and business-owner gates.
+
 ## Candidate identity
 
 - Release commit: `<40-character git SHA>`
@@ -37,6 +39,22 @@ Evidence:
 - Date/time (UTC): `<timestamp>`
 - Result/log reference: `<reference>`
 
+## Production configuration gate
+
+Run the production-only validator against the actual deployment environment file. Do not paste the environment file or secret values into this record.
+
+```bash
+npm --prefix backend run verify:production-config -- /absolute/path/to/production.env --check-files
+```
+
+Add `--require-smtp` when email-based authentication features will be enabled in the target environment.
+
+- [ ] Production configuration readiness returned `PASS`.
+- [ ] Backup encryption key path was reported `VERIFIED` by `--check-files`.
+- [ ] If email-based auth is enabled, SMTP was required by the validator and real delivery UAT is recorded below.
+
+Production-config evidence/reference: `<non-secret log/reference>`
+
 ## Human browser review
 
 Use the authenticated browser-UAT screenshots/metrics as baseline evidence, then interact with the supported admin/member surfaces.
@@ -51,18 +69,18 @@ Use the authenticated browser-UAT screenshots/metrics as baseline evidence, then
 Reviewer: `<name>`  
 Evidence/reference: `<reference>`
 
-## External providers
+## External providers and real operator processes
 
-For each provider that will be enabled in this release, record UAT approval. Mark a provider `N/A` only when it will remain disabled.
+Use the provider model in `docs/GO-LIVE-READINESS.md`. The current payment contract is manual QR/UPI + UTR/screenshot verification; withdrawals expose an audited provider/reference payout rail but no automatic payout adapter is selected. Mark an external integration `N/A` only when it remains disabled or is not part of the current contract. Real money/email/fulfilment processes that will be used still require operator UAT.
 
-| Provider function | Provider/reference | Status (`APPROVED` / `N/A`) | Evidence |
+| Function | Provider/process reference | Status (`APPROVED` / `N/A`) | Evidence |
 | --- | --- | --- | --- |
-| Payment collection |  |  |  |
-| Payout |  |  |  |
+| QR/UPI payment collection + verification |  |  |  |
+| Withdrawal payout process/provider |  |  |  |
 | SMTP/email |  |  |  |
 | Product/prize fulfilment |  |  |  |
 
-- [ ] Every enabled provider above is UAT-approved.
+- [ ] Every enabled provider or real operator process above is UAT-approved.
 
 ## Recovery readiness
 
@@ -90,13 +108,14 @@ Recovery evidence:
 
 ## Stateful UAT and open blockers
 
-Review `docs/STATEFUL-UAT-COVERAGE.md` together with `docs/UAT-CHECKLIST.md`. Automated status is evidence for the contract named in the matrix; it does not pre-approve rows that still require human, provider or business-owner disposition.
+Review `docs/STATEFUL-UAT-COVERAGE.md`, `docs/UAT-CHECKLIST.md` and `docs/GO-LIVE-READINESS.md` together. Automated status is evidence for the contract named in the matrix; it does not pre-approve rows that still require human, provider/process or business-owner disposition.
 
 - [ ] Applicable scenarios in `docs/UAT-CHECKLIST.md` are completed with evidence.
 - [ ] One coherent test-data stateful journey covers paid E-PIN registration, installment submission/review, same-receipt status transition, five-digit token issuance, draw entry/winner flow and downstream KYC/fulfilment or entitlement state where applicable.
 - [ ] Every `AUTOMATED + HUMAN` matrix row applicable to this release has a human evidence reference.
-- [ ] Every `PROVIDER` matrix row is either UAT-approved above or explicitly `N/A` because the provider remains disabled.
+- [ ] Every `PROVIDER`/real-process row is either UAT-approved above or explicitly `N/A` for a reason allowed by `docs/GO-LIVE-READINESS.md`.
 - [ ] Every applicable `OPEN RULE` has an explicit approved business decision or remains a release blocker; no default was invented during UAT.
+- [ ] Production domain/TLS/proxy, monitoring/alert routing, retention controls, rollback/recovery owner and release owner are recorded/approved for the target environment.
 - [ ] No unresolved issue is being treated as implicitly approved.
 
 Stateful journey evidence/reference: `<reference>`
