@@ -127,6 +127,7 @@ jobs:
                   status: "PASS_VIA_BACKEND_CI",
                   includes: [
                     "unit and integration suites",
+                    "production configuration readiness contract",
                     "isolated backup/restore recovery drill",
                     "compiled API readiness and authenticated UAT smoke",
                     "authenticated desktop/mobile browser UAT"
@@ -143,10 +144,13 @@ jobs:
               },
               manualReleaseGates: [
                 {id: "local-root-verify", status: "REQUIRED", requirement: "Pull this exact commit on the target-like host and run root npm run verify successfully."},
+                {id: "production-config", status: "REQUIRED", requirement: "Run verify:production-config against the actual deployment environment with --check-files; add --require-smtp when email-based auth is enabled."},
                 {id: "human-visual-uat", status: "REQUIRED", requirement: "Review browser-UAT evidence and complete a human interaction/readability pass on supported breakpoints."},
-                {id: "provider-uat", status: "REQUIRED_IF_PROVIDER_ENABLED", requirement: "Any selected payment, payout, SMTP or fulfilment provider must be configured and UAT-approved before enabling it in production."},
-                {id: "off-host-recovery", status: "REQUIRED", requirement: "Complete an operational restore exercise from an encrypted off-host backup into production-like isolated infrastructure."},
-                {id: "release-ownership", status: "REQUIRED", requirement: "Identify rollback/recovery owner and release sign-off owner before production deployment."}
+                {id: "stateful-uat", status: "REQUIRED", requirement: "Complete one coherent controlled-data business journey per docs/RELEASE-SIGNOFF.md."},
+                {id: "provider-process-uat", status: "REQUIRED_IF_USED", requirement: "UAT-approve each real money, email or fulfilment provider/operator process that will be used; N/A is valid only when disabled/not part of the current contract."},
+                {id: "off-host-recovery", status: "REQUIRED", requirement: "Complete an operational restore exercise from an encrypted backup retrieved from the real off-host boundary into production-like isolated infrastructure."},
+                {id: "business-rule-disposition", status: "REQUIRED_FOR_AFFECTED_FEATURES", requirement: "Every applicable open business rule in docs/GO-LIVE-READINESS.md must have an approved decision or remain an explicit blocker; CI must not invent defaults."},
+                {id: "production-operations", status: "REQUIRED", requirement: "Approve production domain/TLS/proxy, monitoring/alerts, retention controls and release/rollback/recovery ownership."}
               ]
             }' >"${EVIDENCE_DIR}/release-evidence.json"
 
@@ -165,17 +169,20 @@ jobs:
           | Backend CI | PASS | [run ${backend_run_number}](${backend_url}) |
           | Frontend CI | PASS | [run ${frontend_run_number}](${frontend_url}) |
           | Authenticated browser UAT | PASS | Artifact \`${browser_name}\` (ID ${browser_id}) |
-          | Recovery/API/auth regression coverage | PASS via Backend CI | Same exact Backend CI run |
+          | Production-config contract + recovery/API/auth regressions | PASS via Backend CI | Same exact Backend CI run |
 
-          ## Manual release gates still required
+          ## Manual/target release gates still required
 
           - **local-root-verify — REQUIRED:** pull this exact commit on the target-like host and run root \`npm run verify\` successfully.
+          - **production-config — REQUIRED:** run \`verify:production-config\` against the actual production env with \`--check-files\`; add \`--require-smtp\` if email-based auth is enabled.
           - **human-visual-uat — REQUIRED:** review browser-UAT evidence and complete a human interaction/readability pass.
-          - **provider-uat — REQUIRED IF ENABLED:** UAT-approve every payment, payout, SMTP or fulfilment provider that will be enabled.
-          - **off-host-recovery — REQUIRED:** complete an operational restore exercise from encrypted off-host backup into production-like isolated infrastructure.
-          - **release-ownership — REQUIRED:** identify rollback/recovery owner and release sign-off owner.
+          - **stateful-uat — REQUIRED:** complete the coherent controlled-data journey in \`docs/RELEASE-SIGNOFF.md\`.
+          - **provider/process-uat — REQUIRED IF USED:** approve each real money/email/fulfilment process that will be used; use N/A only as allowed by \`docs/GO-LIVE-READINESS.md\`.
+          - **off-host-recovery — REQUIRED:** retrieve a real encrypted off-host backup and restore it into isolated production-like infrastructure.
+          - **business-rule-disposition — REQUIRED FOR AFFECTED FEATURES:** open rules require an approved owner decision or remain blockers; CI does not invent defaults.
+          - **production-operations — REQUIRED:** approve domain/TLS/proxy, monitoring/alerts, retention and named release/rollback/recovery owners.
 
-          This evidence intentionally does not mark manual/provider/off-host checks complete. Complete \`docs/RELEASE-SIGNOFF.md\` before production approval.
+          This evidence intentionally does not mark target/manual/provider/business-owner gates complete. Complete \`docs/GO-LIVE-READINESS.md\` and \`docs/RELEASE-SIGNOFF.md\` before production approval.
           EOF2
 
           cat "${EVIDENCE_DIR}/release-evidence.md" >>"${GITHUB_STEP_SUMMARY}"
