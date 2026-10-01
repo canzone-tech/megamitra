@@ -46,6 +46,7 @@ Use the authenticated browser-UAT screenshots/metrics as baseline evidence, then
 - [ ] Member desktop dashboard/navigation is readable and usable.
 - [ ] Member mobile navigation remains reachable and usable.
 - [ ] Appearance/theme controls render and behave as intended.
+- [ ] Public payment receipt is readable without login at desktop/mobile widths and Print/Save PDF output is acceptable.
 
 Reviewer: `<name>`  
 Evidence/reference: `<reference>`
@@ -75,8 +76,16 @@ Recovery owner: `<name>`
 
 ## Stateful UAT and open blockers
 
+Review `docs/STATEFUL-UAT-COVERAGE.md` together with `docs/UAT-CHECKLIST.md`. Automated status is evidence for the contract named in the matrix; it does not pre-approve rows that still require human, provider or business-owner disposition.
+
 - [ ] Applicable scenarios in `docs/UAT-CHECKLIST.md` are completed with evidence.
+- [ ] One coherent test-data stateful journey covers paid E-PIN registration, installment submission/review, same-receipt status transition, five-digit token issuance, draw entry/winner flow and downstream KYC/fulfilment or entitlement state where applicable.
+- [ ] Every `AUTOMATED + HUMAN` matrix row applicable to this release has a human evidence reference.
+- [ ] Every `PROVIDER` matrix row is either UAT-approved above or explicitly `N/A` because the provider remains disabled.
+- [ ] Every applicable `OPEN RULE` has an explicit approved business decision or remains a release blocker; no default was invented during UAT.
 - [ ] No unresolved issue is being treated as implicitly approved.
+
+Stateful journey evidence/reference: `<reference>`
 
 Open blockers / approved exceptions:
 
