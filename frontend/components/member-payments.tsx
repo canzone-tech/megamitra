@@ -5,7 +5,15 @@ import { useRouter } from 'next/navigation';
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { ApiClientError, apiJson } from '@/lib/client-api';
 
-type Season = { id: string; code: string; name: string; currencyCode: string; joiningAmount: string };
+type Season = {
+  id: string;
+  code: string;
+  name: string;
+  currencyCode: string;
+  registrationFee: string;
+  installmentAmount: string;
+  joiningAmount: string;
+};
 type Installment = {
   seasonCode: string;
   seasonName: string;
@@ -47,6 +55,7 @@ type Epin = {
   pin: string | null;
   displaySuffix: string;
   status: string;
+  pinType: 'ACTIVATION' | 'INSTALLMENT';
   seasonCode: string | null;
   seasonName: string | null;
   expiresAt: string;
@@ -120,6 +129,7 @@ export function MemberPayments() {
   const [epins, setEpins] = useState<Epin[]>([]);
   const [seasonId, setSeasonId] = useState('');
   const [epinQuantity, setEpinQuantity] = useState(1);
+  const [epinType, setEpinType] = useState<'ACTIVATION' | 'INSTALLMENT'>('ACTIVATION');
   const [installmentCount, setInstallmentCount] = useState(1);
   const [installmentProof, setInstallmentProof] = useState('');
   const [epinProof, setEpinProof] = useState('');
@@ -171,7 +181,10 @@ export function MemberPayments() {
   const selectedSeason = useMemo(() => config?.seasons.find((item) => item.id === seasonId) ?? null, [config, seasonId]);
   const installment = config?.installment ?? null;
   const installmentTotal = Number(installment?.installmentAmount ?? 0) * installmentCount;
-  const epinTotal = Number(selectedSeason?.joiningAmount ?? 0) * epinQuantity;
+  const epinUnitValue = epinType === 'ACTIVATION'
+    ? Number(selectedSeason?.joiningAmount ?? 0)
+    : Number(selectedSeason?.installmentAmount ?? 0);
+  const epinTotal = epinUnitValue * epinQuantity;
 
   async function setProof(file: File | undefined, setter: (value: string) => void) {
     if (!file) {
@@ -212,11 +225,11 @@ export function MemberPayments() {
     try {
       const receipt = await apiJson<Receipt>('/api/backend/member/payments/epins', {
         method: 'POST',
-        body: JSON.stringify({ seasonId: selectedSeason.id, quantity: epinQuantity, utr: String(form.get('utr') ?? '').trim(), paymentProofDataUrl: epinProof }),
+        body: JSON.stringify({ seasonId: selectedSeason.id, epinType, quantity: epinQuantity, utr: String(form.get('utr') ?? '').trim(), paymentProofDataUrl: epinProof }),
       });
       setLatestReceipt(receipt);
       setEpinProof(''); setEpinQuantity(1);
-      setNotice('E-PIN purchase submitted. Session-bound E-PINs are generated only after Super Admin verification.');
+      setNotice(`${epinType === 'ACTIVATION' ? 'Activation' : 'Installment'} E-PIN purchase submitted. Session-bound E-PINs are generated only after Super Admin verification.`);
       event.currentTarget.reset();
       await load();
     } catch (reason) { handleError(reason); } finally { setBusy(false); }
@@ -241,13 +254,13 @@ export function MemberPayments() {
 
         <section className="mm-portal-grid">
           <article className="mm-card"><div className="mm-card-head"><h2>Pay installment</h2><span className="mm-chip">No partial EMI</span></div><div className="mm-card-body"><form method="post" onSubmit={submitInstallment}><div className="mm-field"><label htmlFor="installmentCount">Installment count</label><input id="installmentCount" className="mm-input" type="number" min="1" max={Math.max(1, installment?.remainingInstallmentCount ?? 1)} value={installmentCount} disabled={!rail?.enabled || !installment || installment.fullyPaid || busy} onChange={(event) => setInstallmentCount(Math.max(1, Number(event.target.value) || 1))} /></div><div className="mm-field"><label>Amount</label><input className="mm-input" value={money(installmentTotal, installment?.currencyCode)} readOnly /></div><div className="mm-field"><label htmlFor="installmentUtr">UTR / reference</label><input id="installmentUtr" name="utr" className="mm-input" minLength={4} maxLength={191} required disabled={busy} /></div><div className="mm-field"><label htmlFor="installmentProof">Payment screenshot</label><input id="installmentProof" className="mm-input" type="file" accept="image/*" required={!installmentProof} disabled={busy} onChange={(event) => void setProof(event.target.files?.[0], setInstallmentProof)} /></div><button className="mm-button blue" disabled={busy || !rail?.enabled || !installment || installment.fullyPaid || !installmentProof}>{busy ? 'Submitting…' : 'Submit installment payment'}</button></form></div></article>
-          <article className="mm-card"><div className="mm-card-head"><h2>Buy E-PINs</h2><span className="mm-chip">Session-bound</span></div><div className="mm-card-body"><form method="post" onSubmit={submitEpin}><div className="mm-field"><label htmlFor="seasonId">Session</label><select id="seasonId" className="mm-input" value={seasonId} required disabled={busy} onChange={(event) => setSeasonId(event.target.value)}><option value="">Select session</option>{config?.seasons.map((season) => <option key={season.id} value={season.id}>{season.name} ({season.code})</option>)}</select></div><div className="mm-field"><label htmlFor="epinQuantity">Quantity</label><input id="epinQuantity" className="mm-input" type="number" min="1" max="100" value={epinQuantity} disabled={busy} onChange={(event) => setEpinQuantity(Math.max(1, Math.min(100, Number(event.target.value) || 1)))} /></div><div className="mm-field"><label>Amount</label><input className="mm-input" value={money(epinTotal, selectedSeason?.currencyCode)} readOnly /></div><div className="mm-field"><label htmlFor="epinUtr">UTR / reference</label><input id="epinUtr" name="utr" className="mm-input" minLength={4} maxLength={191} required disabled={busy} /></div><div className="mm-field"><label htmlFor="epinProof">Payment screenshot</label><input id="epinProof" className="mm-input" type="file" accept="image/*" required={!epinProof} disabled={busy} onChange={(event) => void setProof(event.target.files?.[0], setEpinProof)} /></div><button className="mm-button blue" disabled={busy || !rail?.enabled || !selectedSeason || !epinProof}>{busy ? 'Submitting…' : 'Submit E-PIN purchase'}</button></form></div></article>
+          <article className="mm-card"><div className="mm-card-head"><h2>Buy E-PINs</h2><span className="mm-chip">Session-bound</span></div><div className="mm-card-body"><form method="post" onSubmit={submitEpin}><div className="mm-field"><label htmlFor="seasonId">Session</label><select id="seasonId" className="mm-input" value={seasonId} required disabled={busy} onChange={(event) => setSeasonId(event.target.value)}><option value="">Select session</option>{config?.seasons.map((season) => <option key={season.id} value={season.id}>{season.name} ({season.code})</option>)}</select></div><div className="mm-field"><label htmlFor="epinType">E-PIN type</label><select id="epinType" className="mm-input" value={epinType} disabled={busy} onChange={(event) => setEpinType(event.target.value as 'ACTIVATION' | 'INSTALLMENT')}><option value="ACTIVATION">Activation — registration + installment #1</option><option value="INSTALLMENT">Installment — one monthly installment</option></select></div><div className="mm-field"><label htmlFor="epinQuantity">Quantity</label><input id="epinQuantity" className="mm-input" type="number" min="1" max="100" value={epinQuantity} disabled={busy} onChange={(event) => setEpinQuantity(Math.max(1, Math.min(100, Number(event.target.value) || 1)))} /></div><div className="mm-field"><label>Amount</label><input className="mm-input" value={money(epinTotal, selectedSeason?.currencyCode)} readOnly /></div><div className="mm-field"><label htmlFor="epinUtr">UTR / reference</label><input id="epinUtr" name="utr" className="mm-input" minLength={4} maxLength={191} required disabled={busy} /></div><div className="mm-field"><label htmlFor="epinProof">Payment screenshot</label><input id="epinProof" className="mm-input" type="file" accept="image/*" required={!epinProof} disabled={busy} onChange={(event) => void setProof(event.target.files?.[0], setEpinProof)} /></div><button className="mm-button blue" disabled={busy || !rail?.enabled || !selectedSeason || !epinProof}>{busy ? 'Submitting…' : 'Submit E-PIN purchase'}</button></form></div></article>
         </section>
 
         {latestReceipt ? <section className="mm-card"><div className="mm-card-head"><h2>Provisional receipt</h2><span className="mm-chip">{statusLabel(latestReceipt.status)}</span></div><div className="mm-card-body"><p><strong>{latestReceipt.receiptNumber}</strong> • {latestReceipt.purpose.replace('_', ' ')} • {money(latestReceipt.amount, latestReceipt.currencyCode)}</p><p>UTR: {latestReceipt.providerReference} • Submitted: {dateTime(latestReceipt.submittedAt)}</p>{latestReceipt.receiptUrl ? <Link className="mm-button blue" href={latestReceipt.receiptUrl} target="_blank">Open public receipt</Link> : null}</div></section> : null}
 
-        <section className="mm-card"><div className="mm-card-head"><h2>Payment receipts</h2><span className="mm-chip">{history.length}</span></div><div className="mm-card-body">{history.length ? <div className="mm-list">{history.map((receipt) => { const details = detailsObject(receipt.details); return <div key={receipt.id ?? receipt.receiptNumber}><strong>{receipt.receiptNumber}</strong> • {receipt.purpose.replace('_', ' ')} • {money(receipt.amount, receipt.currencyCode)}<br /><span>{statusLabel(receipt.status)} • UTR {receipt.providerReference} • {receipt.seasonName ?? receipt.seasonCode ?? 'Session'}</span><br /><small>{receipt.purpose === 'INSTALLMENT' ? `${String(details.installmentCount ?? '—')} installment(s)` : `${String(details.quantity ?? '—')} E-PIN(s)`} • {dateTime(receipt.submittedAt)}</small>{' '}{receipt.receiptUrl ? <Link href={receipt.receiptUrl} target="_blank">Public receipt</Link> : null}</div>; })}</div> : <p>No payment submissions yet.</p>}</div></section>
-        <section className="mm-card"><div className="mm-card-head"><h2>My E-PINs</h2><span className="mm-chip">{epins.length}</span></div><div className="mm-card-body">{epins.length ? <div className="mm-list">{epins.map((epin) => <div key={epin.id}><strong>{epin.pin ?? `••••${epin.displaySuffix}`}</strong> • {epin.status}<br /><span>{epin.seasonName ?? epin.seasonCode ?? 'Session'} • Expires {dateTime(epin.expiresAt)}</span></div>)}</div> : <p>No E-PINs assigned yet. Verified purchases will appear here.</p>}</div></section>
+        <section className="mm-card"><div className="mm-card-head"><h2>Payment receipts</h2><span className="mm-chip">{history.length}</span></div><div className="mm-card-body">{history.length ? <div className="mm-list">{history.map((receipt) => { const details = detailsObject(receipt.details); return <div key={receipt.id ?? receipt.receiptNumber}><strong>{receipt.receiptNumber}</strong> • {receipt.purpose.replace('_', ' ')} • {money(receipt.amount, receipt.currencyCode)}<br /><span>{statusLabel(receipt.status)} • UTR {receipt.providerReference} • {receipt.seasonName ?? receipt.seasonCode ?? 'Session'}</span><br /><small>{receipt.purpose === 'INSTALLMENT' ? `${String(details.installmentCount ?? '—')} installment(s)` : `${String(details.quantity ?? '—')} ${String(details.epinType ?? 'ACTIVATION')} E-PIN(s)`} • {dateTime(receipt.submittedAt)}</small>{' '}{receipt.receiptUrl ? <Link href={receipt.receiptUrl} target="_blank">Public receipt</Link> : null}</div>; })}</div> : <p>No payment submissions yet.</p>}</div></section>
+        <section className="mm-card"><div className="mm-card-head"><h2>My E-PINs</h2><span className="mm-chip">{epins.length}</span></div><div className="mm-card-body">{epins.length ? <div className="mm-list">{epins.map((epin) => <div key={epin.id}><strong>{epin.pin ?? `••••${epin.displaySuffix}`}</strong> • {epin.status}<br /><span>{epin.pinType === 'INSTALLMENT' ? 'Installment E-PIN' : 'Activation E-PIN'} • {epin.seasonName ?? epin.seasonCode ?? 'Session'} • Expires {dateTime(epin.expiresAt)}</span></div>)}</div> : <p>No E-PINs assigned yet. Verified purchases will appear here.</p>}</div></section>
       </main>
     </div>
   );
