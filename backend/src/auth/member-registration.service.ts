@@ -436,8 +436,8 @@ export class MemberRegistrationService {
       throw new ConflictException('E-PIN paid activation amount is invalid');
     }
     const enrollmentDate = occurredAt.toISOString().slice(0, 10);
-    const seasonStartAt = new Date(`${String(epin.seasonStartDate).slice(0, 10)}T00:00:00.000Z`);
-    const seasonStartDate = seasonStartAt.toISOString().slice(0, 10);
+    const seasonStartDate = this.dateOnly(epin.seasonStartDate!);
+    const seasonStartAt = new Date(`${seasonStartDate}T00:00:00.000Z`);
     const enrollmentSource = `epin-enrollment:${epin.id}`;
     const enrollmentFingerprint = this.fingerprint({
       epinId: epin.id,
@@ -658,6 +658,14 @@ export class MemberRegistrationService {
 
   private fingerprint(value: unknown) {
     return createHash('sha256').update(JSON.stringify(value)).digest('hex');
+  }
+
+  private dateOnly(value: Date | string) {
+    const date = value instanceof Date ? value : new Date(value);
+    if (!Number.isFinite(date.getTime())) {
+      throw new ConflictException('E-PIN session start date is invalid');
+    }
+    return date.toISOString().slice(0, 10);
   }
 
   private money(value: number) {
