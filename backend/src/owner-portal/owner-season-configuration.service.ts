@@ -539,18 +539,6 @@ export class OwnerSeasonConfigurationService {
 
     if (target === 'ACTIVE' && season.status === 'REVIEW') {
       this.requirePolicyMapping(season);
-      const other = await this.rows<{ id: string; name: string }>(
-        `SELECT id, name FROM owner_seasons
-         WHERE id<>? AND status IN ('ACTIVE','PAUSED')
-         ORDER BY startDate DESC LIMIT 1`,
-        [id],
-      );
-      if (other[0]) {
-        throw new ConflictException(
-          `Another season is already active or paused: ${other[0].name}`,
-        );
-      }
-
       const program = await this.programs.getVersion(season.programVersionId!);
       const expectedMonths = Number(program.installmentCount);
       const coverage = await this.rows<{ months: bigint | number | string }>(
@@ -591,6 +579,42 @@ export class OwnerSeasonConfigurationService {
       const referral = await this.referralPolicies.getVersion(
         season.referralPolicyVersionId!,
       );
+
+      // Activating a season opens registration immediately, even when the
+      // season's draw/installment calendar starts in the future. Move only
+      // future draft policy starts back to the activation instant so existing
+      // payment/referral/binary rules can evaluate pre-start registrations.
+      const registrationOpensAt = new Date();
+      const registrationOpensAtIso = registrationOpensAt.toISOString();
+      if (program.lifecycle === 'DRAFT' && program.effectiveFrom > registrationOpensAt) {
+        await this.programs.updateDraft(
+          program.id,
+          { effectiveFrom: registrationOpensAtIso },
+          actorUserId,
+        );
+      }
+      if (binary.lifecycle === 'DRAFT' && binary.effectiveFrom > registrationOpensAt) {
+        await this.binaryPolicies.updateDraft(
+          binary.id,
+          { effectiveFrom: registrationOpensAtIso },
+          actorUserId,
+        );
+      }
+      if (referral.lifecycle === 'DRAFT' && referral.effectiveFrom > registrationOpensAt) {
+        await this.referralPolicies.updateDraft(
+          referral.id,
+          { effectiveFrom: registrationOpensAtIso },
+          actorUserId,
+        );
+      }
+      if (automatic.lifecycle === 'DRAFT' && automatic.effectiveFrom > registrationOpensAt) {
+        await this.orchestration.updateDraft(
+          automatic.id,
+          { effectiveFrom: registrationOpensAtIso },
+          actorUserId,
+        );
+      }
+
       if (program.lifecycle === 'DRAFT') {
         await this.programs.publish(program.id, actorUserId);
       } else if (program.lifecycle !== 'PUBLISHED') {
