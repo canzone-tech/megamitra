@@ -1,5 +1,6 @@
 import { NestFactory } from '@nestjs/core';
 import { randomUUID } from 'node:crypto';
+import { generateLuckyDrawToken } from '../src/lucky-draw/lucky-draw-token.util';
 import { AppModule } from '../src/app.module';
 import { PasswordService } from '../src/auth/password.service';
 import { configureApp } from '../src/bootstrap/configure-app';
@@ -33,6 +34,12 @@ describe('MegaGoldenClub owner lucky draw workflow integration', () => {
   let drawId = '';
   let drawPolicyId = '';
   let drawPolicyVersionId = '';
+  let installmentToken = '';
+  let futureInstallmentToken = '';
+  let secondDrawRunId = '';
+  let secondDrawId = '';
+  let secondDrawPolicyId = '';
+  let secondDrawPolicyVersionId = '';
 
   async function request(path: string, token?: string, init: RequestInit = {}) {
     const response = await fetch(`${baseUrl}${path}`, {
@@ -177,9 +184,34 @@ describe('MegaGoldenClub owner lucky draw workflow integration', () => {
       businessEventId,
       member.id,
       programVersionId,
-      JSON.stringify({ eligible: true, source: 'owner-workflow-uat' }),
+      JSON.stringify({ eligible: true, source: 'legacy-hook-must-not-drive-owner-draw' }),
       occurredAt,
     );
+
+    const createInstallmentToken = async (sequence: number) => {
+      for (let attempt = 0; attempt < 128; attempt += 1) {
+        const candidate = generateLuckyDrawToken();
+        const existing = await prisma.$queryRawUnsafe<Array<{ token: string }>>(
+          'SELECT token FROM lucky_draw_tokens WHERE token=? LIMIT 1',
+          candidate,
+        );
+        if (existing[0]) continue;
+        await prisma.$executeRawUnsafe(
+          `INSERT INTO lucky_draw_tokens
+             (token, sourceType, userId, enrollmentId, installmentSequence, status, createdAt)
+           VALUES (?, 'INSTALLMENT', ?, ?, ?, 'AVAILABLE', ?)`,
+          candidate,
+          member.id,
+          enrollmentId,
+          sequence,
+          occurredAt,
+        );
+        return candidate;
+      }
+      throw new Error('Unable to allocate token test fixture');
+    };
+    installmentToken = await createInstallmentToken(1);
+    futureInstallmentToken = await createInstallmentToken(2);
 
     seasonId = randomUUID();
     seasonCode = `OWS${suffix}`;
@@ -199,10 +231,15 @@ describe('MegaGoldenClub owner lucky draw workflow integration', () => {
     await prisma.$executeRawUnsafe(
       `INSERT INTO owner_season_prizes
          (id, seasonId, monthNumber, prizeCode, category, name, winnerCount, currencyCode)
-       VALUES (?, ?, 1, ?, 'UAT', 'January Workflow Prize', 1, 'INR')`,
+       VALUES
+         (?, ?, 1, ?, 'UAT', 'January Workflow Prize', 1, 'INR'),
+         (?, ?, 2, ?, 'UAT', 'February Workflow Prize', 1, 'INR')`,
       randomUUID(),
       seasonId,
       `JAN${suffix}`,
+      randomUUID(),
+      seasonId,
+      `FEB${suffix}`,
     );
   });
 
@@ -211,6 +248,38 @@ describe('MegaGoldenClub owner lucky draw workflow integration', () => {
       const userIds = [adminId, memberId].filter(Boolean);
       if (userIds.length) {
         await prisma.auditLog.deleteMany({ where: { actorUserId: { in: userIds } } });
+      }
+
+      if (installmentToken || futureInstallmentToken) {
+        const tokens = [installmentToken, futureInstallmentToken].filter(Boolean);
+        await prisma.$executeRawUnsafe(
+          `DELETE FROM lucky_draw_tokens WHERE token IN (${tokens.map(() => '?').join(',')})`,
+          ...tokens,
+        );
+      }
+
+      if (secondDrawId) {
+        await prisma.$executeRawUnsafe('DELETE FROM owner_draw_runs WHERE id = ?', secondDrawRunId);
+        await prisma.$executeRawUnsafe('DELETE FROM lucky_draw_winners WHERE drawId = ?', secondDrawId);
+        await prisma.$executeRawUnsafe('DELETE FROM lucky_draw_entries WHERE drawId = ?', secondDrawId);
+        await prisma.$executeRawUnsafe('DELETE FROM lucky_draw_instances WHERE id = ?', secondDrawId);
+      }
+      if (secondDrawPolicyVersionId) {
+        await prisma.$executeRawUnsafe(
+          'DELETE FROM lucky_draw_fulfillment_rules WHERE policyVersionId = ?',
+          secondDrawPolicyVersionId,
+        );
+        await prisma.$executeRawUnsafe(
+          'DELETE FROM lucky_draw_prize_tiers WHERE policyVersionId = ?',
+          secondDrawPolicyVersionId,
+        );
+        await prisma.$executeRawUnsafe(
+          'DELETE FROM lucky_draw_policy_versions WHERE id = ?',
+          secondDrawPolicyVersionId,
+        );
+      }
+      if (secondDrawPolicyId) {
+        await prisma.$executeRawUnsafe('DELETE FROM lucky_draw_policies WHERE id = ?', secondDrawPolicyId);
       }
 
       if (drawId) {
@@ -334,6 +403,28 @@ describe('MegaGoldenClub owner lucky draw workflow integration', () => {
     expect(locked.body.status).toBe('ELIGIBILITY_LOCKED');
     expect(Number(locked.body.eligibleEntryCount)).toBe(1);
 
+    const firstEntries = await prisma.$queryRawUnsafe<
+      Array<{ sourceHookId: string | null; drawToken: string | null }>
+    >(
+      'SELECT sourceHookId, drawToken FROM lucky_draw_entries WHERE drawId=? AND disposition=\'ELIGIBLE\'',
+      drawId,
+    );
+    expect(firstEntries).toHaveLength(1);
+    expect(firstEntries[0]?.sourceHookId).toBeNull();
+    expect(firstEntries[0]?.drawToken).toBe(installmentToken);
+
+    const tokenStates = await prisma.$queryRawUnsafe<
+      Array<{ token: string; status: string; drawId: string | null }>
+    >(
+      'SELECT token, status, drawId FROM lucky_draw_tokens WHERE token IN (?, ?) ORDER BY installmentSequence',
+      installmentToken,
+      futureInstallmentToken,
+    );
+    expect(tokenStates).toEqual([
+      expect.objectContaining({ token: installmentToken, status: 'USED', drawId }),
+      expect.objectContaining({ token: futureInstallmentToken, status: 'AVAILABLE', drawId: null }),
+    ]);
+
     const selected = await request(
       `/admin/owner-portal/draws/${drawRunId}/select-winners`,
       adminToken,
@@ -344,6 +435,55 @@ describe('MegaGoldenClub owner lucky draw workflow integration', () => {
     expect(selected.body.winners).toHaveLength(1);
     expect(selected.body.winners[0].verificationStatus).toBe('PENDING');
     const winnerId = String(selected.body.winners[0].id);
+
+    const secondPrepared = await request(
+      `/admin/owner-portal/seasons/${seasonId}/draws`,
+      adminToken,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          monthNumber: 2,
+          entryWindowStart: '2026-01-18T10:01:00+05:30',
+          entryWindowEnd: '2026-02-15T22:00:00+05:30',
+          drawAt: '2026-02-15T23:00:00+05:30',
+          claimWindowDays: 36500,
+        }),
+      },
+    );
+    expect(secondPrepared.status).toBe(201);
+    secondDrawRunId = String(secondPrepared.body.id);
+    secondDrawId = String(secondPrepared.body.drawId);
+    secondDrawPolicyId = String(secondPrepared.body.policyId);
+    secondDrawPolicyVersionId = String(secondPrepared.body.policyVersionId);
+
+    const secondLocked = await request(
+      `/admin/owner-portal/draws/${secondDrawRunId}/lock-eligibility`,
+      adminToken,
+      { method: 'POST', body: '{}' },
+    );
+    expect(secondLocked.status).toBe(201);
+    expect(Number(secondLocked.body.eligibleEntryCount)).toBe(0);
+    expect(Number(secondLocked.body.excludedEntryCount)).toBe(1);
+    const secondEntries = await prisma.$queryRawUnsafe<
+      Array<{ disposition: string; drawToken: string | null }>
+    >(
+      'SELECT disposition, drawToken FROM lucky_draw_entries WHERE drawId=?',
+      secondDrawId,
+    );
+    expect(secondEntries).toEqual([
+      expect.objectContaining({ disposition: 'PRIOR_WINNER', drawToken: null }),
+    ]);
+    const advanceToken = await prisma.$queryRawUnsafe<
+      Array<{ status: string; drawId: string | null; entryId: string | null }>
+    >(
+      'SELECT status, drawId, entryId FROM lucky_draw_tokens WHERE token=? LIMIT 1',
+      futureInstallmentToken,
+    );
+    expect(advanceToken[0]).toMatchObject({
+      status: 'AVAILABLE',
+      drawId: null,
+      entryId: null,
+    });
 
     const failedVerification = await request(
       `/admin/owner-portal/draws/${drawRunId}/winners/${winnerId}/verify`,
