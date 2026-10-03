@@ -10,7 +10,7 @@ export type PaidRegistrationFixture = {
   seasonStartDate: string;
   sponsorUserId: string;
   sponsorUsername: string;
-  createEpin: (raw: string) => Promise<string>;
+  createEpin: (raw: string, pinType?: 'ACTIVATION' | 'INSTALLMENT') => Promise<string>;
   cleanupUserEnrollments: (userIds: string[]) => Promise<void>;
   cleanupDomain: () => Promise<void>;
 };
@@ -19,6 +19,7 @@ export async function createPaidRegistrationFixture(
   prisma: PrismaService,
   config: ConfigService,
   prefix: string,
+  options: { seasonStartOffsetMonths?: number } = {},
 ): Promise<PaidRegistrationFixture> {
   const suffix = randomUUID().replaceAll('-', '').slice(0, 12);
   const memberRole = await prisma.role.findUniqueOrThrow({ where: { name: 'MEMBER' } });
@@ -44,7 +45,9 @@ export async function createPaidRegistrationFixture(
   const seasonStart = new Date();
   seasonStart.setUTCHours(0, 0, 0, 0);
   seasonStart.setUTCDate(1);
-  seasonStart.setUTCMonth(seasonStart.getUTCMonth() + 3);
+  seasonStart.setUTCMonth(
+    seasonStart.getUTCMonth() + (options.seasonStartOffsetMonths ?? 3),
+  );
   const seasonStartDate = seasonStart.toISOString().slice(0, 10);
 
   const program = await prisma.program.create({
@@ -91,7 +94,10 @@ export async function createPaidRegistrationFixture(
     programVersion.id,
   );
 
-  async function createEpin(raw: string) {
+  async function createEpin(
+    raw: string,
+    pinType: 'ACTIVATION' | 'INSTALLMENT' = 'ACTIVATION',
+  ) {
     const id = randomUUID();
     const pinHash = createHmac(
       'sha256',
@@ -101,16 +107,18 @@ export async function createPaidRegistrationFixture(
       .digest('hex');
     await prisma.$executeRawUnsafe(
       `INSERT INTO owner_epins
-         (id, pinHash, displaySuffix, seasonId, status, expiresAt,
+         (id, pinHash, displaySuffix, seasonId, pinType, status, expiresAt,
           currencyCodeSnapshot, registrationFeeSnapshot, installmentAmountSnapshot,
           createdAt, updatedAt)
-       VALUES (?, ?, ?, ?, 'ACTIVE', ?, 'INR', 1000.00, 1000.00,
+       VALUES (?, ?, ?, ?, ?, 'ACTIVE', ?, 'INR', ?, 1000.00,
                CURRENT_TIMESTAMP(3), CURRENT_TIMESTAMP(3))`,
       id,
       pinHash,
       raw.slice(-6),
       seasonId,
+      pinType,
       new Date(Date.now() + 60 * 60 * 1000),
+      pinType === 'ACTIVATION' ? '1000.00' : '0.00',
     );
     return id;
   }
