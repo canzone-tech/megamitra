@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   Param,
   Patch,
@@ -22,11 +23,13 @@ import {
   CreateOwnerNotificationDto,
   CreateOwnerSeasonDto,
   CreateSupportTicketDto,
+  FinalizeExternalDrawDto,
   FulfillOwnerWinnerDto,
   GenerateEpinsDto,
   GenerateOwnerAuthCodeDto,
   OwnerSeasonStatusDto,
   PrepareOwnerDrawDto,
+  RecordExternalDrawWinnerDto,
   RecordOwnerPaymentDto,
   RevokeEpinDto,
   SaveSeasonPrizesDto,
@@ -226,6 +229,36 @@ export class OwnerPortalController {
   @Post('draws/:id/select-winners')
   selectWinners(@Param('id') id: string, @CurrentUser() actor: AuthUser) {
     return this.portal.executeDraw(id, actor.id);
+  }
+
+  @Permissions('draw.execution.manage')
+  @Post('draws/:id/external-winners')
+  recordExternalWinner(
+    @Param('id') id: string,
+    @Body() dto: RecordExternalDrawWinnerDto,
+    @CurrentUser() actor: AuthUser,
+  ) {
+    return this.drawWorkflow.recordExternalWinner(id, dto, actor.id);
+  }
+
+  @Permissions('draw.execution.manage')
+  @Delete('draws/:id/external-winners/:winnerId')
+  removeExternalWinner(
+    @Param('id') id: string,
+    @Param('winnerId') winnerId: string,
+    @CurrentUser() actor: AuthUser,
+  ) {
+    return this.drawWorkflow.removeExternalWinner(id, winnerId, actor.id);
+  }
+
+  @Permissions('draw.execution.manage')
+  @Post('draws/:id/finalize-external-selection')
+  finalizeExternalSelection(
+    @Param('id') id: string,
+    @Body() dto: FinalizeExternalDrawDto,
+    @CurrentUser() actor: AuthUser,
+  ) {
+    return this.drawWorkflow.finalizeExternalDraw(id, dto, actor.id);
   }
 
   @Permissions('draw.execution.manage')
