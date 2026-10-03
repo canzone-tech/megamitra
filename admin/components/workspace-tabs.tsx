@@ -17,11 +17,13 @@ export function WorkspaceTabs({
   initialTab,
   children,
   ariaLabel = 'Workspace sections',
+  onTabChange,
 }: {
   tabs: WorkspaceTab[];
   initialTab?: string;
   children: (activeTab: string) => ReactNode;
   ariaLabel?: string;
+  onTabChange?: (activeTab: string) => void;
 }) {
   const depth = useContext(WorkspaceTabsDepth);
   const ownsLocationHash = depth === 0;
@@ -46,8 +48,19 @@ export function WorkspaceTabs({
     };
   }, [ownsLocationHash, tabKey]);
 
+  useEffect(() => {
+    if (activeTab && tabs.some((tab) => tab.id === activeTab)) return;
+    if (!fallback) return;
+    const timer = window.setTimeout(() => {
+      setActiveTab(fallback);
+      onTabChange?.(fallback);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [activeTab, fallback, onTabChange, tabKey, tabs]);
+
   function activate(id: string) {
     setActiveTab(id);
+    onTabChange?.(id);
     if (!ownsLocationHash) return;
     const url = new URL(window.location.href);
     url.hash = id;
