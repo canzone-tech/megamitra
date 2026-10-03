@@ -396,6 +396,14 @@ async function runScenario(debugPort, scenario) {
         navLabels: [...document.querySelectorAll('nav a, nav button')].map((node) => node.textContent?.trim()).filter(Boolean),
         memberNavLabels,
         memberNavScrollable: memberNav ? memberNav.scrollWidth > memberNav.clientWidth : false,
+        adminNavIcons: Object.fromEntries(
+          [...document.querySelectorAll('aside nav a')]
+            .map((node) => {
+              const spans = node.querySelectorAll('span');
+              return [spans[1]?.textContent?.trim() ?? '', spans[0]?.textContent?.trim() ?? ''];
+            })
+            .filter(([label]) => Boolean(label)),
+        ),
         tokenBlue900: getComputedStyle(root).getPropertyValue('--mm-blue-900').trim(),
         tokenMagenta600: getComputedStyle(root).getPropertyValue('--mm-magenta-600').trim(),
       };
@@ -411,6 +419,36 @@ async function runScenario(debugPort, scenario) {
     }
     if (!metrics.tokenBlue900 || !metrics.tokenMagenta600) {
       throw new Error(`${scenario.name} did not load shared MegaGoldenClub design tokens`);
+    }
+    if (scenario.requireAdminNavIcons) {
+      const expected = {
+        Dashboard: '🏠',
+        '9 Income Types': '📈',
+        Members: '👥',
+        'Binary 1:4': '🌳',
+        'Placement / Pairing': '🧭',
+        'Season Management': '📅',
+        'Monthly Draw': '🎲',
+        Winners: '🏆',
+        'Prize Catalogue': '🎁',
+        'Payments / Bills': '💳',
+        'Member Verification': '✅',
+        'Wallet / Ledger': '📒',
+        'E-PIN Management': '🔑',
+        'Auth Codes': '🔐',
+        'Admins & Agents': '🧑‍💼',
+        'Roles & Permissions': '🛡️',
+        Reports: '📊',
+        Notifications: '🔔',
+        Support: '🎫',
+        Settings: '⚙️',
+      };
+      const mismatches = Object.entries(expected)
+        .filter(([label, icon]) => metrics.adminNavIcons?.[label] !== icon)
+        .map(([label, icon]) => `${label}: expected ${icon}, got ${metrics.adminNavIcons?.[label] ?? 'missing'}`);
+      if (mismatches.length) {
+        throw new Error(`${scenario.name} admin navigation icon mismatch: ${mismatches.join('; ')}`);
+      }
     }
     if (scenario.requireMemberMobileNav) {
       const required = ['Products', 'Withdrawals', 'KYC', 'Security', 'Public site', 'Sign out'];
@@ -502,6 +540,7 @@ async function main() {
       height: 1000,
       mobile: false,
       expectedTexts: ['MEGAGOLDENCLUB', 'MegaGoldenClub Management Dashboard', 'Binary 1:4 Rule'],
+      requireAdminNavIcons: true,
     },
     {
       name: 'admin-season-setup-desktop',

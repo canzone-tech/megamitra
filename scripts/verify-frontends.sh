@@ -192,6 +192,9 @@ bash "${ROOT_DIR}/scripts/verify-branding.sh"
 echo "==> Verifying frontend privacy and native-form safety"
 node "${ROOT_DIR}/scripts/verify-frontend-safety.mjs"
 
+echo "==> Verifying semantic UI iconography"
+node "${ROOT_DIR}/scripts/verify-ui-iconography.mjs"
+
 echo "==> Verifying shared MegaGoldenClub design token contract"
 verify_token_copy "${ROOT_DIR}/admin/app/tokens.css"
 verify_token_copy "${ROOT_DIR}/frontend/app/tokens.css"
