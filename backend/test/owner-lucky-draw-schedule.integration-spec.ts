@@ -111,9 +111,9 @@ describe('MegaGoldenClub owner lucky draw schedule integration', () => {
     seasonCode = `ODS${suffix}`;
     await prisma.$executeRawUnsafe(
       `INSERT INTO owner_seasons
-         (id, code, name, status, startDate, drawDay, eligibilityCutoff,
+         (id, code, name, status, startDate, eligibilityCutoff,
           programId, programVersionId, createdByUserId)
-       VALUES (?, ?, ?, 'ACTIVE', ?, 25, 'BEFORE_DRAW_DATE', ?, ?, ?)`,
+       VALUES (?, ?, ?, 'ACTIVE', ?, 'BEFORE_DRAW_DATE', ?, ?, ?)`,
       seasonId,
       seasonCode,
       `Owner draw season ${suffix}`,
@@ -199,16 +199,18 @@ describe('MegaGoldenClub owner lucky draw schedule integration', () => {
   it('enforces January third-Sunday recurrence, admin authorization, and exact replay semantics', async () => {
     const defaults = await prisma.$queryRawUnsafe<
       Array<{
+        drawDay: number | null;
         drawStartMonth: number;
         drawWeekOfMonth: number;
         drawWeekday: string;
         drawTimezone: string;
       }>
     >(
-      'SELECT drawStartMonth, drawWeekOfMonth, drawWeekday, drawTimezone FROM owner_seasons WHERE id = ?',
+      'SELECT drawDay, drawStartMonth, drawWeekOfMonth, drawWeekday, drawTimezone FROM owner_seasons WHERE id = ?',
       seasonId,
     );
     expect(defaults[0]).toMatchObject({
+      drawDay: null,
       drawStartMonth: 1,
       drawWeekOfMonth: 3,
       drawWeekday: 'SUNDAY',

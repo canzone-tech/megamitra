@@ -65,7 +65,7 @@ export class CreateOwnerSeasonDto {
   @IsNumberString() monthlyEmi!: string;
   @IsNumberString() registrationFee!: string;
   @IsInt() @Min(1) @Max(60) totalMonths!: number;
-  @IsInt() @Min(1) @Max(31) drawDay!: number;
+  @IsOptional() @IsInt() @Min(1) @Max(31) drawDay?: number;
   @IsNumberString() pairValue!: string;
   @IsNumberString() directReferral!: string;
   @IsInt() @Min(0) dailyCap!: number;

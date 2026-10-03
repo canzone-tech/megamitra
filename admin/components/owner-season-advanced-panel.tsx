@@ -217,7 +217,7 @@ export function OwnerSeasonAdvancedPanel({ embedded = false }: { embedded?: bool
 
                 <div hidden={activeTab !== 'draw-calendar'}>
                   <div className={styles.sectionHead}><div className={styles.sectionTitle}><span className={styles.sectionIcon}>◆</span><h2>Monthly Lucky Draw Calendar</h2></div><small>Calendar recurrence locked into the Season version</small></div>
-                  <div className={styles.notice}><b>Default MegaGoldenClub rule:</b> January start • every month • third Sunday. These calendar values are configurable while the Season is DRAFT or REVIEW. Draw time, eligibility window and claim window remain configurable per prepared draw. The legacy Season Setup “Draw Day” value is retained only for historical compatibility; this recurrence is authoritative.</div>
+                  <div className={styles.notice}><b>Default MegaGoldenClub rule:</b> January start • every month • third Sunday. These calendar values are configurable while the Season is DRAFT or REVIEW. Draw time, eligibility window and claim window remain configurable per prepared draw. Season Setup no longer asks for a fixed “Draw Day”; this recurrence is the authoritative draw calendar.</div>
                   <div className={styles.summary}>
                     <div><small>START MONTH</small><b>{MONTHS[drawSchedule.startMonth - 1] ?? drawSchedule.startMonth}</b></div>
                     <div><small>WEEK</small><b>{drawSchedule.weekOfMonth}</b></div>

@@ -325,6 +325,41 @@ async function runScenario(debugPort, scenario) {
       );
     }
 
+    if (scenario.verifyBlankSeasonSetup) {
+      const contract = await evaluate(client, `(() => {
+        const form = [...document.querySelectorAll('form')].find((node) =>
+          node.textContent?.includes('CREATE SEASON')
+        );
+        if (!form) return { found: false };
+        const names = [
+          'name', 'code', 'monthlyEmi', 'registrationFee', 'totalMonths',
+          'startDate', 'endDate', 'dailyCap', 'pairValue', 'directReferral',
+          'eligibilityCutoff', 'carryForward', 'description',
+        ];
+        const values = Object.fromEntries(names.map((name) => {
+          const field = form.querySelector(`[name="${name}"]`);
+          return [name, field ? String(field.value ?? '') : '__MISSING__'];
+        }));
+        const labels = [...form.querySelectorAll('label')].map((node) => node.textContent?.trim());
+        return {
+          found: true,
+          values,
+          hasDrawDayControl: Boolean(form.querySelector('[name="drawDay"]')),
+          hasDrawDayLabel: labels.includes('Draw Day'),
+        };
+      })()`);
+      if (!contract.found) throw new Error('Season setup form was not found');
+      const nonBlank = Object.entries(contract.values)
+        .filter(([, value]) => value !== '')
+        .map(([name, value]) => `${name}=${value}`);
+      if (nonBlank.length) {
+        throw new Error(`New season setup contains prefilled values: ${nonBlank.join(', ')}`);
+      }
+      if (contract.hasDrawDayControl || contract.hasDrawDayLabel) {
+        throw new Error('Legacy fixed Draw Day returned to Season Setup');
+      }
+    }
+
     if (scenario.action === 'open-admin-mobile-more') {
       const clicked = await evaluate(client, `(() => {
         const button = [...document.querySelectorAll('button')].find((node) => node.textContent?.trim() === '☰More' || node.textContent?.trim() === 'More' || node.textContent?.includes('More'));
@@ -467,6 +502,18 @@ async function main() {
       height: 1000,
       mobile: false,
       expectedTexts: ['MEGAGOLDENCLUB', 'MegaGoldenClub Management Dashboard', 'Binary 1:4 Rule'],
+    },
+    {
+      name: 'admin-season-setup-desktop',
+      baseUrl: adminBaseUrl,
+      path: '/portal/seasons',
+      cookieName: 'megagoldenclub_admin_access',
+      token: adminToken,
+      width: 1440,
+      height: 1000,
+      mobile: false,
+      expectedTexts: ['Season Management', 'Create New Season', 'Eligibility Cut-off'],
+      verifyBlankSeasonSetup: true,
     },
     {
       name: 'admin-appearance-desktop',

@@ -38,7 +38,7 @@ type SeasonRow = {
   status: SeasonStatus;
   startDate: Date | string;
   endDate: Date | string | null;
-  drawDay: number;
+  drawDay: number | null;
   eligibilityCutoff: string;
   programId: string | null;
   programVersionId: string | null;
@@ -205,7 +205,7 @@ export class OwnerSeasonConfigurationService {
         dto.description?.trim() || null,
         new Date(this.dayStart(dto.startDate)),
         dto.endDate ? new Date(this.dayStart(dto.endDate)) : null,
-        dto.drawDay,
+        dto.drawDay ?? null,
         dto.eligibilityCutoff,
         program.id,
         programVersion.id,
@@ -309,14 +309,14 @@ export class OwnerSeasonConfigurationService {
 
     await this.db.execute(
       `UPDATE owner_seasons
-       SET name=?, description=?, startDate=?, endDate=?, drawDay=?, eligibilityCutoff=?
+       SET name=?, description=?, startDate=?, endDate=?, drawDay=COALESCE(?, drawDay), eligibilityCutoff=?
        WHERE id=?`,
       [
         dto.name.trim(),
         dto.description?.trim() || null,
         new Date(this.dayStart(dto.startDate)),
         dto.endDate ? new Date(this.dayStart(dto.endDate)) : null,
-        dto.drawDay,
+        dto.drawDay ?? null,
         dto.eligibilityCutoff,
         id,
       ],
