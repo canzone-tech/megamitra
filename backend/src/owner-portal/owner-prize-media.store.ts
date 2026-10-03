@@ -116,7 +116,13 @@ export class OwnerPrizeMediaStore implements OnModuleInit, OnModuleDestroy {
   }
 
   private safeFilename(value: string): string {
-    const cleaned = value.replace(/[\\/\0-\x1f\x7f]+/g, '_').trim().slice(0, 180);
+    const withoutControls = [...value]
+      .map((character) => {
+        const code = character.charCodeAt(0);
+        return code < 32 || code === 127 ? '_' : character;
+      })
+      .join('');
+    const cleaned = withoutControls.replace(/[\\/]+/g, '_').trim().slice(0, 180);
     return cleaned || 'prize-attachment';
   }
 }
