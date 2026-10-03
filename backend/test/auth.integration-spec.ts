@@ -286,11 +286,9 @@ describe('MegaGoldenClub auth integration', () => {
       where: { enrollmentId, sequence: 1 },
       select: { dueDate: true },
     });
-    const firstDueDate =
-      firstInstallment.dueDate instanceof Date
-        ? firstInstallment.dueDate.toISOString().slice(0, 10)
-        : String(firstInstallment.dueDate).slice(0, 10);
-    expect(firstDueDate).toBe(paidRegistration.seasonStartDate);
+    expect(String(firstInstallment.dueDate).slice(0, 10)).toBe(
+      paidRegistration.seasonStartDate,
+    );
 
     const drawTokenRows = await prisma.$queryRawUnsafe<
       Array<{ token: string; installmentSequence: number; status: string }>
