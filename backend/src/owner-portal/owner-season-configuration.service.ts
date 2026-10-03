@@ -101,8 +101,9 @@ export class OwnerSeasonConfigurationService {
     if (existing.length) throw new ConflictException('Season code already exists');
     this.validateSeason(dto);
     const settings = (await this.portal.settings()) as PortalSettings;
+    const endDate = this.deriveSeasonEndDate(dto.startDate, dto.totalMonths);
     const effectiveFrom = this.dayStart(dto.startDate);
-    const effectiveTo = dto.endDate ? this.dayEnd(dto.endDate) : undefined;
+    const effectiveTo = this.dayEnd(endDate);
 
     const program = await this.programs.createProgram(
       {
@@ -116,7 +117,7 @@ export class OwnerSeasonConfigurationService {
       program.id,
       {
         effectiveFrom,
-        ...(effectiveTo ? { effectiveTo } : {}),
+        effectiveTo,
         currencyCode: settings.currencyCode,
         registrationFee: dto.registrationFee,
         installmentAmount: dto.monthlyEmi,
@@ -146,7 +147,7 @@ export class OwnerSeasonConfigurationService {
       binary.id,
       {
         effectiveFrom,
-        ...(effectiveTo ? { effectiveTo } : {}),
+        effectiveTo,
         qualifyingUnit: '1.0000',
         leftVolumePerPair: '2.0000',
         rightVolumePerPair: '2.0000',
@@ -181,7 +182,7 @@ export class OwnerSeasonConfigurationService {
       referral.id,
       {
         effectiveFrom,
-        ...(effectiveTo ? { effectiveTo } : {}),
+        effectiveTo,
         rewardMode: ReferralRewardMode.FIXED,
         fixedAmount: dto.directReferral,
         currencyCode: settings.currencyCode,
@@ -204,7 +205,7 @@ export class OwnerSeasonConfigurationService {
         dto.name.trim(),
         dto.description?.trim() || null,
         dto.startDate.slice(0, 10),
-        dto.endDate ? dto.endDate.slice(0, 10) : null,
+        endDate,
         dto.drawDay ?? null,
         dto.eligibilityCutoff,
         program.id,
@@ -248,14 +249,15 @@ export class OwnerSeasonConfigurationService {
     this.requirePolicyMapping(current);
     this.validateSeason(dto);
     const settings = (await this.portal.settings()) as PortalSettings;
+    const endDate = this.deriveSeasonEndDate(dto.startDate, dto.totalMonths);
     const effectiveFrom = this.dayStart(dto.startDate);
-    const effectiveTo = dto.endDate ? this.dayEnd(dto.endDate) : undefined;
+    const effectiveTo = this.dayEnd(endDate);
 
     await this.programs.updateDraft(
       current.programVersionId!,
       {
         effectiveFrom,
-        ...(effectiveTo ? { effectiveTo } : {}),
+        effectiveTo,
         currencyCode: settings.currencyCode,
         registrationFee: dto.registrationFee,
         installmentAmount: dto.monthlyEmi,
@@ -277,7 +279,7 @@ export class OwnerSeasonConfigurationService {
       current.binaryPlanVersionId!,
       {
         effectiveFrom,
-        ...(effectiveTo ? { effectiveTo } : {}),
+        effectiveTo,
         pairPayoutAmount: dto.pairValue,
         currencyCode: settings.currencyCode,
         settlementTimezone: settings.timezone,
@@ -297,7 +299,7 @@ export class OwnerSeasonConfigurationService {
       current.referralPolicyVersionId!,
       {
         effectiveFrom,
-        ...(effectiveTo ? { effectiveTo } : {}),
+        effectiveTo,
         rewardMode: ReferralRewardMode.FIXED,
         fixedAmount: dto.directReferral,
         currencyCode: settings.currencyCode,
@@ -315,7 +317,7 @@ export class OwnerSeasonConfigurationService {
         dto.name.trim(),
         dto.description?.trim() || null,
         dto.startDate.slice(0, 10),
-        dto.endDate ? dto.endDate.slice(0, 10) : null,
+        endDate,
         dto.drawDay ?? null,
         dto.eligibilityCutoff,
         id,
@@ -703,7 +705,7 @@ export class OwnerSeasonConfigurationService {
       draft.id,
       {
         effectiveFrom,
-        ...(effectiveTo ? { effectiveTo } : {}),
+        effectiveTo,
       },
       actorUserId,
     );
@@ -765,13 +767,34 @@ export class OwnerSeasonConfigurationService {
       );
     }
     const start = new Date(dto.startDate);
-    const end = dto.endDate ? new Date(dto.endDate) : null;
     if (!Number.isFinite(start.getTime())) {
       throw new BadRequestException('Season start date is invalid');
     }
-    if (end && (!Number.isFinite(end.getTime()) || end < start)) {
-      throw new BadRequestException('Season end date must not be before start date');
+    const derivedEndDate = this.deriveSeasonEndDate(dto.startDate, dto.totalMonths);
+    if (dto.endDate && dto.endDate.slice(0, 10) !== derivedEndDate) {
+      throw new BadRequestException(
+        'Season end date is derived automatically from start date and total months',
+      );
     }
+  }
+
+  private deriveSeasonEndDate(startDate: string, totalMonths: number) {
+    const start = startDate.slice(0, 10);
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(start);
+    if (!match) throw new BadRequestException('Season start date is invalid');
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    const parsed = new Date(Date.UTC(year, month - 1, day));
+    if (
+      parsed.getUTCFullYear() !== year ||
+      parsed.getUTCMonth() !== month - 1 ||
+      parsed.getUTCDate() !== day
+    ) {
+      throw new BadRequestException('Season start date is invalid');
+    }
+    const end = new Date(Date.UTC(year, month - 1 + totalMonths, 0));
+    return end.toISOString().slice(0, 10);
   }
 
   private defaultPrizes(totalMonths: number): OwnerSeasonPrizeDto[] {
