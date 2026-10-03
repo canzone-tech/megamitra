@@ -337,7 +337,7 @@ async function runScenario(debugPort, scenario) {
           'eligibilityCutoff', 'carryForward', 'description',
         ];
         const values = Object.fromEntries(names.map((name) => {
-          const field = form.querySelector(`[name="${name}"]`);
+          const field = form.querySelector('[name="' + name + '"]');
           return [name, field ? String(field.value ?? '') : '__MISSING__'];
         }));
         const labels = [...form.querySelectorAll('label')].map((node) => node.textContent?.trim());
