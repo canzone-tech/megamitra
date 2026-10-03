@@ -70,6 +70,7 @@ export class RegisterDto {
   @IsArray()
   @ArrayMaxSize(59)
   @IsString({ each: true })
+  @MinLength(1, { each: true })
   @MaxLength(80, { each: true })
   installmentEpins?: string[];
 
