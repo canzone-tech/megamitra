@@ -701,14 +701,71 @@ export function OwnerCorePortal({ section, extension }: { section: OwnerCoreSect
     const runs = (Array.isArray(aux) ? aux : []) as Row[];
     const selected = selectedDraw;
     const winners = (selected && Array.isArray(selected.winners) ? selected.winners : []) as Row[];
+    const prizeTiers = (selected && Array.isArray(selected.prizeTiers) ? selected.prizeTiers : []) as Row[];
+    const selectionMode = text(selected?.selectionMode, 'AUTO');
+    const drawStatus = text(selected?.status, '');
+    const manualOpen = Boolean(selected && selectionMode === 'MANUAL_EXTERNAL' && drawStatus === 'ELIGIBILITY_LOCKED');
+    const configuredWinnerCount = prizeTiers.reduce((sum, tier) => sum + number(tier.winnerCount), 0);
+    let remainingManualSlots = Math.min(configuredWinnerCount, number(selected?.eligibleEntryCount, 0));
+    const manualTierPlans = prizeTiers.map((tier) => {
+      const required = Math.min(number(tier.winnerCount), remainingManualSlots);
+      remainingManualSlots -= required;
+      return {
+        tier,
+        required,
+        recorded: winners.filter((winner) => text(winner.prizeCode) === text(tier.code)).length,
+      };
+    });
+
     return <><Hero title="Winner Management Workflow" subtitle="Eligibility → selection → verification → approval → publication → claim → fulfilment → audit." pill="CONTROLLED WINNER WORKFLOW" />
       <WorkspaceTabs ariaLabel="Winner management workspace" tabs={[
         { id: 'winner-draws', label: 'Workflow & Draws', count: runs.length },
         { id: 'winner-review', label: 'Winner Review', count: winners.length },
       ]}>
         {(activeTab) => <>
-          {activeTab === 'winner-draws' ? <><div className={styles.card}><SectionHead icon="🧭" title="Winner Workflow" /><div className={styles.workflow}><div><small>STEP 1</small><b>Eligibility Lock</b></div><div><small>STEP 2</small><b>Draw / Selection</b></div><div><small>STEP 3</small><b>Verification</b></div><div><small>STEP 4</small><b>Approval</b></div><div><small>STEP 5</small><b>Publish & Fulfil</b></div></div></div><div className={styles.card}><SectionHead icon="🎲" title="Draws" />{runs.length ? <DrawRunTable rows={runs} onOpen={(id) => void openDraw(id)} /> : <Empty />}</div></> : null}
-          {activeTab === 'winner-review' ? selected ? <><div className={styles.card}><SectionHead icon="⚙️" title={`${text(selected.seasonName)} • Month ${text(selected.monthNumber)}`} note={text(selected.status)} /><div className={styles.buttonLine}>{text(selected.status) === 'SCHEDULED' ? <button className={styles.button} type="button" disabled={busy} onClick={() => void drawAction('lock-eligibility', 'Eligibility locked')}>LOCK ELIGIBILITY</button> : null}{text(selected.status) === 'ELIGIBILITY_LOCKED' ? <button className={classNames(styles.button, styles.dark)} type="button" disabled={busy} onClick={() => void drawAction('select-winners', 'Winner selection completed')}>RUN SELECTION</button> : null}{text(selected.status) === 'APPROVED' ? <button className={classNames(styles.button, styles.dark)} type="button" disabled={busy} onClick={() => void drawAction('publish', 'Winner list published and claims opened')}>PUBLISH WINNERS</button> : null}</div></div><div className={styles.card}><SectionHead icon="✅" title={text(selected.status) === 'PUBLISHED' ? 'Prize Claim & Fulfilment' : 'Winner Verification Queue'} />{winners.length ? <div className={styles.tableBox}><table className={styles.table}><thead><tr><th>USER ID</th><th>NAME</th><th>PRIZE</th><th>ELIGIBILITY</th><th>IDENTITY</th><th>PAYMENT</th><th>VERIFY</th><th>CLAIM</th><th>ACTION</th></tr></thead><tbody>{winners.map((winner) => <tr key={text(winner.id)}><td>{text(winner.username)}</td><td>{[text(winner.firstName, ''), text(winner.lastName, '')].filter(Boolean).join(' ')}</td><td>{text(winner.prizeName)}</td><td>{text(winner.eligibilityStatus, 'PASS')}</td><td>{text(winner.identityStatus, 'PENDING')}</td><td>{text(winner.paymentStatus, 'PASS')}</td><td><span className={styles.tag}>{text(winner.verificationStatus, 'PENDING')}</span></td><td><span className={styles.tag}>{text(winner.claimStatus, text(selected.status) === 'PUBLISHED' ? 'PENDING' : '—')}</span></td><td>{winnerAction(selected, winner)}</td></tr>)}</tbody></table></div> : <Empty>Run selection to create the winner queue.</Empty>}</div>{text(selected.status) === 'VERIFIED' ? <div className={styles.card}><SectionHead icon="✅" title="Approval & Publication" /><form method="post" onSubmit={approveDraw}><div className={styles.fields}><Field label="Approval Reference"><input name="approvalReference" className={styles.input} required /></Field><Field label="Winner Approval Auth Code"><input name="authorizationCode" className={styles.input} placeholder="Optional purpose-bound code" /></Field><Field label="Approval Note" full><textarea name="approvalNote" className={styles.textarea} /></Field></div><div className={styles.buttonLine}><button className={styles.button} disabled={busy}>APPROVE VERIFIED WINNERS</button></div></form></div> : null}</> : <div className={styles.card}><Empty>Select a draw from Workflow & Draws first.</Empty></div> : null}
+          {activeTab === 'winner-draws' ? <><div className={styles.card}><SectionHead icon="🧭" title="Winner Workflow" /><div className={styles.workflow}><div><small>STEP 1</small><b>Eligibility Lock</b></div><div><small>STEP 2</small><b>Auto Draw / External Result</b></div><div><small>STEP 3</small><b>Verification</b></div><div><small>STEP 4</small><b>Approval</b></div><div><small>STEP 5</small><b>Publish & Fulfil</b></div></div></div><div className={styles.card}><SectionHead icon="🎲" title="Draws" />{runs.length ? <DrawRunTable rows={runs} onOpen={(id) => void openDraw(id)} /> : <Empty />}</div></> : null}
+          {activeTab === 'winner-review' ? selected ? <>
+            <div className={styles.card}>
+              <SectionHead
+                icon="⚙️"
+                title={`${text(selected.seasonName)} • Month ${text(selected.monthNumber)}`}
+                note={`${text(selected.status)} • ${selectionMode === 'MANUAL_EXTERNAL' ? 'MANUAL / EXTERNAL DRAW' : 'AUTO SOFTWARE DRAW'}`}
+              />
+              <div className={styles.buttonLine}>
+                {drawStatus === 'SCHEDULED' ? <button className={styles.button} type="button" disabled={busy} onClick={() => void drawAction('lock-eligibility', 'Eligibility locked')}>LOCK ELIGIBILITY</button> : null}
+                {drawStatus === 'ELIGIBILITY_LOCKED' && selectionMode === 'AUTO' ? <button className={classNames(styles.button, styles.dark)} type="button" disabled={busy} onClick={() => void drawAction('select-winners', 'Automatic winner selection completed')}>RUN AUTO DRAW</button> : null}
+                {drawStatus === 'APPROVED' ? <button className={classNames(styles.button, styles.dark)} type="button" disabled={busy} onClick={() => void drawAction('publish', 'Winner list published and claims opened')}>PUBLISH WINNERS</button> : null}
+              </div>
+            </div>
+
+            {manualOpen ? <div className={styles.card}>
+              <SectionHead icon="📝" title="Record External Draw Results" note={`${number(selected.eligibleEntryCount)} eligible token(s)`} />
+              <div className={styles.notice}>The draw is conducted outside the software. Enter each winning <b>5-digit lucky draw token</b> under the exact prize it won. The system accepts only tokens from this locked eligibility snapshot, prevents duplicate winners, and keeps the prize mapping in the audited winner record.</div>
+              {manualTierPlans.map(({ tier, required, recorded }) => <div className={styles.notice} key={text(tier.id)}>
+                <b>{text(tier.name)}</b> • required this draw: <b>{required}</b> • recorded: <b>{recorded}</b> • configured slots: {text(tier.winnerCount)}
+                <form method="post" onSubmit={(event) => recordExternalWinner(event, text(tier.code))}>
+                  <div className={styles.buttonLine}>
+                    <input name="drawToken" className={styles.input} inputMode="numeric" pattern="[0-9]{5}" minLength={5} maxLength={5} required placeholder="Winning 5-digit token" />
+                    <button className={styles.button} disabled={busy || recorded >= required || required === 0}>ADD WINNER TO {text(tier.name).toUpperCase()}</button>
+                  </div>
+                </form>
+              </div>)}
+              <form method="post" onSubmit={finalizeExternalDraw}>
+                <div className={styles.fields}>
+                  <Field label="External Draw Reference"><input name="externalReference" className={styles.input} required placeholder="Event sheet / video / register reference" /></Field>
+                  <Field label="External Draw Note"><input name="note" className={styles.input} placeholder="Optional venue / witness / result note" /></Field>
+                </div>
+                <div className={styles.buttonLine}><button className={classNames(styles.button, styles.green)} disabled={busy}>FINALIZE EXTERNAL DRAW</button></div>
+              </form>
+            </div> : null}
+
+            <div className={styles.card}>
+              <SectionHead icon="✅" title={drawStatus === 'PUBLISHED' ? 'Prize Claim & Fulfilment' : manualOpen ? 'External Winner Register' : 'Winner Verification Queue'} />
+              {winners.length ? <div className={styles.tableBox}><table className={styles.table}><thead><tr><th>USER ID</th><th>NAME</th><th>TOKEN</th><th>PRIZE SLOT</th><th>ELIGIBILITY</th><th>IDENTITY</th><th>PAYMENT</th><th>VERIFY</th><th>CLAIM</th><th>ACTION</th></tr></thead><tbody>{winners.map((winner) => <tr key={text(winner.id)}><td>{text(winner.username)}</td><td>{[text(winner.firstName, ''), text(winner.lastName, '')].filter(Boolean).join(' ')}</td><td>{text(winner.drawToken)}</td><td>{text(winner.prizeName)} #{text(winner.tierWinnerPosition, '1')}/{text(winner.prizeWinnerCount, '1')}</td><td>{text(winner.eligibilityStatus, 'PASS')}</td><td>{text(winner.identityStatus, 'PENDING')}</td><td>{text(winner.paymentStatus, 'PASS')}</td><td><span className={styles.tag}>{text(winner.verificationStatus, manualOpen ? 'NOT FINALIZED' : 'PENDING')}</span></td><td><span className={styles.tag}>{text(winner.claimStatus, drawStatus === 'PUBLISHED' ? 'PENDING' : '—')}</span></td><td>{winnerAction(selected, winner)}</td></tr>)}</tbody></table></div> : <Empty>{manualOpen ? 'Record the external draw winning tokens prize-by-prize.' : 'Run selection to create the winner queue.'}</Empty>}
+            </div>
+
+            {drawStatus === 'VERIFIED' ? <div className={styles.card}><SectionHead icon="✅" title="Approval & Publication" /><form method="post" onSubmit={approveDraw}><div className={styles.fields}><Field label="Approval Reference"><input name="approvalReference" className={styles.input} required /></Field><Field label="Winner Approval Auth Code"><input name="authorizationCode" className={styles.input} placeholder="Optional purpose-bound code" /></Field><Field label="Approval Note" full><textarea name="approvalNote" className={styles.textarea} /></Field></div><div className={styles.buttonLine}><button className={styles.button} disabled={busy}>APPROVE VERIFIED WINNERS</button></div></form></div> : null}
+          </> : <div className={styles.card}><Empty>Select a draw from Workflow & Draws first.</Empty></div> : null}
         </>}
       </WorkspaceTabs>
     </>;
@@ -716,7 +773,11 @@ export function OwnerCorePortal({ section, extension }: { section: OwnerCoreSect
 
   function winnerAction(selected: Row, winner: Row) {
     const drawStatus = text(selected.status);
+    const selectionMode = text(selected.selectionMode, 'AUTO');
     const winnerId = text(winner.id, '');
+    if (drawStatus === 'ELIGIBILITY_LOCKED' && selectionMode === 'MANUAL_EXTERNAL') {
+      return <button type="button" className={classNames(styles.button, styles.red)} disabled={busy} onClick={() => void removeExternalWinner(winnerId)}>REMOVE</button>;
+    }
     if (drawStatus === 'PUBLISHED') {
       const claimStatus = text(winner.claimStatus, 'PENDING');
       if (claimStatus === 'PENDING') return <button type="button" className={styles.button} disabled={busy} onClick={() => void claimWinner(winnerId)}>START CLAIM</button>;
