@@ -123,7 +123,7 @@ describe('MegaGoldenClub owner season edit round-trip integration', () => {
     });
     expect(created.status).toBe(201);
     expect(created.body).toMatchObject({
-      code: seasonCode,
+      code: seasonCode.toUpperCase(),
       name: payload.name,
       startDate: '2027-01-01',
       endDate: null,
