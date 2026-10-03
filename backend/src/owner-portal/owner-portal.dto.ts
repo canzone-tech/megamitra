@@ -52,6 +52,7 @@ export class OwnerSeasonPrizeDto {
   @IsString() @Length(1, 80) category!: string;
   @IsString() @Length(1, 120) name!: string;
   @IsOptional() @IsString() @MaxLength(255) description?: string;
+  @IsOptional() @IsString() @Matches(/^[a-fA-F0-9]{24}$/) mediaId?: string;
   @IsInt() @Min(1) winnerCount!: number;
   @IsOptional() @IsNumberString() nominalValue?: string;
 }
