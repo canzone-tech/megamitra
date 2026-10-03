@@ -91,6 +91,7 @@ type DrawRunRow = {
   policyVersionId: string;
   drawId: string;
   status: string;
+  selectionMode: 'AUTO' | 'MANUAL_EXTERNAL';
   eligibilityLockedAt: Date | null;
   verifiedAt: Date | null;
   approvedAt: Date | null;
@@ -794,8 +795,16 @@ export class OwnerPortalService {
       [runId],
     );
     if (!runs[0]) throw new NotFoundException('Draw run not found');
-    const winners = await this.drawWinners(runId);
-    return { ...runs[0], winners };
+    const [winners, prizeTiers] = await Promise.all([
+      this.drawWinners(runId),
+      this.rows<Record<string, unknown>>(
+        `SELECT id, tierOrder, code, name, winnerCount, prizeKind
+         FROM lucky_draw_prize_tiers
+         WHERE policyVersionId=? ORDER BY tierOrder ASC`,
+        [runs[0].policyVersionId],
+      ),
+    ]);
+    return { ...runs[0], winners, prizeTiers };
   }
 
   async lockDrawEligibility(runId: string, actorUserId: string) {
@@ -813,6 +822,9 @@ export class OwnerPortalService {
     const run = await this.requireDrawRun(runId);
     if (run.status !== 'ELIGIBILITY_LOCKED') {
       throw new ConflictException('Lock eligibility before running winner selection');
+    }
+    if (run.selectionMode !== 'AUTO') {
+      throw new ConflictException('This draw is configured for manual external winner recording');
     }
     await this.draws.execute(run.drawId, { selectionSeed: this.drawSeed(runId) }, actorUserId);
     await this.db.execute("UPDATE owner_draw_runs SET status='SELECTED' WHERE id=?", [runId]);
@@ -925,11 +937,14 @@ export class OwnerPortalService {
 
   async drawWinners(runId: string) {
     return this.rows<Record<string, unknown>>(
-      `SELECT w.id, w.userId, u.username, u.firstName, u.lastName, t.code AS prizeCode, t.name AS prizeName,
-              w.overallRank, v.eligibilityStatus, v.identityStatus, v.paymentStatus, v.status AS verificationStatus,
+      `SELECT w.id, w.userId, u.username, u.firstName, u.lastName,
+              t.code AS prizeCode, t.name AS prizeName, t.winnerCount AS prizeWinnerCount,
+              w.overallRank, w.tierWinnerPosition, e.drawToken,
+              v.eligibilityStatus, v.identityStatus, v.paymentStatus, v.status AS verificationStatus,
               c.id AS claimId, c.status AS claimStatus
        FROM owner_draw_runs r
        JOIN lucky_draw_winners w ON w.drawId=r.drawId
+       JOIN lucky_draw_entries e ON e.id=w.entryId
        JOIN users u ON u.id=w.userId
        JOIN lucky_draw_prize_tiers t ON t.id=w.prizeTierId
        LEFT JOIN owner_winner_verifications v ON v.winnerId=w.id
