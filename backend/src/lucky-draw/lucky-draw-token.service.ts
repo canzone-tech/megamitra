@@ -144,6 +144,32 @@ export class LuckyDrawTokenService {
     return id ? this.tokensForSubmission(id) : [];
   }
 
+  async ensurePaymentRecordInstallmentTokens(paymentRecordId: string) {
+    return this.db.transaction(async (connection) => {
+      const allocations = await connection.query<AllocationRow[]>(
+        `SELECT a.id AS paymentAllocationId, a.paymentRecordId, a.enrollmentId,
+                a.installmentId, i.sequence AS installmentSequence, e.userId
+         FROM program_payment_allocations a
+         JOIN program_installments i ON i.id=a.installmentId
+         JOIN program_enrollments e ON e.id=a.enrollmentId
+         WHERE a.paymentRecordId=? AND a.allocationType='INSTALLMENT'
+           AND a.installmentId IS NOT NULL
+         ORDER BY i.sequence ASC, a.createdAt ASC, a.id ASC`,
+        [paymentRecordId],
+      );
+      for (const allocation of allocations) {
+        await this.ensureInstallmentToken(connection, allocation, null);
+      }
+      return connection.query<TokenRow[]>(
+        `SELECT token, installmentSequence, status, drawId, entryId
+         FROM lucky_draw_tokens
+         WHERE paymentRecordId=? AND sourceType='INSTALLMENT'
+         ORDER BY installmentSequence ASC, createdAt ASC, token ASC`,
+        [paymentRecordId],
+      );
+    });
+  }
+
 
   async snapshotOwnerMonthlyDrawEntrants(
     drawId: string,
@@ -180,6 +206,25 @@ export class LuckyDrawTokenService {
       }
       if (draw.policyLifecycle !== 'PUBLISHED') {
         throw new ConflictException('Lucky draw policy version is no longer published');
+      }
+
+      const missingTokenAllocations = await connection.query<AllocationRow[]>(
+        `SELECT a.id AS paymentAllocationId, a.paymentRecordId, a.enrollmentId,
+                a.installmentId, i.sequence AS installmentSequence, e.userId
+         FROM program_payment_allocations a
+         JOIN program_installments i ON i.id=a.installmentId
+         JOIN program_enrollments e ON e.id=a.enrollmentId
+         LEFT JOIN lucky_draw_tokens t
+           ON t.paymentAllocationId=a.id OR (t.enrollmentId=a.enrollmentId AND t.installmentId=a.installmentId)
+         WHERE e.programVersionId=? AND i.sequence=?
+           AND a.allocationType='INSTALLMENT' AND a.installmentId IS NOT NULL
+           AND a.amount>=i.amount AND t.token IS NULL
+         ORDER BY a.createdAt ASC, a.id ASC
+         FOR UPDATE`,
+        [draw.programVersionId, Number(draw.monthNumber)],
+      );
+      for (const allocation of missingTokenAllocations) {
+        await this.ensureInstallmentToken(connection, allocation, null);
       }
 
       const candidates = await connection.query<OwnerDrawTokenCandidateRow[]>(
@@ -374,7 +419,7 @@ export class LuckyDrawTokenService {
   private async ensureInstallmentToken(
     connection: PoolConnection,
     allocation: AllocationRow,
-    submissionId: string,
+    submissionId: string | null,
   ) {
     const existing = await connection.query<Array<{ token: string }>>(
       `SELECT token FROM lucky_draw_tokens
