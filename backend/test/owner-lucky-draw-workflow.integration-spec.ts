@@ -22,6 +22,10 @@ describe('MegaGoldenClub owner lucky draw workflow integration', () => {
   let memberToken: string;
   let adminId = '';
   let memberId = '';
+  let externalMemberId = '';
+  let externalEnrollmentId = '';
+  let externalInstallmentToken = '';
+  let secondPrizeCode = '';
   let seasonId = '';
   let seasonCode = '';
   let programId = '';
@@ -76,7 +80,7 @@ describe('MegaGoldenClub owner lucky draw workflow integration', () => {
     const suffix = randomUUID().replaceAll('-', '').slice(0, 10);
     const password = 'Owner-Draw-Workflow-Pass-123!';
     const passwordHash = await passwords.hash(password);
-    const [admin, member] = await Promise.all([
+    const [admin, member, externalMember] = await Promise.all([
       prisma.user.create({
         data: {
           username: `owner_flow_admin_${suffix}`,
@@ -91,9 +95,17 @@ describe('MegaGoldenClub owner lucky draw workflow integration', () => {
           status: UserStatus.ACTIVE,
         },
       }),
+      prisma.user.create({
+        data: {
+          username: `owner_flow_external_${suffix}`,
+          passwordHash,
+          status: UserStatus.ACTIVE,
+        },
+      }),
     ]);
     adminId = admin.id;
     memberId = member.id;
+    externalMemberId = externalMember.id;
     const superAdmin = await prisma.role.findUniqueOrThrow({ where: { name: 'SUPER_ADMIN' } });
     await prisma.userRole.create({ data: { userId: admin.id, roleId: superAdmin.id } });
     [adminToken, memberToken] = await Promise.all([
@@ -149,6 +161,25 @@ describe('MegaGoldenClub owner lucky draw workflow integration', () => {
     });
     enrollmentId = enrollment.id;
 
+    const externalEnrollment = await prisma.programEnrollment.create({
+      data: {
+        sourceKey: `OWNER-FLOW-EXTERNAL-ENROLL-${suffix}`,
+        requestFingerprint: 'b'.repeat(64),
+        userId: externalMember.id,
+        programVersionId,
+        enrolledAt: new Date('2026-01-02T00:00:00.000Z'),
+        enrollmentDate: '2026-01-02',
+        status: ProgramEnrollmentStatus.ACTIVE,
+        eligibilitySnapshot: { eligible: true, source: 'owner-workflow-external-uat' },
+        currencyCode: 'INR',
+        registrationFeeSnapshot: '0.00',
+        installmentAmountSnapshot: '0.00',
+        installmentCountSnapshot: 0,
+        gracePeriodDaysSnapshot: 0,
+      },
+    });
+    externalEnrollmentId = externalEnrollment.id;
+
     const occurredAt = new Date('2026-01-10T06:00:00.000Z');
     const businessEvent = await prisma.programBusinessEvent.create({
       data: {
@@ -188,7 +219,11 @@ describe('MegaGoldenClub owner lucky draw workflow integration', () => {
       occurredAt,
     );
 
-    const createInstallmentToken = async (sequence: number) => {
+    const createInstallmentToken = async (
+      userId: string,
+      tokenEnrollmentId: string,
+      sequence: number,
+    ) => {
       for (let attempt = 0; attempt < 128; attempt += 1) {
         const candidate = generateLuckyDrawToken();
         const existing = await prisma.$queryRawUnsafe<Array<{ token: string }>>(
@@ -201,8 +236,8 @@ describe('MegaGoldenClub owner lucky draw workflow integration', () => {
              (token, sourceType, userId, enrollmentId, installmentSequence, status, createdAt)
            VALUES (?, 'INSTALLMENT', ?, ?, ?, 'AVAILABLE', ?)`,
           candidate,
-          member.id,
-          enrollmentId,
+          userId,
+          tokenEnrollmentId,
           sequence,
           occurredAt,
         );
@@ -210,8 +245,13 @@ describe('MegaGoldenClub owner lucky draw workflow integration', () => {
       }
       throw new Error('Unable to allocate token test fixture');
     };
-    installmentToken = await createInstallmentToken(1);
-    futureInstallmentToken = await createInstallmentToken(2);
+    installmentToken = await createInstallmentToken(member.id, enrollmentId, 1);
+    futureInstallmentToken = await createInstallmentToken(member.id, enrollmentId, 2);
+    externalInstallmentToken = await createInstallmentToken(
+      externalMember.id,
+      externalEnrollmentId,
+      2,
+    );
 
     seasonId = randomUUID();
     seasonCode = `OWS${suffix}`;
@@ -241,17 +281,18 @@ describe('MegaGoldenClub owner lucky draw workflow integration', () => {
       seasonId,
       `FEB${suffix}`,
     );
+    secondPrizeCode = `FEB${suffix}`;
   });
 
   afterAll(async () => {
     if (prisma) {
-      const userIds = [adminId, memberId].filter(Boolean);
+      const userIds = [adminId, memberId, externalMemberId].filter(Boolean);
       if (userIds.length) {
         await prisma.auditLog.deleteMany({ where: { actorUserId: { in: userIds } } });
       }
 
-      if (installmentToken || futureInstallmentToken) {
-        const tokens = [installmentToken, futureInstallmentToken].filter(Boolean);
+      if (installmentToken || futureInstallmentToken || externalInstallmentToken) {
+        const tokens = [installmentToken, futureInstallmentToken, externalInstallmentToken].filter(Boolean);
         await prisma.$executeRawUnsafe(
           `DELETE FROM lucky_draw_tokens WHERE token IN (${tokens.map(() => '?').join(',')})`,
           ...tokens,
@@ -259,6 +300,7 @@ describe('MegaGoldenClub owner lucky draw workflow integration', () => {
       }
 
       if (secondDrawId) {
+        await prisma.$executeRawUnsafe('DELETE FROM owner_winner_verifications WHERE drawRunId = ?', secondDrawRunId);
         await prisma.$executeRawUnsafe('DELETE FROM owner_draw_runs WHERE id = ?', secondDrawRunId);
         await prisma.$executeRawUnsafe('DELETE FROM lucky_draw_winners WHERE drawId = ?', secondDrawId);
         await prisma.$executeRawUnsafe('DELETE FROM lucky_draw_entries WHERE drawId = ?', secondDrawId);
@@ -344,6 +386,9 @@ describe('MegaGoldenClub owner lucky draw workflow integration', () => {
       }
       if (enrollmentId) {
         await prisma.programEnrollment.deleteMany({ where: { id: enrollmentId } });
+      }
+      if (externalEnrollmentId) {
+        await prisma.programEnrollment.deleteMany({ where: { id: externalEnrollmentId } });
       }
       if (seasonId) {
         await prisma.$executeRawUnsafe('DELETE FROM owner_season_prizes WHERE seasonId = ?', seasonId);
