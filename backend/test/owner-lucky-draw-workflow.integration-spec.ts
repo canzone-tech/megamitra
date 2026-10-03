@@ -219,6 +219,9 @@ describe('MegaGoldenClub owner lucky draw workflow integration', () => {
       occurredAt,
     );
 
+    seasonId = randomUUID();
+    seasonCode = `OWS${suffix}`;
+
     const createInstallmentToken = async (
       userId: string,
       tokenEnrollmentId: string,
@@ -227,15 +230,17 @@ describe('MegaGoldenClub owner lucky draw workflow integration', () => {
       for (let attempt = 0; attempt < 128; attempt += 1) {
         const candidate = generateLuckyDrawToken();
         const existing = await prisma.$queryRawUnsafe<Array<{ token: string }>>(
-          'SELECT token FROM lucky_draw_tokens WHERE token=? LIMIT 1',
+          'SELECT token FROM lucky_draw_tokens WHERE seasonId=? AND token=? LIMIT 1',
+          seasonId,
           candidate,
         );
         if (existing[0]) continue;
         await prisma.$executeRawUnsafe(
           `INSERT INTO lucky_draw_tokens
-             (token, sourceType, userId, enrollmentId, installmentSequence, status, createdAt)
-           VALUES (?, 'INSTALLMENT', ?, ?, ?, 'AVAILABLE', ?)`,
+             (token, seasonId, sourceType, userId, enrollmentId, installmentSequence, status, createdAt)
+           VALUES (?, ?, 'INSTALLMENT', ?, ?, ?, 'AVAILABLE', ?)`,
           candidate,
+          seasonId,
           userId,
           tokenEnrollmentId,
           sequence,
@@ -253,8 +258,6 @@ describe('MegaGoldenClub owner lucky draw workflow integration', () => {
       2,
     );
 
-    seasonId = randomUUID();
-    seasonCode = `OWS${suffix}`;
     await prisma.$executeRawUnsafe(
       `INSERT INTO owner_seasons
          (id, code, name, status, startDate, drawDay, eligibilityCutoff,
@@ -294,7 +297,9 @@ describe('MegaGoldenClub owner lucky draw workflow integration', () => {
       if (installmentToken || futureInstallmentToken || externalInstallmentToken) {
         const tokens = [installmentToken, futureInstallmentToken, externalInstallmentToken].filter(Boolean);
         await prisma.$executeRawUnsafe(
-          `DELETE FROM lucky_draw_tokens WHERE token IN (${tokens.map(() => '?').join(',')})`,
+          `DELETE FROM lucky_draw_tokens
+           WHERE seasonId=? AND token IN (${tokens.map(() => '?').join(',')})`,
+          seasonId,
           ...tokens,
         );
       }
@@ -461,7 +466,8 @@ describe('MegaGoldenClub owner lucky draw workflow integration', () => {
     const tokenStates = await prisma.$queryRawUnsafe<
       Array<{ token: string; status: string; drawId: string | null }>
     >(
-      'SELECT token, status, drawId FROM lucky_draw_tokens WHERE token IN (?, ?) ORDER BY installmentSequence',
+      'SELECT token, status, drawId FROM lucky_draw_tokens WHERE seasonId=? AND token IN (?, ?) ORDER BY installmentSequence',
+      seasonId,
       installmentToken,
       futureInstallmentToken,
     );
@@ -525,7 +531,8 @@ describe('MegaGoldenClub owner lucky draw workflow integration', () => {
     const advanceToken = await prisma.$queryRawUnsafe<
       Array<{ status: string; drawId: string | null; entryId: string | null }>
     >(
-      'SELECT status, drawId, entryId FROM lucky_draw_tokens WHERE token=? LIMIT 1',
+      'SELECT status, drawId, entryId FROM lucky_draw_tokens WHERE seasonId=? AND token=? LIMIT 1',
+      seasonId,
       futureInstallmentToken,
     );
     expect(advanceToken[0]).toMatchObject({
@@ -536,7 +543,8 @@ describe('MegaGoldenClub owner lucky draw workflow integration', () => {
     const externalTokenState = await prisma.$queryRawUnsafe<
       Array<{ status: string; drawId: string | null; entryId: string | null }>
     >(
-      'SELECT status, drawId, entryId FROM lucky_draw_tokens WHERE token=? LIMIT 1',
+      'SELECT status, drawId, entryId FROM lucky_draw_tokens WHERE seasonId=? AND token=? LIMIT 1',
+      seasonId,
       externalInstallmentToken,
     );
     expect(externalTokenState[0]).toMatchObject({
