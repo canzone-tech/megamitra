@@ -329,7 +329,10 @@ export class OwnerPortalService {
   }
 
   async listSeasons() {
-    return this.rows<SeasonRow>(this.seasonSelectSql('ORDER BY s.startDate DESC, s.createdAt DESC'));
+    const rows = await this.rows<SeasonRow>(
+      this.seasonSelectSql('ORDER BY s.startDate DESC, s.createdAt DESC'),
+    );
+    return rows.map((row) => this.formatSeason(row));
   }
 
   async getSeason(id: string) {
@@ -428,8 +431,8 @@ export class OwnerPortalService {
         code,
         dto.name.trim(),
         dto.description?.trim() || null,
-        new Date(this.dayStart(dto.startDate)),
-        dto.endDate ? new Date(this.dayStart(dto.endDate)) : null,
+        dto.startDate.slice(0, 10),
+        dto.endDate ? dto.endDate.slice(0, 10) : null,
         dto.drawDay ?? null,
         dto.eligibilityCutoff,
         program.id,
@@ -527,8 +530,8 @@ export class OwnerPortalService {
       [
         dto.name.trim(),
         dto.description?.trim() || null,
-        new Date(this.dayStart(dto.startDate)),
-        dto.endDate ? new Date(this.dayStart(dto.endDate)) : null,
+        dto.startDate.slice(0, 10),
+        dto.endDate ? dto.endDate.slice(0, 10) : null,
         dto.drawDay ?? null,
         dto.eligibilityCutoff,
         id,
@@ -1337,7 +1340,17 @@ export class OwnerPortalService {
   }
 
   private seasonSelectSql(suffix: string) {
-    return `SELECT s.*,
+    return `SELECT
+                   s.id, s.code, s.name, s.description, s.status,
+                   DATE_FORMAT(s.startDate, '%Y-%m-%d') AS startDate,
+                   DATE_FORMAT(s.endDate, '%Y-%m-%d') AS endDate,
+                   s.drawDay, s.drawStartMonth, s.drawWeekOfMonth, s.drawWeekday, s.drawTimezone,
+                   s.eligibilityCutoff,
+                   s.programId, s.programVersionId,
+                   s.binaryPlanId, s.binaryPlanVersionId,
+                   s.referralPolicyId, s.referralPolicyVersionId,
+                   s.createdByUserId, s.reviewedByUserId, s.activatedByUserId, s.closedByUserId,
+                   s.createdAt, s.updatedAt,
                    pv.registrationFee, pv.installmentAmount, pv.installmentCount, pv.currencyCode,
                    bpv.pairPayoutAmount, bpv.dailyPairCap, bpv.carryForwardEnabled, bpv.settlementTimezone,
                    rpv.fixedAmount

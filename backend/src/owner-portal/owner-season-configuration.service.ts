@@ -203,8 +203,8 @@ export class OwnerSeasonConfigurationService {
         code,
         dto.name.trim(),
         dto.description?.trim() || null,
-        new Date(this.dayStart(dto.startDate)),
-        dto.endDate ? new Date(this.dayStart(dto.endDate)) : null,
+        dto.startDate.slice(0, 10),
+        dto.endDate ? dto.endDate.slice(0, 10) : null,
         dto.drawDay ?? null,
         dto.eligibilityCutoff,
         program.id,
@@ -314,8 +314,8 @@ export class OwnerSeasonConfigurationService {
       [
         dto.name.trim(),
         dto.description?.trim() || null,
-        new Date(this.dayStart(dto.startDate)),
-        dto.endDate ? new Date(this.dayStart(dto.endDate)) : null,
+        dto.startDate.slice(0, 10),
+        dto.endDate ? dto.endDate.slice(0, 10) : null,
         dto.drawDay ?? null,
         dto.eligibilityCutoff,
         id,
@@ -687,7 +687,16 @@ export class OwnerSeasonConfigurationService {
 
   private async requireSeason(id: string) {
     const rows = await this.rows<SeasonRow>(
-      'SELECT * FROM owner_seasons WHERE id=? LIMIT 1',
+      `SELECT
+         id, code, name, description, status,
+         DATE_FORMAT(startDate, '%Y-%m-%d') AS startDate,
+         DATE_FORMAT(endDate, '%Y-%m-%d') AS endDate,
+         drawDay, eligibilityCutoff,
+         programId, programVersionId,
+         binaryPlanId, binaryPlanVersionId,
+         referralPolicyId, referralPolicyVersionId
+       FROM owner_seasons
+       WHERE id=? LIMIT 1`,
       [id],
     );
     if (!rows[0]) throw new NotFoundException('Season not found');
