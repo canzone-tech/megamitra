@@ -185,7 +185,7 @@ export function MemberPaymentVerificationPortal() {
       </div>
 
       <div className={styles.card}>
-        <div className={styles.sectionHead}><div className={styles.sectionTitle}><span className={styles.sectionIcon}>✓</span><h2>Verification Queue</h2></div><small>{rows.length} submission(s)</small></div>
+        <div className={styles.sectionHead}><div className={styles.sectionTitle}><span className={styles.sectionIcon}>✅</span><h2>Verification Queue</h2></div><small>{rows.length} submission(s)</small></div>
         <div className={styles.fields}>
           <div className={styles.field}><label>Status</label><select className={styles.select} value={status} onChange={(event) => setStatus(event.target.value)}><option value="PENDING_VERIFICATION">Pending verification</option><option value="CONFIRMED">Confirmed / paid</option><option value="REJECTED">Rejected</option><option value="">All</option></select></div>
           <div className={styles.field}><label>Purpose</label><select className={styles.select} value={purpose} onChange={(event) => setPurpose(event.target.value)}><option value="">All purposes</option><option value="INSTALLMENT">Installment</option><option value="EPIN_PURCHASE">E-PIN purchase</option></select></div>

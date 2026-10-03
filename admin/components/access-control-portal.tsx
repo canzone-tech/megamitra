@@ -184,7 +184,7 @@ export function AccessControlPortal({ section }: { section: AccessSection }) {
     return <div className={styles.grid2}>
       <section className={styles.card}>
         <div className={styles.sectionHead}>
-          <div className={styles.sectionTitle}><span className={styles.sectionIcon}>+</span><h2>Create Admin / Agent</h2></div>
+          <div className={styles.sectionTitle}><span className={styles.sectionIcon}>➕</span><h2>Create Admin / Agent</h2></div>
           <small>Role is assigned atomically</small>
         </div>
         <form method="post" onSubmit={createStaff}>
@@ -204,7 +204,7 @@ export function AccessControlPortal({ section }: { section: AccessSection }) {
 
       <section className={styles.card}>
         <div className={styles.sectionHead}>
-          <div className={styles.sectionTitle}><span className={styles.sectionIcon}>♟</span><h2>Management Accounts</h2></div>
+          <div className={styles.sectionTitle}><span className={styles.sectionIcon}>🧑‍💼</span><h2>Management Accounts</h2></div>
           <small>{users.length} account(s)</small>
         </div>
         {users.length ? <div className={styles.tableBox}><table className={styles.table}>
@@ -244,7 +244,7 @@ export function AccessControlPortal({ section }: { section: AccessSection }) {
           const selected = new Set(drafts[roleName] ?? []);
           return <section className={styles.card} key={roleName}>
             <div className={styles.sectionHead}>
-              <div className={styles.sectionTitle}><span className={styles.sectionIcon}>⌾</span><h2>{roleName} Permissions</h2></div>
+              <div className={styles.sectionTitle}><span className={styles.sectionIcon}>🛡️</span><h2>{roleName} Permissions</h2></div>
               <small>{role?.description ?? 'Delegated management role'}</small>
             </div>
             <div style={{ display: 'grid', gap: 8 }}>

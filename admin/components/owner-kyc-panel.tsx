@@ -152,7 +152,7 @@ export function OwnerKycPanel() {
       <div className={styles.card}>
         <div className={styles.sectionHead}>
           <div className={styles.sectionTitle}>
-            <span className={styles.sectionIcon}>✓</span>
+            <span className={styles.sectionIcon}>✅</span>
             <div>
               <h2>Member KYC</h2>
               <small>Review and policy lifecycle stay inside Member Management</small>
@@ -183,7 +183,7 @@ export function OwnerKycPanel() {
                 <div>
                   <div className={styles.sectionHead}>
                     <div className={styles.sectionTitle}>
-                      <span className={styles.sectionIcon}>●</span>
+                      <span className={styles.sectionIcon}>👥</span>
                       <h2>Review Queue</h2>
                     </div>
                     <span className={styles.tag}>{submissions?.total ?? 0} TOTAL</span>
@@ -214,7 +214,7 @@ export function OwnerKycPanel() {
                 <div>
                   <div className={styles.sectionHead}>
                     <div className={styles.sectionTitle}>
-                      <span className={styles.sectionIcon}>▣</span>
+                      <span className={styles.sectionIcon}>📄</span>
                       <h2>Selected Submission</h2>
                     </div>
                   </div>
@@ -256,7 +256,7 @@ export function OwnerKycPanel() {
 
             {activeTab === 'kyc-policy' ? <>
               <div className={styles.sectionHead}>
-                <div className={styles.sectionTitle}><span className={styles.sectionIcon}>⚙</span><h2>KYC Policy Lifecycle</h2></div>
+                <div className={styles.sectionTitle}><span className={styles.sectionIcon}>⚙️</span><h2>KYC Policy Lifecycle</h2></div>
                 <span className={styles.tag}>{policies.length} POLICIES</span>
               </div>
               {policies.length ? (
