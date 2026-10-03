@@ -250,7 +250,7 @@ export function OwnerSeasonAdvancedPanel({ embedded = false }: { embedded?: bool
               </>}
             </WorkspaceTabs>
 
-            <div className={styles.notice} style={{ marginTop: 14 }}>Season activation is blocked until the automatic-rule draft exists and every Season month has a prize schedule. Binary and Referral activation rules use the confirmed-payment filters above; monthly Lucky Draw eligibility is derived independently from each confirmed installment's permanent 5-digit token.</div>
+            <div className={styles.notice} style={{ marginTop: 14 }}>Season activation is blocked until the automatic-rule draft exists and every Season month has a prize schedule. Binary and Referral activation rules use the confirmed-payment filters above; monthly Lucky Draw eligibility is derived independently from the permanent 5-digit token for each confirmed installment.</div>
             <div className={styles.buttonLine}><button className={styles.button} disabled={busy || !editable}>{busy ? 'SAVING…' : 'SAVE ADVANCED SEASON POLICY'}</button></div>
           </form>
         ) : <div className={styles.empty}>Create a Season draft before configuring advanced rules.</div>}
