@@ -148,13 +148,7 @@ export function SignupForm() {
 
   useEffect(() => {
     const value = activationEpin.trim();
-    if (!value) {
-      setEpinPreview(null);
-      setEpinPreviewState('idle');
-      setInstallmentEpins([]);
-      return;
-    }
-    setEpinPreviewState('checking');
+    if (!value) return;
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
       void apiJson<EpinPreview>('/api/backend/auth/registration-epin-preview', {
@@ -314,8 +308,11 @@ export function SignupForm() {
           placeholder="Session-bound activation E-PIN"
           value={activationEpin}
           onChange={(event) => {
-            setActivationEpin(event.target.value);
+            const value = event.target.value;
+            setActivationEpin(value);
             setEpinPreview(null);
+            setInstallmentEpins([]);
+            setEpinPreviewState(value.trim() ? 'checking' : 'idle');
           }}
         />
         <div aria-live="polite" style={{ minHeight: 20, fontSize: 12 }}>
