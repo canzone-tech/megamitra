@@ -780,6 +780,63 @@ export class MemberRegistrationService {
     return due.toISOString().slice(0, 10);
   }
 
+  private epinLookupSql(forUpdate: boolean) {
+    return `SELECT e.id, e.status, e.assignedUserId, e.expiresAt, e.seasonId, e.pinType,
+                   e.paymentSubmissionId, e.currencyCodeSnapshot, e.registrationFeeSnapshot,
+                   e.installmentAmountSnapshot, s.status AS seasonStatus, s.code AS seasonCode,
+                   s.name AS seasonName, s.startDate AS seasonStartDate, s.drawTimezone,
+                   s.programVersionId, s.referralPolicyVersionId,
+                   pv.lifecycle AS programLifecycle, pv.currencyCode AS programCurrencyCode,
+                   pv.installmentCount, pv.installmentIntervalUnit, pv.installmentIntervalCount,
+                   pv.firstInstallmentOffsetDays, pv.gracePeriodDays, pv.eligibilityRules
+            FROM owner_epins e
+            LEFT JOIN owner_seasons s ON s.id=e.seasonId
+            LEFT JOIN program_versions pv ON pv.id=s.programVersionId
+            WHERE e.pinHash=?
+            LIMIT 1${forUpdate ? ' FOR UPDATE' : ''}`;
+  }
+
+  private requiredInstallmentCount(epin: EpinRow, occurredAt: Date) {
+    const installmentCount = Number(epin.installmentCount ?? 0);
+    if (!Number.isInteger(installmentCount) || installmentCount < 1) {
+      throw new ConflictException('E-PIN session installment schedule is invalid');
+    }
+    const seasonStartDate = this.dateOnly(epin.seasonStartDate!);
+    const seasonStartAt = new Date(`${seasonStartDate}T00:00:00.000Z`);
+    const businessDate = this.businessDate(occurredAt, epin.drawTimezone || 'Asia/Kolkata');
+    let required = 1;
+    for (let sequence = 1; sequence <= installmentCount; sequence += 1) {
+      const dueDate = this.installmentDueDate(
+        seasonStartAt,
+        Number(epin.firstInstallmentOffsetDays ?? 0),
+        epin.installmentIntervalUnit ?? 'MONTH',
+        Number(epin.installmentIntervalCount ?? 1),
+        sequence,
+      );
+      if (dueDate <= businessDate) required = sequence;
+    }
+    return Math.min(installmentCount, Math.max(1, required));
+  }
+
+  private businessDate(value: Date, timeZone: string) {
+    try {
+      const parts = Object.fromEntries(
+        new Intl.DateTimeFormat('en-US', {
+          timeZone,
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+        })
+          .formatToParts(value)
+          .filter((part) => part.type !== 'literal')
+          .map((part) => [part.type, part.value]),
+      );
+      return `${parts.year}-${parts.month}-${parts.day}`;
+    } catch {
+      throw new ConflictException('E-PIN session timezone is invalid');
+    }
+  }
+
   private async requireSponsor(reference: string) {
     return this.sponsor(reference);
   }
