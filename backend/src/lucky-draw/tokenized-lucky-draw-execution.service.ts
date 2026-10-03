@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { AuditService } from '../audit/audit.service';
 import { FinancialDbService } from '../database/financial-db.service';
 import { PrismaService } from '../database/prisma.service';
+import { AuditAction } from '../generated/prisma/enums';
 import { LuckyDrawExecutionService } from './lucky-draw-execution.service';
 import { LuckyDrawTokenService } from './lucky-draw-token.service';
 
@@ -22,7 +23,7 @@ export class TokenizedLuckyDrawExecutionService extends LuckyDrawExecutionServic
       if (!ownerSnapshot.idempotent) {
         await this.tokenAudit.log({
           actorUserId,
-          action: 'CREATE',
+          action: AuditAction.CREATE,
           entityType: 'LuckyDrawEntrantSnapshot',
           entityId: drawId,
           description: 'Owner monthly draw entrant snapshot frozen from installment tokens',
