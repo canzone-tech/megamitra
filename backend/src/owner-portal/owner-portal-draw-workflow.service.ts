@@ -770,7 +770,7 @@ export class OwnerPortalDrawWorkflowService {
 
   private async requireRun(runId: string) {
     const rows = await this.rows<DrawRunRow>(
-      'SELECT id, seasonId, monthNumber, policyId, policyVersionId, drawId, status FROM owner_draw_runs WHERE id=? LIMIT 1',
+      'SELECT id, seasonId, monthNumber, policyId, policyVersionId, drawId, status, selectionMode FROM owner_draw_runs WHERE id=? LIMIT 1',
       [runId],
     );
     if (!rows[0]) throw new NotFoundException('Draw run not found');
