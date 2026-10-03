@@ -23,6 +23,7 @@ type AllocationRow = {
   installmentId: string;
   installmentSequence: number;
   userId: string;
+  seasonId: string;
 };
 
 type TokenRow = {
@@ -39,6 +40,7 @@ type DrawEntryRow = {
   drawToken: string | null;
   enrollmentId: string | null;
   monthNumber: number | null;
+  seasonId: string | null;
 };
 
 type AffectedRows = { affectedRows?: number };
@@ -75,6 +77,7 @@ type OwnerDrawSnapshotResult = {
 
 type TokenInsert = {
   sourceType: 'INSTALLMENT' | 'DRAW_ENTRY';
+  seasonId?: string | null;
   userId: string;
   enrollmentId?: string | null;
   installmentId?: string | null;
@@ -111,10 +114,12 @@ export class LuckyDrawTokenService {
 
       const allocations = await connection.query<AllocationRow[]>(
         `SELECT a.id AS paymentAllocationId, a.paymentRecordId, a.enrollmentId,
-                a.installmentId, i.sequence AS installmentSequence, e.userId
+                a.installmentId, i.sequence AS installmentSequence, e.userId,
+                s.id AS seasonId
          FROM program_payment_allocations a
          JOIN program_installments i ON i.id=a.installmentId
          JOIN program_enrollments e ON e.id=a.enrollmentId
+         JOIN owner_seasons s ON s.programVersionId=e.programVersionId
          WHERE a.paymentRecordId=? AND a.allocationType='INSTALLMENT'
            AND a.installmentId IS NOT NULL
          ORDER BY i.sequence ASC, a.createdAt ASC, a.id ASC`,
@@ -148,10 +153,12 @@ export class LuckyDrawTokenService {
     return this.db.transaction(async (connection) => {
       const allocations = await connection.query<AllocationRow[]>(
         `SELECT a.id AS paymentAllocationId, a.paymentRecordId, a.enrollmentId,
-                a.installmentId, i.sequence AS installmentSequence, e.userId
+                a.installmentId, i.sequence AS installmentSequence, e.userId,
+                s.id AS seasonId
          FROM program_payment_allocations a
          JOIN program_installments i ON i.id=a.installmentId
          JOIN program_enrollments e ON e.id=a.enrollmentId
+         JOIN owner_seasons s ON s.programVersionId=e.programVersionId
          WHERE a.paymentRecordId=? AND a.allocationType='INSTALLMENT'
            AND a.installmentId IS NOT NULL
          ORDER BY i.sequence ASC, a.createdAt ASC, a.id ASC`,
@@ -210,10 +217,12 @@ export class LuckyDrawTokenService {
 
       const missingTokenAllocations = await connection.query<AllocationRow[]>(
         `SELECT a.id AS paymentAllocationId, a.paymentRecordId, a.enrollmentId,
-                a.installmentId, i.sequence AS installmentSequence, e.userId
+                a.installmentId, i.sequence AS installmentSequence, e.userId,
+                s.id AS seasonId
          FROM program_payment_allocations a
          JOIN program_installments i ON i.id=a.installmentId
          JOIN program_enrollments e ON e.id=a.enrollmentId
+         JOIN owner_seasons s ON s.programVersionId=e.programVersionId
          LEFT JOIN lucky_draw_tokens t
            ON t.paymentAllocationId=a.id OR (t.enrollmentId=a.enrollmentId AND t.installmentId=a.installmentId)
          WHERE e.programVersionId=? AND i.sequence=?
@@ -235,6 +244,7 @@ export class LuckyDrawTokenService {
          JOIN program_enrollments e ON e.id=t.enrollmentId
          JOIN users u ON u.id=t.userId
          WHERE t.sourceType='INSTALLMENT'
+           AND t.seasonId=?
            AND t.installmentSequence=?
            AND t.status='AVAILABLE'
            AND t.drawId IS NULL
@@ -245,7 +255,7 @@ export class LuckyDrawTokenService {
            AND u.status='ACTIVE'
          ORDER BY t.createdAt ASC, t.token ASC
          FOR UPDATE`,
-        [Number(draw.monthNumber), draw.entryWindowEnd, draw.programVersionId],
+        [draw.seasonId, Number(draw.monthNumber), draw.entryWindowEnd, draw.programVersionId],
       );
 
       const priorWinnerRows = await connection.query<Array<{ userId: string }>>(
@@ -332,8 +342,9 @@ export class LuckyDrawTokenService {
           const used = (await connection.query(
             `UPDATE lucky_draw_tokens
              SET status='USED', drawId=?, entryId=?, usedAt=CURRENT_TIMESTAMP(3)
-             WHERE token=? AND status='AVAILABLE' AND drawId IS NULL AND entryId IS NULL`,
-            [drawId, entryId, drawToken],
+             WHERE seasonId=? AND token=? AND status='AVAILABLE'
+               AND drawId IS NULL AND entryId IS NULL`,
+            [drawId, entryId, draw.seasonId, drawToken],
           )) as AffectedRows;
           if (Number(used.affectedRows ?? 0) !== 1) {
             throw new ConflictException(
@@ -376,7 +387,7 @@ export class LuckyDrawTokenService {
     return this.db.transaction(async (connection) => {
       const entries = await connection.query<DrawEntryRow[]>(
         `SELECT e.id AS entryId, e.userId, e.drawToken,
-                be.enrollmentId, odr.monthNumber
+                be.enrollmentId, odr.monthNumber, odr.seasonId
          FROM lucky_draw_entries e
          LEFT JOIN program_draw_eligibility_hooks h ON h.id=e.sourceHookId
          LEFT JOIN program_business_events be ON be.id=h.businessEventId
@@ -432,12 +443,15 @@ export class LuckyDrawTokenService {
         `UPDATE lucky_draw_tokens
          SET paymentSubmissionId=COALESCE(paymentSubmissionId, ?),
              paymentRecordId=COALESCE(paymentRecordId, ?),
-             paymentAllocationId=COALESCE(paymentAllocationId, ?)
-         WHERE token=?`,
+             paymentAllocationId=COALESCE(paymentAllocationId, ?),
+             seasonId=COALESCE(seasonId, ?)
+         WHERE seasonId=? AND token=?`,
         [
           submissionId,
           allocation.paymentRecordId,
           allocation.paymentAllocationId,
+          allocation.seasonId,
+          allocation.seasonId,
           existing[0].token,
         ],
       );
@@ -446,6 +460,7 @@ export class LuckyDrawTokenService {
 
     return this.insertUniqueToken(connection, {
       sourceType: 'INSTALLMENT',
+      seasonId: allocation.seasonId,
       userId: allocation.userId,
       enrollmentId: allocation.enrollmentId,
       installmentId: allocation.installmentId,
@@ -476,8 +491,9 @@ export class LuckyDrawTokenService {
     const result = (await connection.query(
       `UPDATE lucky_draw_tokens
        SET status='USED', drawId=?, entryId=?, usedAt=CURRENT_TIMESTAMP(3)
-       WHERE token=? AND status='AVAILABLE' AND drawId IS NULL AND entryId IS NULL`,
-      [drawId, entryId, token],
+       WHERE enrollmentId=? AND token=? AND status='AVAILABLE'
+         AND drawId IS NULL AND entryId IS NULL`,
+      [drawId, entryId, enrollmentId, token],
     )) as AffectedRows;
     return Number(result.affectedRows ?? 0) === 1 ? token : null;
   }
@@ -494,6 +510,7 @@ export class LuckyDrawTokenService {
     if (existing[0]) return existing[0].token;
     return this.insertUniqueToken(connection, {
       sourceType: 'DRAW_ENTRY',
+      seasonId: entry.seasonId,
       userId: entry.userId,
       enrollmentId: entry.enrollmentId,
       drawId,
@@ -508,12 +525,13 @@ export class LuckyDrawTokenService {
       try {
         await connection.query(
           `INSERT INTO lucky_draw_tokens
-           (token, sourceType, userId, enrollmentId, installmentId, installmentSequence,
+           (token, seasonId, sourceType, userId, enrollmentId, installmentId, installmentSequence,
             paymentRecordId, paymentAllocationId, paymentSubmissionId, drawId, entryId,
             status, createdAt, usedAt)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP(3), ?)`,
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP(3), ?)`,
           [
             token,
+            input.seasonId ?? null,
             input.sourceType,
             input.userId,
             input.enrollmentId ?? null,
