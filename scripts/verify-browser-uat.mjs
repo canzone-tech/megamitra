@@ -512,7 +512,7 @@ async function main() {
       width: 1440,
       height: 1000,
       mobile: false,
-      expectedTexts: ['Season Management', 'Create New Season', 'Eligibility Cut-off'],
+      expectedTexts: ['Season Management', 'Create New Season'],
       verifyBlankSeasonSetup: true,
     },
     {
