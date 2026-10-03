@@ -23,24 +23,7 @@ describe('MegaGoldenClub lucky draw token registry contract', () => {
   it('keeps five non-zero-leading digits while moving uniqueness from global to season scope', () => {
     expect(migrationSql).toContain('`token` CHAR(5) NOT NULL');
     expect(migrationSql).toContain(
-      "CONSTRAINT `lucky_draw_tokens_format_check` CHECK (`token` REGEXP '^[1-9][0-9]{4}
-
-  it('generates only valid five-digit tokens in the 10000-99999 namespace', () => {
-    expect(LUCKY_DRAW_TOKEN_MIN).toBe(10_000);
-    expect(LUCKY_DRAW_TOKEN_MAX_EXCLUSIVE).toBe(100_000);
-
-    for (let sample = 0; sample < 512; sample += 1) {
-      const token = generateLuckyDrawToken();
-      const numericToken = Number(token);
-
-      expect(isLuckyDrawToken(token)).toBe(true);
-      expect(token).toMatch(/^[1-9][0-9]{4}$/);
-      expect(numericToken).toBeGreaterThanOrEqual(LUCKY_DRAW_TOKEN_MIN);
-      expect(numericToken).toBeLessThan(LUCKY_DRAW_TOKEN_MAX_EXCLUSIVE);
-    }
-  });
-});
-)",
+      "CONSTRAINT `lucky_draw_tokens_format_check` CHECK (`token` REGEXP '^[1-9][0-9]{4}$')",
     );
 
     expect(seasonScopeMigrationSql).toContain('ADD COLUMN `seasonId` CHAR(36) NULL');
@@ -49,7 +32,7 @@ describe('MegaGoldenClub lucky draw token registry contract', () => {
       'ADD UNIQUE INDEX `lucky_draw_tokens_season_token_key` (`seasonId`, `token`)',
     );
     expect(seasonScopeMigrationSql).toContain(
-      "AS (IFNULL(`seasonId`, '00000000-0000-0000-0000-000000000000')) PERSISTENT",
+      "GENERATED ALWAYS AS (IFNULL(`seasonId`, '00000000-0000-0000-0000-000000000000')) STORED",
     );
     expect(seasonScopeMigrationSql).toContain(
       'ADD UNIQUE INDEX `lucky_draw_entries_draw_token_key` (`drawId`, `drawToken`)',
