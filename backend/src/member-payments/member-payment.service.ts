@@ -111,6 +111,7 @@ type EpinRow = {
   assignedUserId: string | null;
   usedByUserId: string | null;
   seasonId: string | null;
+  pinType: 'ACTIVATION' | 'INSTALLMENT';
   paymentSubmissionId: string | null;
   currencyCodeSnapshot: string | null;
   registrationFeeSnapshot: string | null;
@@ -246,7 +247,11 @@ export class MemberPaymentService {
     await this.requirePaymentRail();
     this.validatePaymentProof(dto.paymentProofDataUrl);
     const season = await this.requireOpenSeason(dto.seasonId);
-    const pinValue = Number(season.registrationFee) + Number(season.installmentAmount);
+    const epinType = dto.epinType ?? 'ACTIVATION';
+    const registrationFeePerPin =
+      epinType === 'ACTIVATION' ? Number(season.registrationFee) : 0;
+    const installmentAmountPerPin = Number(season.installmentAmount);
+    const pinValue = registrationFeePerPin + installmentAmountPerPin;
     const amount = pinValue * dto.quantity;
     const submission = await this.createSubmission({
       purpose: 'EPIN_PURCHASE',
@@ -260,8 +265,9 @@ export class MemberPaymentService {
       paymentProofDataUrl: dto.paymentProofDataUrl,
       details: {
         quantity: dto.quantity,
-        registrationFeePerPin: this.money(Number(season.registrationFee)),
-        firstInstallmentPerPin: this.money(Number(season.installmentAmount)),
+        epinType,
+        registrationFeePerPin: this.money(registrationFeePerPin),
+        installmentAmountPerPin: this.money(installmentAmountPerPin),
         valuePerPin: this.money(pinValue),
       },
     });
@@ -349,7 +355,7 @@ export class MemberPaymentService {
   async memberEpins(userId: string) {
     const rows = await this.rows<EpinRow & { seasonCode: string | null; seasonName: string | null }>(
       `SELECT e.id, e.pinCiphertext, e.displaySuffix, e.status, e.assignedUserId, e.usedByUserId,
-              e.seasonId, e.paymentSubmissionId, e.currencyCodeSnapshot, e.registrationFeeSnapshot,
+              e.seasonId, e.pinType, e.paymentSubmissionId, e.currencyCodeSnapshot, e.registrationFeeSnapshot,
               e.installmentAmountSnapshot, e.expiresAt, e.usedAt, e.assignedAt, e.cancelledAt,
               e.refundAmount, e.refundReference, s.code AS seasonCode, s.name AS seasonName
        FROM owner_epins e
@@ -367,6 +373,7 @@ export class MemberPaymentService {
         displaySuffix: row.displaySuffix,
         status: expired ? 'EXPIRED' : row.status,
         seasonId: row.seasonId,
+        pinType: row.pinType,
         seasonCode: row.seasonCode,
         seasonName: row.seasonName,
         currencyCode: row.currencyCodeSnapshot,
@@ -384,7 +391,7 @@ export class MemberPaymentService {
     const changed = await this.db.transaction(async (connection) => {
       const rows = await connection.query<EpinRow[]>(
         `SELECT id, pinCiphertext, displaySuffix, status, assignedUserId, usedByUserId, seasonId,
-                paymentSubmissionId, currencyCodeSnapshot, registrationFeeSnapshot,
+                pinType, paymentSubmissionId, currencyCodeSnapshot, registrationFeeSnapshot,
                 installmentAmountSnapshot, expiresAt, usedAt, assignedAt, cancelledAt,
                 refundAmount, refundReference
          FROM owner_epins WHERE id=? LIMIT 1 FOR UPDATE`,
@@ -420,7 +427,7 @@ export class MemberPaymentService {
     const cancelled = await this.db.transaction(async (connection) => {
       const rows = await connection.query<EpinRow[]>(
         `SELECT id, pinCiphertext, displaySuffix, status, assignedUserId, usedByUserId, seasonId,
-                paymentSubmissionId, currencyCodeSnapshot, registrationFeeSnapshot,
+                pinType, paymentSubmissionId, currencyCodeSnapshot, registrationFeeSnapshot,
                 installmentAmountSnapshot, expiresAt, usedAt, assignedAt, cancelledAt,
                 refundAmount, refundReference
          FROM owner_epins WHERE id=? LIMIT 1 FOR UPDATE`,
@@ -776,8 +783,11 @@ export class MemberPaymentService {
       throw new ConflictException('E-PIN purchase quantity is invalid');
     }
     const season = await this.requireOpenSeason(submission.seasonId);
-    const expected =
-      quantity * (Number(season.registrationFee) + Number(season.installmentAmount));
+    const epinType = this.epinTypeFromSubmission(submission);
+    const registrationFeePerPin =
+      epinType === 'ACTIVATION' ? Number(season.registrationFee) : 0;
+    const installmentAmountPerPin = Number(season.installmentAmount);
+    const expected = quantity * (registrationFeePerPin + installmentAmountPerPin);
     if (Math.abs(expected - Number(submission.amount)) > 0.001) {
       throw new ConflictException('E-PIN purchase amount no longer matches the submitted commercial snapshot');
     }
@@ -796,10 +806,10 @@ export class MemberPaymentService {
         const raw = this.readablePin();
         await connection.query(
           `INSERT INTO owner_epins
-           (id, pinHash, displaySuffix, paymentSubmissionId, pinCiphertext, seasonId,
+           (id, pinHash, displaySuffix, paymentSubmissionId, pinCiphertext, seasonId, pinType,
             currencyCodeSnapshot, registrationFeeSnapshot, installmentAmountSnapshot,
             assignedUserId, assignedAt, status, expiresAt, createdByUserId)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP(3), 'ACTIVE', ?, ?)`,
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP(3), 'ACTIVE', ?, ?)`,
           [
             id,
             this.epinHash(raw),
@@ -807,9 +817,10 @@ export class MemberPaymentService {
             submission.id,
             this.encryptPin(raw),
             season.id,
+            epinType,
             season.currencyCode,
-            this.money(Number(season.registrationFee)),
-            this.money(Number(season.installmentAmount)),
+            this.money(registrationFeePerPin),
+            this.money(installmentAmountPerPin),
             submission.requesterUserId,
             expiresAt,
             actorUserId,
@@ -831,7 +842,7 @@ export class MemberPaymentService {
           randomUUID(),
           submission.id,
           actorUserId,
-          JSON.stringify({ generatedEpinIds: pins.map((pin) => pin.id), quantity }),
+          JSON.stringify({ generatedEpinIds: pins.map((pin) => pin.id), quantity, epinType }),
         ],
       );
       return pins;
@@ -845,6 +856,7 @@ export class MemberPaymentService {
       metadata: {
         memberUserId: submission.requesterUserId,
         seasonId: submission.seasonId,
+        epinType,
         quantity,
         generatedEpinIds: generated.map((pin) => pin.id),
       },
@@ -974,6 +986,24 @@ export class MemberPaymentService {
       throw new ConflictException('QR / UPI payment is not currently available');
     }
     return settings;
+  }
+
+  private epinTypeFromSubmission(
+    submission: Pick<SubmissionRow, 'details'>,
+  ): 'ACTIVATION' | 'INSTALLMENT' {
+    const raw = submission.details;
+    let details: Record<string, unknown> = {};
+    if (raw && typeof raw === 'object') {
+      details = raw as Record<string, unknown>;
+    } else if (typeof raw === 'string') {
+      try {
+        const parsed = JSON.parse(raw) as unknown;
+        if (parsed && typeof parsed === 'object') details = parsed as Record<string, unknown>;
+      } catch {
+        details = {};
+      }
+    }
+    return details.epinType === 'INSTALLMENT' ? 'INSTALLMENT' : 'ACTIVATION';
   }
 
   private receiptEnvelope(row: Partial<SubmissionRow> & Record<string, unknown>) {
