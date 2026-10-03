@@ -34,6 +34,18 @@ type CaptchaChallenge = {
   expiresInSeconds: number;
 };
 
+type EpinPreview = {
+  seasonId: string;
+  seasonCode: string;
+  seasonName: string;
+  seasonStartDate: string;
+  requiredInstallmentCount: number;
+  activationPinInstallments: number;
+  additionalInstallmentEpinsRequired: number;
+  installmentAmount: string;
+  currencyCode: string;
+};
+
 type RegistrationResult = {
   user: {
     id: string;
@@ -44,6 +56,13 @@ type RegistrationResult = {
   };
   sponsor: { id: string; username: string; fullName: string } | null;
   placement: { slot?: string; side?: string } | null;
+  enrollment?: {
+    id: string;
+    seasonId: string;
+    paidInstallmentCount: number;
+    catchUpInstallmentCount: number;
+    drawTokens: Array<{ token: string; installmentSequence: number; status: string }>;
+  };
   initialPassword?: string;
 };
 
@@ -58,6 +77,10 @@ export function SignupForm() {
   const [sponsorResolvedFor, setSponsorResolvedFor] = useState('');
   const [sponsorState, setSponsorState] = useState<'idle' | 'checking' | 'found' | 'missing'>('idle');
   const [captcha, setCaptcha] = useState<CaptchaChallenge | null>(null);
+  const [activationEpin, setActivationEpin] = useState('');
+  const [epinPreview, setEpinPreview] = useState<EpinPreview | null>(null);
+  const [epinPreviewState, setEpinPreviewState] = useState<'idle' | 'checking' | 'found' | 'invalid'>('idle');
+  const [installmentEpins, setInstallmentEpins] = useState<string[]>([]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<RegistrationResult | null>(null);
@@ -123,12 +146,64 @@ export function SignupForm() {
     };
   }, [sponsorReference]);
 
+  useEffect(() => {
+    const value = activationEpin.trim();
+    if (!value) {
+      setEpinPreview(null);
+      setEpinPreviewState('idle');
+      setInstallmentEpins([]);
+      return;
+    }
+    setEpinPreviewState('checking');
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => {
+      void apiJson<EpinPreview>('/api/backend/auth/registration-epin-preview', {
+        method: 'POST',
+        body: JSON.stringify({ epin: value }),
+        signal: controller.signal,
+      })
+        .then((preview) => {
+          if (controller.signal.aborted) return;
+          setEpinPreview(preview);
+          setEpinPreviewState('found');
+          setInstallmentEpins((current) =>
+            Array.from(
+              { length: preview.additionalInstallmentEpinsRequired },
+              (_, index) => current[index] ?? '',
+            ),
+          );
+        })
+        .catch(() => {
+          if (controller.signal.aborted) return;
+          setEpinPreview(null);
+          setEpinPreviewState('invalid');
+          setInstallmentEpins([]);
+        });
+    }, 450);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [activationEpin]);
+
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!config?.publicRegistrationEnabled) return;
     const reference = sponsorReference.trim();
     if (reference && (sponsorState !== 'found' || sponsorResolvedFor !== reference || !sponsor)) {
       setError('Please enter a valid sponsor and wait for the sponsor details to appear.');
+      return;
+    }
+
+    if (epinPreviewState !== 'found' || !epinPreview) {
+      setError('Please enter a valid activation E-PIN and wait for the session details to appear.');
+      return;
+    }
+    if (
+      installmentEpins.length !== epinPreview.additionalInstallmentEpinsRequired ||
+      installmentEpins.some((pin) => !pin.trim())
+    ) {
+      setError(`Enter all ${epinPreview.additionalInstallmentEpinsRequired} required installment E-PIN(s).`);
       return;
     }
 
@@ -149,7 +224,8 @@ export function SignupForm() {
           state: formString(form, 'state') || undefined,
           city: formString(form, 'city') || undefined,
           sponsorReference: reference || undefined,
-          epin: formString(form, 'epin'),
+          epin: activationEpin.trim(),
+          installmentEpins: installmentEpins.map((pin) => pin.trim()),
           ...(captcha
             ? {
                 captchaId: captcha.captchaId,
@@ -164,6 +240,10 @@ export function SignupForm() {
       setSponsor(null);
       setSponsorState('idle');
       setSponsorResolvedFor('');
+      setActivationEpin('');
+      setEpinPreview(null);
+      setEpinPreviewState('idle');
+      setInstallmentEpins([]);
       if (config.captchaOnRegistrationEnabled) await loadCaptcha();
     } catch (reason) {
       const message = reason instanceof ApiClientError ? reason.message : 'Unable to complete registration';
@@ -224,9 +304,57 @@ export function SignupForm() {
       ) : null}
 
       <div className="mm-field">
-        <label htmlFor="epin">E-PIN *</label>
-        <input className="mm-input" id="epin" name="epin" required autoComplete="off" placeholder="Required E-PIN" />
+        <label htmlFor="epin">Activation E-PIN *</label>
+        <input
+          className="mm-input"
+          id="epin"
+          name="epin"
+          required
+          autoComplete="off"
+          placeholder="Session-bound activation E-PIN"
+          value={activationEpin}
+          onChange={(event) => {
+            setActivationEpin(event.target.value);
+            setEpinPreview(null);
+          }}
+        />
+        <div aria-live="polite" style={{ minHeight: 20, fontSize: 12 }}>
+          {epinPreviewState === 'checking' ? <span style={{ color: 'var(--mm-ink-500)' }}>Checking E-PIN and session catch-up…</span> : null}
+          {epinPreviewState === 'invalid' ? <span style={{ color: '#9f1d31' }}>Activation E-PIN is invalid, expired, used, or unavailable.</span> : null}
+        </div>
       </div>
+
+      {epinPreview ? (
+        <div style={{ margin: '-4px 0 18px', padding: '13px 14px', borderRadius: 13, border: '1px solid rgba(7,150,77,.25)', background: 'var(--mm-green-100)' }}>
+          <strong style={{ display: 'block', color: 'var(--mm-green-700)' }}>Session verified ✓</strong>
+          <span style={{ display: 'block', marginTop: 5, fontSize: 13 }}><b>{epinPreview.seasonName}</b> • {epinPreview.seasonCode}</span>
+          <span style={{ display: 'block', marginTop: 3, color: 'var(--mm-ink-500)', fontSize: 12 }}>
+            Start {epinPreview.seasonStartDate} • installments required through joining: {epinPreview.requiredInstallmentCount}
+          </span>
+          <span style={{ display: 'block', marginTop: 3, color: 'var(--mm-ink-500)', fontSize: 12 }}>
+            Additional installment E-PINs required now: <b>{epinPreview.additionalInstallmentEpinsRequired}</b>
+          </span>
+        </div>
+      ) : null}
+
+      {installmentEpins.map((value, index) => (
+        <div className="mm-field" key={index}>
+          <label htmlFor={`installmentEpin-${index}`}>Installment E-PIN #{index + 1} *</label>
+          <input
+            className="mm-input"
+            id={`installmentEpin-${index}`}
+            value={value}
+            required
+            autoComplete="off"
+            placeholder={`Catch-up installment #${index + 2}`}
+            onChange={(event) => {
+              const next = [...installmentEpins];
+              next[index] = event.target.value;
+              setInstallmentEpins(next);
+            }}
+          />
+        </div>
+      ))}
       <div className="mm-field">
         <label htmlFor="username">Username{usernameMode === 'MANUAL' ? ' *' : ''}</label>
         <input
@@ -300,6 +428,7 @@ export function SignupForm() {
           <span style={{ display: 'block', marginTop: 5 }}>Username: <b>{result.user.username}</b> • Role: MEMBER • Status: {result.user.status}</span>
           {result.sponsor ? <span style={{ display: 'block', marginTop: 4 }}>Sponsor: {result.sponsor.fullName} ({result.sponsor.username})</span> : null}
           {result.placement?.slot ? <span style={{ display: 'block', marginTop: 4 }}>Auto placement: Slot {result.placement.slot} • {result.placement.side}</span> : null}
+          {result.enrollment ? <span style={{ display: 'block', marginTop: 4 }}>Installments paid through joining: {result.enrollment.paidInstallmentCount} • Catch-up: {result.enrollment.catchUpInstallmentCount}</span> : null}
           {result.initialPassword ? <span style={{ display: 'block', marginTop: 7 }}>One-time generated password: <b>{result.initialPassword}</b>. Save it now.</span> : null}
           <span style={{ display: 'block', marginTop: 7 }}>Complete any required verification/activation before signing in.</span>
         </div>
