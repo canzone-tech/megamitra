@@ -7,6 +7,7 @@ export type PaidRegistrationFixture = {
   programId: string;
   programVersionId: string;
   seasonId: string;
+  seasonStartDate: string;
   sponsorUserId: string;
   sponsorUsername: string;
   createEpin: (raw: string) => Promise<string>;
@@ -40,6 +41,12 @@ export async function createPaidRegistrationFixture(
     sponsor.id,
   );
 
+  const seasonStart = new Date();
+  seasonStart.setUTCHours(0, 0, 0, 0);
+  seasonStart.setUTCDate(1);
+  seasonStart.setUTCMonth(seasonStart.getUTCMonth() + 3);
+  const seasonStartDate = seasonStart.toISOString().slice(0, 10);
+
   const program = await prisma.program.create({
     data: {
       code: `${prefix.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 20)}PG${suffix}`,
@@ -72,12 +79,14 @@ export async function createPaidRegistrationFixture(
   const seasonId = randomUUID();
   await prisma.$executeRawUnsafe(
     `INSERT INTO owner_seasons
-       (id, code, name, status, startDate, drawDay, eligibilityCutoff, programId, programVersionId)
-     VALUES (?, ?, ?, 'ACTIVE', ?, 17, 'BEFORE_DRAW_DATE', ?, ?)`,
+       (id, code, name, status, startDate, registrationClosesAt, drawDay,
+        eligibilityCutoff, programId, programVersionId)
+     VALUES (?, ?, ?, 'ACTIVE', ?, ?, 17, 'BEFORE_DRAW_DATE', ?, ?)`,
     seasonId,
     `${prefix.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 20)}S${suffix}`,
     `${prefix} registration session ${suffix}`,
-    new Date('2026-01-01T00:00:00.000Z'),
+    seasonStart,
+    new Date(Date.now() - 60_000),
     program.id,
     programVersion.id,
   );
@@ -132,6 +141,7 @@ export async function createPaidRegistrationFixture(
     programId: program.id,
     programVersionId: programVersion.id,
     seasonId,
+    seasonStartDate,
     sponsorUserId: sponsor.id,
     sponsorUsername,
     createEpin,
