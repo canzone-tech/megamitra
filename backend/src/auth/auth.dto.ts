@@ -1,4 +1,6 @@
 import {
+  ArrayMaxSize,
+  IsArray,
   IsEmail,
   IsOptional,
   IsString,
@@ -65,12 +67,26 @@ export class RegisterDto {
   epin!: string;
 
   @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(59)
+  @IsString({ each: true })
+  @MaxLength(80, { each: true })
+  installmentEpins?: string[];
+
+  @IsOptional()
   @IsString()
   captchaId?: string;
 
   @IsOptional()
   @IsString()
   captchaAnswer?: string;
+}
+
+export class RegistrationEpinPreviewDto {
+  @IsString()
+  @MinLength(1)
+  @MaxLength(80)
+  epin!: string;
 }
 
 export class LoginDto {
