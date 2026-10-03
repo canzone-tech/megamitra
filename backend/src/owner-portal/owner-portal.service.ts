@@ -1354,6 +1354,19 @@ export class OwnerPortalService {
     currencyCode: string,
   ) {
     const normalizedCurrency = currencyCode.trim().toUpperCase();
+    const season = await this.requireSeason(seasonId);
+    const totalMonths = Number(season.installmentCount ?? 0);
+    const prizeKeys = new Set<string>();
+    for (const prize of prizes) {
+      if (totalMonths > 0 && prize.monthNumber > totalMonths) {
+        throw new BadRequestException(`Prize month ${prize.monthNumber} exceeds the season's ${totalMonths} configured months`);
+      }
+      const key = `${prize.monthNumber}:${prize.prizeCode.trim().toUpperCase()}`;
+      if (prizeKeys.has(key)) {
+        throw new BadRequestException(`Duplicate prize code ${prize.prizeCode} for month ${prize.monthNumber}`);
+      }
+      prizeKeys.add(key);
+    }
     const media = new Map<string, { filename: string; contentType: string }>();
     for (const mediaId of [...new Set(prizes.flatMap((prize) => prize.mediaId ? [prize.mediaId] : []))]) {
       const info = await this.prizeMedia.info(mediaId);
