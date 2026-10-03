@@ -696,7 +696,10 @@ export function OwnerCorePortal({ section, extension }: { section: OwnerCoreSect
   function renderPrizes() {
     const seasons = (Array.isArray(data) ? data : []) as Row[];
     const selectedSeason = seasons.find((row) => text(row.id) === selectedSeasonId) ?? {};
-    const monthNumbers = [...new Set(prizeDraft.map((prize) => prize.monthNumber))].sort((left, right) => left - right);
+    const configuredMonths = number(selectedSeason.totalMonths, 0);
+    const monthNumbers = configuredMonths > 0
+      ? Array.from({ length: configuredMonths }, (_, index) => index + 1)
+      : [...new Set(prizeDraft.map((prize) => prize.monthNumber))].sort((left, right) => left - right);
     const monthTabs = monthNumbers.map((monthNumber) => ({
       id: `prize-editor-month-${monthNumber}`,
       label: `Month ${monthNumber}`,
@@ -710,7 +713,7 @@ export function OwnerCorePortal({ section, extension }: { section: OwnerCoreSect
         {(activeTab) => <>
           {activeTab === 'prize-season' ? <div className={styles.card}><SectionHead icon="🎁" title="Prize Schedule" action={<button type="button" className={classNames(styles.button, styles.outline)} disabled={!prizeDraft.length} onClick={() => exportCsv(prizeDraft as unknown as Row[], `${text(selectedSeason.code, 'season').toLowerCase()}-prize-schedule.csv`)}>EXPORT SCHEDULE</button>} /><Field label="Season"><select className={styles.select} value={selectedSeasonId} onChange={(event) => void changePrizeSeason(event.target.value)}><option value="">Select season</option>{seasons.map((row) => <option key={text(row.id)} value={text(row.id)}>{text(row.name)} • {text(row.status)}</option>)}</select></Field><div className={styles.buttonLine}><button type="button" className={styles.button} disabled={!selectedSeasonId} onClick={() => showTab('prize-editor')}>OPEN MONTHWISE EDITOR</button></div></div> : null}
           {activeTab === 'prize-editor' ? selectedSeasonId ? <div className={styles.card}>
-            <SectionHead icon="🎁" title="Monthwise Prizes" action={<button type="button" className={styles.button} disabled={busy || !monthNumbers.length} onClick={addPrize}>+ ADD PRIZE TO MONTH {selectedPrizeMonth}</button>} />
+            <SectionHead icon="🎁" title="Monthwise Prizes" action={<button type="button" className={styles.button} disabled={busy} onClick={addPrize}>+ ADD PRIZE TO MONTH {selectedPrizeMonth}</button>} />
             <div className={styles.notice}>“Add Prize” adds another prize inside the selected month. It does not create another month.</div>
             {prizeDraft.length ? <WorkspaceTabs
               ariaLabel="Prize editor months"
