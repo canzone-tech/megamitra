@@ -393,6 +393,7 @@ export function OwnerCorePortal({ section, extension }: { section: OwnerCoreSect
         entryWindowEnd: iso('entryWindowEnd'),
         drawAt: iso('drawAt'),
         claimWindowDays: formNumber(form, 'claimWindowDays'),
+        selectionMode: formString(form, 'selectionMode') || 'AUTO',
       }),
     }), 'Monthly draw prepared');
     if (result) showTab('draw-register');
@@ -415,6 +416,40 @@ export function OwnerCorePortal({ section, extension }: { section: OwnerCoreSect
   async function drawAction(action: string, success: string) {
     if (!selectedDrawId) return;
     await run(() => apiJson(`${API}/draws/${encodeURIComponent(selectedDrawId)}/${action}`, { method: 'POST', body: '{}' }), success);
+  }
+
+  async function recordExternalWinner(event: FormEvent<HTMLFormElement>, prizeCode: string) {
+    event.preventDefault();
+    if (!selectedDrawId) return;
+    const form = new FormData(event.currentTarget);
+    const result = await run(() => apiJson(`${API}/draws/${encodeURIComponent(selectedDrawId)}/external-winners`, {
+      method: 'POST',
+      body: JSON.stringify({
+        drawToken: formString(form, 'drawToken'),
+        prizeCode,
+      }),
+    }), 'External draw winner recorded');
+    if (result) event.currentTarget.reset();
+  }
+
+  async function removeExternalWinner(winnerId: string) {
+    if (!selectedDrawId) return;
+    await run(() => apiJson(`${API}/draws/${encodeURIComponent(selectedDrawId)}/external-winners/${encodeURIComponent(winnerId)}`, {
+      method: 'DELETE',
+    }), 'External draw winner removed');
+  }
+
+  async function finalizeExternalDraw(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedDrawId) return;
+    const form = new FormData(event.currentTarget);
+    await run(() => apiJson(`${API}/draws/${encodeURIComponent(selectedDrawId)}/finalize-external-selection`, {
+      method: 'POST',
+      body: JSON.stringify({
+        externalReference: formString(form, 'externalReference'),
+        note: formString(form, 'note') || undefined,
+      }),
+    }), 'External draw finalized and winner verification opened');
   }
 
   async function verifyWinner(winnerId: string) {
