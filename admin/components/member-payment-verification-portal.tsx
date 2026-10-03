@@ -170,7 +170,7 @@ export function MemberPaymentVerificationPortal() {
       {notice ? <div className={classNames(styles.notice, styles.success)} role="status">{notice}</div> : null}
 
       <div className={styles.card}>
-        <div className={styles.sectionHead}><div className={styles.sectionTitle}><span className={styles.sectionIcon}>₹</span><h2>QR / UPI Settings</h2></div><small>Super Admin only</small></div>
+        <div className={styles.sectionHead}><div className={styles.sectionTitle}><span className={styles.sectionIcon}>💳</span><h2>QR / UPI Settings</h2></div><small>Super Admin only</small></div>
         {settings ? <form method="post" onSubmit={saveSettings}>
           <div className={styles.fields}>
             <div className={styles.field}><label>UPI ID</label><input className={styles.input} name="upiId" defaultValue={settings.upiId ?? ''} /></div>

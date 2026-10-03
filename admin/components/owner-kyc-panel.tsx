@@ -284,7 +284,7 @@ export function OwnerKycPanel() {
               {defaultPolicy ? (
                 <form className={extension.draftForm} method="post" onSubmit={createDraft}>
                   <div className={styles.sectionHead}>
-                    <div className={styles.sectionTitle}><span className={styles.sectionIcon}>+</span><h2>Create Next KYC Draft</h2></div>
+                    <div className={styles.sectionTitle}><span className={styles.sectionIcon}>➕</span><h2>Create Next KYC Draft</h2></div>
                     <span className={styles.tag}>{defaultPolicy.code}</span>
                   </div>
                   <div className={styles.fields}>
