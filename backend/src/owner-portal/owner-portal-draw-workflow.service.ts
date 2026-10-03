@@ -17,8 +17,10 @@ import {
   ownerDrawScheduleLabel,
 } from './owner-draw-schedule';
 import type {
+  FinalizeExternalDrawDto,
   FulfillOwnerWinnerDto,
   PrepareOwnerDrawDto,
+  RecordExternalDrawWinnerDto,
   VerifyOwnerWinnerDto,
 } from './owner-portal.dto';
 import { OwnerPortalService } from './owner-portal.service';
@@ -46,6 +48,7 @@ type DrawRunRow = {
   policyVersionId: string;
   drawId: string;
   status: string;
+  selectionMode: 'AUTO' | 'MANUAL_EXTERNAL';
 };
 
 type ExistingDrawRunRow = DrawRunRow & {
@@ -88,10 +91,11 @@ export class OwnerPortalDrawWorkflowService {
     }
 
     const scheduleLabel = this.assertConfiguredDrawDate(season, dto);
+    const selectionMode = dto.selectionMode ?? 'AUTO';
 
     const existing = await this.rows<ExistingDrawRunRow>(
       `SELECT odr.id, odr.seasonId, odr.monthNumber, odr.policyId,
-              odr.policyVersionId, odr.drawId, odr.status,
+              odr.policyVersionId, odr.drawId, odr.status, odr.selectionMode,
               DATE_FORMAT(ldi.entryWindowStart, '%Y-%m-%d %H:%i:%s.%f') AS entryWindowStartUtc,
               DATE_FORMAT(ldi.entryWindowEnd, '%Y-%m-%d %H:%i:%s.%f') AS entryWindowEndUtc,
               DATE_FORMAT(ldi.drawAt, '%Y-%m-%d %H:%i:%s.%f') AS drawAtUtc,
@@ -187,8 +191,8 @@ export class OwnerPortalDrawWorkflowService {
 
     await this.db.execute(
       `INSERT INTO owner_draw_runs
-       (id, seasonId, monthNumber, policyId, policyVersionId, drawId, status, createdByUserId)
-       VALUES (?, ?, ?, ?, ?, ?, 'SCHEDULED', ?)`,
+       (id, seasonId, monthNumber, policyId, policyVersionId, drawId, status, selectionMode, createdByUserId)
+       VALUES (?, ?, ?, ?, ?, ?, 'SCHEDULED', ?, ?)`,
       [
         runId,
         seasonId,
@@ -196,6 +200,7 @@ export class OwnerPortalDrawWorkflowService {
         policy.id,
         policyVersion.id,
         draw.id,
+        selectionMode,
         actorUserId,
       ],
     );
@@ -212,6 +217,7 @@ export class OwnerPortalDrawWorkflowService {
         claimWindowDays: dto.claimWindowDays,
         recurrence: scheduleLabel,
         drawTimezone: season.drawTimezone,
+        selectionMode,
       },
     });
     return this.portal.drawRun(runId);
@@ -402,10 +408,11 @@ export class OwnerPortalDrawWorkflowService {
       storedMilliseconds(existing.entryWindowEndUtc) ===
         canonicalIncoming(dto.entryWindowEnd) &&
       storedMilliseconds(existing.drawAtUtc) === canonicalIncoming(dto.drawAt) &&
-      Number(existing.claimWindowDays) === dto.claimWindowDays;
+      Number(existing.claimWindowDays) === dto.claimWindowDays &&
+      existing.selectionMode === (dto.selectionMode ?? 'AUTO');
     if (!exactReplay) {
       throw new ConflictException(
-        `Month ${dto.monthNumber} draw is already prepared with different entry window, draw time, or claim window settings`,
+        `Month ${dto.monthNumber} draw is already prepared with different entry window, draw time, claim window, or selection mode settings`,
       );
     }
   }
