@@ -2,7 +2,13 @@ import { Body, Controller, Get, HttpCode, HttpStatus, Post, Query } from '@nestj
 import type { AuthUser } from './auth-user';
 import { AuthService } from './auth.service';
 import { CurrentUser } from './current-user.decorator';
-import { ChangePasswordDto, LoginDto, RefreshDto, RegisterDto } from './auth.dto';
+import {
+  ChangePasswordDto,
+  LoginDto,
+  RefreshDto,
+  RegisterDto,
+  RegistrationEpinPreviewDto,
+} from './auth.dto';
 import {
   ConfirmEmailChangeDto,
   ConfirmEmailVerificationDto,
@@ -40,6 +46,13 @@ export class AuthController {
   @Get('sponsor')
   sponsor(@Query('reference') reference?: string) {
     return this.memberRegistration.sponsor(reference ?? '');
+  }
+
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @Post('registration-epin-preview')
+  registrationEpinPreview(@Body() dto: RegistrationEpinPreviewDto) {
+    return this.memberRegistration.registrationEpinPreview(dto.epin);
   }
 
   @Public()
