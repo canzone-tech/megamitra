@@ -195,7 +195,7 @@ export function MemberPaymentVerificationPortal() {
           const memberName = [row.firstName, row.lastName].filter(Boolean).join(' ') || row.username;
           return <tr key={row.id}>
             <td><b>{row.receiptNumber}</b><br />{memberName}<br /><small>{row.username}</small></td>
-            <td>{row.purpose.replace('_', ' ')}<br />{row.seasonName} ({row.seasonCode})<br /><small>{row.purpose === 'INSTALLMENT' ? `${String(details.installmentCount ?? '—')} installment(s)` : `${String(details.quantity ?? row.epinQuantity ?? '—')} E-PIN(s)`}</small></td>
+            <td>{row.purpose.replace('_', ' ')}<br />{row.seasonName} ({row.seasonCode})<br /><small>{row.purpose === 'INSTALLMENT' ? `${String(details.installmentCount ?? '—')} installment(s)` : `${String(details.quantity ?? row.epinQuantity ?? '—')} ${String(details.epinType ?? 'ACTIVATION')} E-PIN(s)`}</small></td>
             <td><b>{money(row.amount, row.currencyCode)}</b><br />UTR {row.providerReference}<br /><small>{dateTime(row.submittedAt)}</small></td>
             <td>{row.paymentProofDataUrl ? <a href={row.paymentProofDataUrl} target="_blank" rel="noreferrer"><img src={row.paymentProofDataUrl} alt={`Payment proof ${row.receiptNumber}`} style={{ width: 96, maxHeight: 96, objectFit: 'contain' }} /></a> : '—'}</td>
             <td className={row.status === 'CONFIRMED' ? styles.status : row.status === 'REJECTED' ? styles.statusOff : ''}>{statusLabel(row.status)}{row.reviewedByUsername ? <><br /><small>by {row.reviewedByUsername}</small></> : null}</td>
