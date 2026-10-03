@@ -287,6 +287,76 @@ describe('MegaGoldenClub owner lucky draw workflow integration', () => {
     secondPrizeCode = `FEB${suffix}`.toUpperCase();
   });
 
+  it('allows five-digit token reuse across seasons but never within one season', async () => {
+    const otherSeasonId = randomUUID();
+    let scopedToken = '';
+    for (let attempt = 0; attempt < 128; attempt += 1) {
+      const candidate = generateLuckyDrawToken();
+      const existing = await prisma.$queryRawUnsafe<Array<{ id: string }>>(
+        `SELECT id FROM lucky_draw_tokens
+         WHERE token=? AND seasonId IN (?, ?) LIMIT 1`,
+        candidate,
+        seasonId,
+        otherSeasonId,
+      );
+      if (!existing[0]) {
+        scopedToken = candidate;
+        break;
+      }
+    }
+    expect(scopedToken).toMatch(/^\d{5}$/);
+
+    try {
+      await prisma.$executeRawUnsafe(
+        `INSERT INTO lucky_draw_tokens
+           (token, seasonId, sourceType, userId, status, createdAt)
+         VALUES
+           (?, ?, 'DRAW_ENTRY', ?, 'USED', CURRENT_TIMESTAMP(3)),
+           (?, ?, 'DRAW_ENTRY', ?, 'USED', CURRENT_TIMESTAMP(3))`,
+        scopedToken,
+        seasonId,
+        memberId,
+        scopedToken,
+        otherSeasonId,
+        memberId,
+      );
+
+      const scopedRows = await prisma.$queryRawUnsafe<Array<{ seasonId: string; token: string }>>(
+        `SELECT seasonId, token FROM lucky_draw_tokens
+         WHERE token=? AND seasonId IN (?, ?) ORDER BY seasonId`,
+        scopedToken,
+        seasonId,
+        otherSeasonId,
+      );
+      expect(scopedRows).toHaveLength(2);
+
+      let sameSeasonDuplicateRejected = false;
+      try {
+        await prisma.$executeRawUnsafe(
+          `INSERT INTO lucky_draw_tokens
+             (token, seasonId, sourceType, userId, status, createdAt)
+           VALUES (?, ?, 'DRAW_ENTRY', ?, 'USED', CURRENT_TIMESTAMP(3))`,
+          scopedToken,
+          seasonId,
+          memberId,
+        );
+      } catch {
+        sameSeasonDuplicateRejected = true;
+      }
+      expect(sameSeasonDuplicateRejected).toBe(true);
+    } finally {
+      if (scopedToken) {
+        await prisma.$executeRawUnsafe(
+          `DELETE FROM lucky_draw_tokens
+           WHERE token=? AND seasonId IN (?, ?)`,
+          scopedToken,
+          seasonId,
+          otherSeasonId,
+        );
+      }
+    }
+  });
+
   afterAll(async () => {
     if (prisma) {
       const userIds = [adminId, memberId, externalMemberId].filter(Boolean);
