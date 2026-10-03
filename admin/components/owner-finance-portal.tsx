@@ -11,6 +11,13 @@ import styles from './owner-portal.module.css';
 export type OwnerFinanceSection = 'payments' | 'wallet' | 'epins' | 'auth-codes';
 type Row = Record<string, unknown>;
 type Settings = { companyName?: string; currencyCode?: string; timezone?: string };
+type MemberPaymentSettings = {
+  upiId: string | null;
+  payeeName: string | null;
+  qrImageDataUrl: string | null;
+  instructions: string | null;
+  enabled: boolean | number;
+};
 
 const API = '/api/backend/admin/owner-portal';
 const TITLES: Record<OwnerFinanceSection, string> = {
@@ -54,6 +61,36 @@ function formNumber(form: FormData, name: string, fallback = 0) {
   const parsed = Number(form.get(name));
   return Number.isFinite(parsed) ? parsed : fallback;
 }
+async function qrFileToDataUrl(file: File): Promise<string> {
+  if (!file.type.startsWith('image/')) throw new Error('UPI QR must be an image');
+  const raw = await new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result ?? ''));
+    reader.onerror = () => reject(new Error('Unable to read UPI QR image'));
+    reader.readAsDataURL(file);
+  });
+  if (raw.length <= 115_000) return raw;
+
+  const image = await new Promise<HTMLImageElement>((resolve, reject) => {
+    const element = new Image();
+    element.onload = () => resolve(element);
+    element.onerror = () => reject(new Error('Unable to process UPI QR image'));
+    element.src = raw;
+  });
+  const scale = Math.min(1, 900 / Math.max(image.width, image.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(image.width * scale));
+  canvas.height = Math.max(1, Math.round(image.height * scale));
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('Unable to process UPI QR image');
+  context.drawImage(image, 0, 0, canvas.width, canvas.height);
+  for (const quality of [0.9, 0.78, 0.66, 0.54]) {
+    const result = canvas.toDataURL('image/jpeg', quality);
+    if (result.length <= 115_000) return result;
+  }
+  throw new Error('UPI QR image is too large. Please crop it and upload again.');
+}
+
 function Field({ label, children, full = false }: { label: string; children: ReactNode; full?: boolean }) {
   return <div className={classNames(styles.field, full && styles.full)}><label>{label}</label>{children}</div>;
 }
@@ -77,9 +114,12 @@ export function OwnerFinancePortal({ section }: { section: OwnerFinanceSection }
   const [seasons, setSeasons] = useState<Row[]>([]);
   const [wallet, setWallet] = useState<Row | null>(null);
   const [receipt, setReceipt] = useState<Row | null>(null);
+  const [memberPaymentSettings, setMemberPaymentSettings] = useState<MemberPaymentSettings | null>(null);
+  const [qrImageDataUrl, setQrImageDataUrl] = useState('');
   const [generatedEpins, setGeneratedEpins] = useState<string[]>([]);
   const [generatedAuthCode, setGeneratedAuthCode] = useState('');
   const [busy, setBusy] = useState(false);
+  const [busyPaymentSettings, setBusyPaymentSettings] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
@@ -102,6 +142,19 @@ export function OwnerFinancePortal({ section }: { section: OwnerFinanceSection }
         const rows = await apiJson<Row[]>(`${API}/payments`);
         setData(rows);
         setSeasons([]);
+        try {
+          const nextPaymentSettings = await apiJson<MemberPaymentSettings>(
+            '/api/backend/admin/member-payments/settings',
+          );
+          setMemberPaymentSettings(nextPaymentSettings);
+          setQrImageDataUrl(nextPaymentSettings.qrImageDataUrl ?? '');
+        } catch (settingsError) {
+          if (!(settingsError instanceof ApiClientError) || settingsError.status !== 403) {
+            throw settingsError;
+          }
+          setMemberPaymentSettings(null);
+          setQrImageDataUrl('');
+        }
       } else if (section === 'epins') {
         const [rows, seasonRows] = await Promise.all([
           apiJson<Row[]>(`${API}/epins`),
@@ -174,6 +227,32 @@ export function OwnerFinancePortal({ section }: { section: OwnerFinanceSection }
     if (nextReceipt && typeof nextReceipt === 'object') {
       setReceipt(nextReceipt as Row);
       showTab('payment-receipt');
+    }
+  }
+
+  async function savePaymentSettings(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    setBusyPaymentSettings(true);
+    setError('');
+    setNotice('');
+    try {
+      await apiJson('/api/backend/admin/member-payments/settings', {
+        method: 'PUT',
+        body: JSON.stringify({
+          upiId: formString(form, 'upiId') || undefined,
+          payeeName: formString(form, 'payeeName') || undefined,
+          qrImageDataUrl: qrImageDataUrl || undefined,
+          instructions: formString(form, 'instructions') || undefined,
+          enabled: form.get('enabled') === 'on',
+        }),
+      });
+      setNotice('QR / UPI payment settings saved. Members will see the updated payment rail immediately.');
+      await load();
+    } catch (err) {
+      handleApiError(err);
+    } finally {
+      setBusyPaymentSettings(false);
     }
   }
 
@@ -262,13 +341,56 @@ export function OwnerFinancePortal({ section }: { section: OwnerFinanceSection }
 
   function renderPayments() {
     const rows = data;
-    return <><Hero title="Payments & Bills" subtitle="Registration, monthly EMI, receipts, payment modes, reconciliation and audit trail." pill={`${currencyCode} • AUTHORIZED ENTRY`} />
+    return <><Hero title="Payments & Bills" subtitle="Configure QR / UPI, record payments, and keep E-PIN as the alternate payment rail." pill={`${currencyCode} • QR / UPI + E-PIN`} />
       <WorkspaceTabs ariaLabel="Payments workspace" tabs={[
+        { id: 'payment-methods', label: 'QR / UPI Settings' },
         { id: 'payment-record', label: 'Record Payment' },
         { id: 'payment-register', label: 'Payment Register', count: rows.length },
         { id: 'payment-receipt', label: 'Receipt Preview' },
       ]}>
         {(activeTab) => <>
+          {activeTab === 'payment-methods' ? <div className={styles.card}>
+            <SectionHead icon="📲" title="QR / UPI Payment Settings" note="Super Admin controls the member-facing QR payment rail" />
+            {memberPaymentSettings ? <form method="post" onSubmit={savePaymentSettings}>
+              <div className={styles.fields}>
+                <Field label="UPI ID"><input name="upiId" className={styles.input} defaultValue={memberPaymentSettings.upiId ?? ''} placeholder="example@bank" /></Field>
+                <Field label="Payee Name"><input name="payeeName" className={styles.input} defaultValue={memberPaymentSettings.payeeName ?? ''} placeholder="Account / business name" /></Field>
+                <Field label="UPI QR Image">
+                  <input
+                    className={styles.input}
+                    type="file"
+                    accept="image/*"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (!file) return;
+                      void qrFileToDataUrl(file)
+                        .then(setQrImageDataUrl)
+                        .catch(handleApiError);
+                    }}
+                  />
+                </Field>
+                <Field label="Member QR Payments">
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 10, minHeight: 42 }}>
+                    <input name="enabled" type="checkbox" defaultChecked={Boolean(memberPaymentSettings.enabled)} />
+                    <span>Enable QR / UPI payment option</span>
+                  </label>
+                </Field>
+                <Field label="Payment Instructions" full>
+                  <textarea name="instructions" className={styles.input} rows={3} defaultValue={memberPaymentSettings.instructions ?? ''} placeholder="Example: Scan QR, pay exact amount, then submit UTR and payment screenshot." />
+                </Field>
+              </div>
+              {qrImageDataUrl ? <div className={styles.notice}>
+                <b>Current member-facing QR preview</b><br />
+                <img src={qrImageDataUrl} alt="Configured UPI payment QR" style={{ width: 220, maxWidth: '100%', height: 'auto', marginTop: 10, borderRadius: 12 }} />
+                <div className={styles.buttonLine}>
+                  <button className={classNames(styles.button, styles.outline)} type="button" disabled={busyPaymentSettings} onClick={() => setQrImageDataUrl('')}>REMOVE QR</button>
+                </div>
+              </div> : <div className={styles.empty}>No UPI QR image configured yet.</div>}
+              <div className={styles.buttonLine}>
+                <button className={styles.button} disabled={busyPaymentSettings}>{busyPaymentSettings ? 'SAVING…' : 'SAVE QR / UPI SETTINGS'}</button>
+              </div>
+            </form> : <div className={styles.notice}>QR / UPI settings require Admin / Super Admin access. Saving changes is restricted by the backend to Super Admin.</div>}
+          </div> : null}
           {activeTab === 'payment-record' ? <div className={styles.card}><SectionHead icon="💳" title="Record Payment" note="Purpose-bound authorization required" /><form method="post" onSubmit={submitPayment}><div className={styles.fields}><Field label="User ID / Mobile"><input name="memberReference" className={styles.input} required /></Field><Field label={`Payment Amount (${currencyCode})`}><input name="amount" className={styles.input} inputMode="decimal" required defaultValue="1000" /></Field><Field label="Payment Type"><select name="paymentType" className={styles.select}><option value="MONTHLY_EMI">Monthly EMI</option><option value="REGISTRATION">Registration</option><option value="OTHER">Other</option></select></Field><Field label="Payment Mode"><select name="paymentMode" className={styles.select}><option value="CASH">Cash</option><option value="UPI_ONLINE">UPI / Online</option><option value="BANK_TRANSFER">Bank Transfer</option></select></Field><Field label="Transaction / Receipt Reference"><input name="transactionReference" className={styles.input} placeholder="Optional provider/reference number" /></Field><Field label="Admin / Agent Auth Code"><input name="authorizationCode" className={styles.input} required placeholder="Generate under Auth Codes" /></Field></div><div className={styles.buttonLine}><button className={styles.button} disabled={busy}>SUBMIT PAYMENT</button></div></form></div> : null}
           {activeTab === 'payment-register' ? <div className={styles.card}><SectionHead icon="🧾" title="Payment Register" note="Recorded payments with refund/reconciliation state" />{rows.length ? <div className={styles.tableBox}><table className={styles.table}><thead><tr><th>DATE</th><th>RECEIPT</th><th>MEMBER</th><th>TYPE</th><th>MODE</th><th>AMOUNT</th><th>REFUNDED</th><th>STATUS</th><th>ACTION</th></tr></thead><tbody>{rows.map((row) => <tr key={text(row.id)}><td>{dateTime(row.occurredAt)}</td><td>{text(row.receiptNumber)}</td><td><b>{text(row.username)}</b><br />{[text(row.firstName, ''), text(row.lastName, '')].filter(Boolean).join(' ') || '—'}</td><td>{text(row.paymentType)}</td><td>{text(row.paymentMode)}</td><td>{money(row.amount, text(row.currencyCode, currencyCode))}</td><td>{money(row.refundedAmount, text(row.currencyCode, currencyCode))}</td><td className={text(row.status) === 'RECORDED' ? styles.status : styles.statusOff}>{text(row.status)}</td><td><button type="button" className={classNames(styles.button, styles.outline)} onClick={() => void openReceipt(text(row.id))}>VIEW RECEIPT</button></td></tr>)}</tbody></table></div> : <Empty>No payments recorded yet.</Empty>}</div> : null}
           {activeTab === 'payment-receipt' ? <div className={styles.card}><SectionHead icon="🧾" title="Receipt Preview" note="Authoritative payment record" />{receipt ? <><div className={styles.notice}><b>{text(receipt.companyName, text(settings.companyName, 'MegaGoldenClub'))}</b> • Receipt {text(receipt.receiptNumber)} • Member {text((receipt.member as Row | undefined)?.fullName)} • User ID {text((receipt.member as Row | undefined)?.username)} • {text(receipt.paymentType)} {money(receipt.amount, text(receipt.currencyCode, currencyCode))} • Season {text((receipt.season as Row | undefined)?.name, 'Unmapped')} • Mode {text(receipt.paymentMode)} • Reference {text(receipt.transactionReference)} • Status {text(receipt.status)} • Refunds {money(receipt.refundedAmount, text(receipt.currencyCode, currencyCode))}.</div><div className={styles.buttonLine}><button className={classNames(styles.button, styles.dark)} type="button" onClick={() => window.print()}>PRINT RECEIPT</button></div></> : <Empty>Submit a payment or open a payment record to preview its receipt.</Empty>}</div> : null}
