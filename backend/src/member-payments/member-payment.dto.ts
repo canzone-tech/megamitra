@@ -27,6 +27,7 @@ export class SubmitInstallmentPaymentDto {
 
 export class SubmitEpinPaymentDto {
   @IsString() @Length(36, 36) seasonId!: string;
+  @IsOptional() @IsIn(['ACTIVATION', 'INSTALLMENT']) epinType?: 'ACTIVATION' | 'INSTALLMENT';
   @IsInt() @Min(1) @Max(100) quantity!: number;
   @IsString() @Length(4, 191) utr!: string;
   @IsString() @MaxLength(120_000) paymentProofDataUrl!: string;
