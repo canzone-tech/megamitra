@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
@@ -381,7 +382,7 @@ export function OwnerFinancePortal({ section }: { section: OwnerFinanceSection }
               </div>
               {qrImageDataUrl ? <div className={styles.notice}>
                 <b>Current member-facing QR preview</b><br />
-                <img src={qrImageDataUrl} alt="Configured UPI payment QR" style={{ width: 220, maxWidth: '100%', height: 'auto', marginTop: 10, borderRadius: 12 }} />
+                <Image src={qrImageDataUrl} alt="Configured UPI payment QR" width={220} height={220} unoptimized style={{ width: 220, maxWidth: '100%', height: 'auto', marginTop: 10, borderRadius: 12 }} />
                 <div className={styles.buttonLine}>
                   <button className={classNames(styles.button, styles.outline)} type="button" disabled={busyPaymentSettings} onClick={() => setQrImageDataUrl('')}>REMOVE QR</button>
                 </div>
