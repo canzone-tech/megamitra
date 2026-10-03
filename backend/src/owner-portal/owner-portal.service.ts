@@ -957,26 +957,61 @@ export class OwnerPortalService {
   async generateEpins(dto: GenerateEpinsDto, actorUserId: string) {
     const expiresAt = new Date(dto.expiresAt);
     if (expiresAt <= new Date()) throw new BadRequestException('E-PIN expiry must be in the future');
-    if (dto.seasonId) await this.requireSeason(dto.seasonId);
+    const season = await this.requireSeason(dto.seasonId);
+    if (season.status !== 'ACTIVE') {
+      throw new ConflictException('E-PINs can only be generated for an active season');
+    }
+    const currencyCode = season.currencyCode?.trim().toUpperCase();
+    const registrationFee = Number(season.registrationFee ?? NaN);
+    const installmentAmount = Number(season.installmentAmount ?? NaN);
+    if (
+      !currencyCode ||
+      !Number.isFinite(registrationFee) ||
+      registrationFee < 0 ||
+      !Number.isFinite(installmentAmount) ||
+      installmentAmount <= 0
+    ) {
+      throw new ConflictException('Season commercial values are incomplete for E-PIN generation');
+    }
+    const pinType = dto.pinType ?? 'ACTIVATION';
+    const registrationFeeSnapshot = pinType === 'ACTIVATION' ? registrationFee : 0;
     const assigned = dto.assignUserReference ? await this.resolveUser(dto.assignUserReference) : null;
-    const generated: { id: string; pin: string; expiresAt: Date }[] = [];
+    const generated: { id: string; pin: string; expiresAt: Date; pinType: string }[] = [];
     for (let index = 0; index < dto.quantity; index += 1) {
       const id = randomUUID();
       const raw = this.readableSecret('MGC-PIN');
       await this.db.execute(
         `INSERT INTO owner_epins
-         (id, pinHash, displaySuffix, seasonId, assignedUserId, status, expiresAt, createdByUserId)
-         VALUES (?, ?, ?, ?, ?, 'ACTIVE', ?, ?)`,
-        [id, this.secretHash('epin', raw), raw.slice(-6), dto.seasonId ?? null, assigned?.id ?? null, expiresAt, actorUserId],
+         (id, pinHash, displaySuffix, seasonId, pinType, assignedUserId, status, expiresAt,
+          currencyCodeSnapshot, registrationFeeSnapshot, installmentAmountSnapshot, createdByUserId)
+         VALUES (?, ?, ?, ?, ?, ?, 'ACTIVE', ?, ?, ?, ?, ?)`,
+        [
+          id,
+          this.secretHash('epin', raw),
+          raw.slice(-6),
+          season.id,
+          pinType,
+          assigned?.id ?? null,
+          expiresAt,
+          currencyCode,
+          registrationFeeSnapshot.toFixed(2),
+          installmentAmount.toFixed(2),
+          actorUserId,
+        ],
       );
-      generated.push({ id, pin: raw, expiresAt });
+      generated.push({ id, pin: raw, expiresAt, pinType });
     }
     await this.audit.log({
       actorUserId,
       action: AuditAction.CREATE,
       entityType: 'OwnerEpinBatch',
-      description: 'E-PIN batch generated',
-      metadata: { quantity: dto.quantity, seasonId: dto.seasonId ?? null, assignedUserId: assigned?.id ?? null },
+      description: 'Typed session-bound E-PIN batch generated',
+      metadata: {
+        quantity: dto.quantity,
+        seasonId: season.id,
+        pinType,
+        assignedUserId: assigned?.id ?? null,
+      },
     });
     return { generated };
   }
@@ -1334,7 +1369,7 @@ export class OwnerPortalService {
 
   private async requireUsableEpin(raw: string) {
     const rows = await this.rows<{ id: string; assignedUserId: string | null; expiresAt: Date }>(
-      "SELECT id, assignedUserId, expiresAt FROM owner_epins WHERE pinHash=? AND status='ACTIVE' LIMIT 1",
+      "SELECT id, assignedUserId, expiresAt FROM owner_epins WHERE pinHash=? AND pinType='ACTIVATION' AND status='ACTIVE' LIMIT 1",
       [this.secretHash('epin', raw)],
     );
     const row = rows[0];
@@ -1348,7 +1383,8 @@ export class OwnerPortalService {
     const changed = await this.db.transaction(async (connection) => {
       const result = (await connection.query(
         `UPDATE owner_epins SET status='USED', usedByUserId=?, usedAt=CURRENT_TIMESTAMP(3)
-         WHERE pinHash=? AND status='ACTIVE' AND expiresAt>CURRENT_TIMESTAMP(3) AND assignedUserId IS NULL`,
+         WHERE pinHash=? AND pinType='ACTIVATION' AND status='ACTIVE'
+           AND expiresAt>CURRENT_TIMESTAMP(3) AND assignedUserId IS NULL`,
         [userId, hash],
       )) as { affectedRows?: number };
       return Number(result.affectedRows ?? 0);
