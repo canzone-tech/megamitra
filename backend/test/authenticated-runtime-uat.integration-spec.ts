@@ -434,7 +434,12 @@ describe('MegaGoldenClub authenticated runtime UAT', () => {
       const epinBatch = await request('/admin/owner-portal/epins', {
         method: 'POST',
         headers: adminHeaders,
-        body: JSON.stringify({ quantity: 7, expiresAt: expiry }),
+        body: JSON.stringify({
+          seasonId: paidRegistration.seasonId,
+          pinType: 'ACTIVATION',
+          quantity: 7,
+          expiresAt: expiry,
+        }),
       });
       expect(epinBatch.status).toBe(201);
       const epins = epinBatch.body.generated as GeneratedEpin[];
