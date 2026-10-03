@@ -510,27 +510,33 @@ export class MemberRegistrationService {
     tx: Parameters<Parameters<PrismaService['$transaction']>[0]>[0],
     userId: string,
     epin: EpinRow,
+    catchUpEpins: EpinRow[],
+    requiredInstallmentCount: number,
     occurredAt: Date,
   ): Promise<ActivationResult> {
     const enrollmentId = randomUUID();
-    const paymentAttemptId = randomUUID();
-    const paymentRecordId = randomUUID();
     const registrationFee = Number(epin.registrationFeeSnapshot);
     const installmentAmount = Number(epin.installmentAmountSnapshot);
-    const paidAmount = registrationFee + installmentAmount;
-    if (!Number.isFinite(paidAmount) || paidAmount <= 0) {
+    const activationPaidAmount = registrationFee + installmentAmount;
+    if (!Number.isFinite(activationPaidAmount) || activationPaidAmount <= 0) {
       throw new ConflictException('E-PIN paid activation amount is invalid');
     }
+    if (catchUpEpins.length !== Math.max(0, requiredInstallmentCount - 1)) {
+      throw new ConflictException('Catch-up E-PIN count no longer matches the session calendar');
+    }
+
     const enrollmentDate = occurredAt.toISOString().slice(0, 10);
     const seasonStartDate = this.dateOnly(epin.seasonStartDate!);
     const seasonStartAt = new Date(`${seasonStartDate}T00:00:00.000Z`);
     const enrollmentSource = `epin-enrollment:${epin.id}`;
     const enrollmentFingerprint = this.fingerprint({
       epinId: epin.id,
+      catchUpEpinIds: catchUpEpins.map((item) => item.id),
       userId,
       programVersionId: epin.programVersionId,
       registrationFee: this.money(registrationFee),
       installmentAmount: this.money(installmentAmount),
+      requiredInstallmentCount,
     });
 
     await tx.$executeRawUnsafe(
@@ -550,8 +556,10 @@ export class MemberRegistrationService {
         source: 'SESSION_BOUND_EPIN',
         seasonId: epin.seasonId,
         epinId: epin.id,
+        catchUpEpinIds: catchUpEpins.map((item) => item.id),
         rules: epin.eligibilityRules ?? {},
         seasonStartDate,
+        requiredInstallmentCount,
       }),
       epin.currencyCodeSnapshot,
       this.money(registrationFee),
@@ -561,10 +569,12 @@ export class MemberRegistrationService {
       JSON.stringify({
         seasonId: epin.seasonId,
         epinId: epin.id,
+        catchUpEpinIds: catchUpEpins.map((item) => item.id),
         paymentSubmissionId: epin.paymentSubmissionId,
         paidActivation: true,
         seasonStartDate,
         installmentScheduleAnchor: 'SEASON_START',
+        requiredInstallmentCount,
       }),
       userId,
     );
@@ -591,53 +601,84 @@ export class MemberRegistrationService {
       );
     }
 
-    const providerReference = epin.paymentSubmissionId ?? epin.id;
-    await tx.$executeRawUnsafe(
-      `INSERT INTO program_payment_attempts
-       (id, sourceKey, requestFingerprint, enrollmentId, amount, currencyCode, provider,
-        providerReference, status, initiatedAt, finalizedAt, metadata, createdByUserId)
-       VALUES (?, ?, ?, ?, ?, ?, 'EPIN_PREPAID', ?, 'CONFIRMED', ?, ?, ?, ?)`,
-      paymentAttemptId,
-      `epin-activation-payment:${epin.id}`,
-      this.fingerprint({ epinId: epin.id, enrollmentId, paidAmount: this.money(paidAmount) }),
-      enrollmentId,
-      this.money(paidAmount),
-      epin.currencyCodeSnapshot,
-      providerReference,
-      occurredAt,
-      occurredAt,
-      JSON.stringify({ seasonId: epin.seasonId, epinId: epin.id, paymentSubmissionId: epin.paymentSubmissionId }),
-      userId,
-    );
-    await tx.$executeRawUnsafe(
-      `INSERT INTO program_payment_records
-       (id, sourceKey, requestFingerprint, paymentAttemptId, enrollmentId, amount, currencyCode,
-        provider, providerReference, occurredAt, metadata, createdByUserId)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'EPIN_PREPAID', ?, ?, ?, ?)`,
-      paymentRecordId,
-      `epin-activation-payment:${epin.id}:confirmed`,
-      this.fingerprint({ epinId: epin.id, paymentAttemptId, confirmed: true }),
-      paymentAttemptId,
-      enrollmentId,
-      this.money(paidAmount),
-      epin.currencyCodeSnapshot,
-      providerReference,
-      occurredAt,
-      JSON.stringify({ seasonId: epin.seasonId, epinId: epin.id, paidActivation: true }),
-      userId,
-    );
-    if (registrationFee > 0) {
+    const paymentRecordIds: string[] = [];
+    const createEpinPayment = async (
+      paymentEpin: EpinRow,
+      sequence: number,
+      amount: number,
+      includeRegistrationFee: boolean,
+    ) => {
+      const paymentAttemptId = randomUUID();
+      const paymentRecordId = randomUUID();
+      const sourcePrefix =
+        sequence === 1
+          ? `epin-activation-payment:${paymentEpin.id}`
+          : `epin-catchup-payment:${paymentEpin.id}`;
+      const providerReference = paymentEpin.paymentSubmissionId ?? paymentEpin.id;
       await tx.$executeRawUnsafe(
-        `INSERT INTO program_payment_allocations
-         (id, paymentRecordId, enrollmentId, allocationType, installmentId, amount)
-         VALUES (?, ?, ?, 'REGISTRATION_FEE', NULL, ?)`,
-        randomUUID(),
-        paymentRecordId,
+        `INSERT INTO program_payment_attempts
+         (id, sourceKey, requestFingerprint, enrollmentId, amount, currencyCode, provider,
+          providerReference, status, initiatedAt, finalizedAt, metadata, createdByUserId)
+         VALUES (?, ?, ?, ?, ?, ?, 'EPIN_PREPAID', ?, 'CONFIRMED', ?, ?, ?, ?)`,
+        paymentAttemptId,
+        sourcePrefix,
+        this.fingerprint({
+          epinId: paymentEpin.id,
+          enrollmentId,
+          amount: this.money(amount),
+          installmentSequence: sequence,
+        }),
         enrollmentId,
-        this.money(registrationFee),
+        this.money(amount),
+        epin.currencyCodeSnapshot,
+        providerReference,
+        occurredAt,
+        occurredAt,
+        JSON.stringify({
+          seasonId: epin.seasonId,
+          epinId: paymentEpin.id,
+          pinType: paymentEpin.pinType,
+          paymentSubmissionId: paymentEpin.paymentSubmissionId,
+          installmentSequence: sequence,
+          catchUp: sequence > 1,
+        }),
+        userId,
       );
-    }
-    if (installmentAmount > 0) {
+      await tx.$executeRawUnsafe(
+        `INSERT INTO program_payment_records
+         (id, sourceKey, requestFingerprint, paymentAttemptId, enrollmentId, amount, currencyCode,
+          provider, providerReference, occurredAt, metadata, createdByUserId)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'EPIN_PREPAID', ?, ?, ?, ?)`,
+        paymentRecordId,
+        `${sourcePrefix}:confirmed`,
+        this.fingerprint({ epinId: paymentEpin.id, paymentAttemptId, confirmed: true }),
+        paymentAttemptId,
+        enrollmentId,
+        this.money(amount),
+        epin.currencyCodeSnapshot,
+        providerReference,
+        occurredAt,
+        JSON.stringify({
+          seasonId: epin.seasonId,
+          epinId: paymentEpin.id,
+          pinType: paymentEpin.pinType,
+          paidActivation: sequence === 1,
+          catchUp: sequence > 1,
+          installmentSequence: sequence,
+        }),
+        userId,
+      );
+      if (includeRegistrationFee && registrationFee > 0) {
+        await tx.$executeRawUnsafe(
+          `INSERT INTO program_payment_allocations
+           (id, paymentRecordId, enrollmentId, allocationType, installmentId, amount)
+           VALUES (?, ?, ?, 'REGISTRATION_FEE', NULL, ?)`,
+          randomUUID(),
+          paymentRecordId,
+          enrollmentId,
+          this.money(registrationFee),
+        );
+      }
       await tx.$executeRawUnsafe(
         `INSERT INTO program_payment_allocations
          (id, paymentRecordId, enrollmentId, allocationType, installmentId, amount)
@@ -645,8 +686,44 @@ export class MemberRegistrationService {
         randomUUID(),
         paymentRecordId,
         enrollmentId,
-        installmentIds[0],
+        installmentIds[sequence - 1],
         this.money(installmentAmount),
+      );
+      await tx.$executeRawUnsafe(
+        `INSERT INTO program_business_events
+         (id, sourceKey, type, enrollmentId, paymentRecordId, occurredAt, payload)
+         VALUES (?, ?, 'PAYMENT_CONFIRMED', ?, ?, ?, ?)`,
+        randomUUID(),
+        `PROGRAM_PAYMENT:${paymentRecordId}:CONFIRMED`,
+        enrollmentId,
+        paymentRecordId,
+        occurredAt,
+        JSON.stringify({
+          paymentAttemptId,
+          amount: this.money(amount),
+          currencyCode: epin.currencyCodeSnapshot,
+          paidActivation: sequence === 1,
+          catchUp: sequence > 1,
+          registrationFeePaid: includeRegistrationFee,
+          installmentSequence: sequence,
+        }),
+      );
+      paymentRecordIds.push(paymentRecordId);
+      return paymentRecordId;
+    };
+
+    const paymentRecordId = await createEpinPayment(
+      epin,
+      1,
+      activationPaidAmount,
+      true,
+    );
+    for (let index = 0; index < catchUpEpins.length; index += 1) {
+      await createEpinPayment(
+        catchUpEpins[index],
+        index + 2,
+        installmentAmount,
+        false,
       );
     }
 
@@ -662,39 +739,26 @@ export class MemberRegistrationService {
         source: 'SESSION_BOUND_EPIN',
         seasonId: epin.seasonId,
         epinId: epin.id,
+        catchUpEpinIds: catchUpEpins.map((item) => item.id),
         activationAt: occurredAt.toISOString(),
         seasonStartDate,
         installmentScheduleAnchor: 'SEASON_START',
-      }),
-    );
-    await tx.$executeRawUnsafe(
-      `INSERT INTO program_business_events
-       (id, sourceKey, type, enrollmentId, paymentRecordId, occurredAt, payload)
-       VALUES (?, ?, 'PAYMENT_CONFIRMED', ?, ?, ?, ?)`,
-      randomUUID(),
-      `PROGRAM_PAYMENT:${paymentRecordId}:CONFIRMED`,
-      enrollmentId,
-      paymentRecordId,
-      occurredAt,
-      JSON.stringify({
-        paymentAttemptId,
-        amount: this.money(paidAmount),
-        currencyCode: epin.currencyCodeSnapshot,
-        paidActivation: true,
-        registrationFeePaid: true,
-        firstInstallmentPaid: true,
+        requiredInstallmentCount,
       }),
     );
 
     return {
       enrollmentId,
       paymentRecordId,
+      paymentRecordIds,
       seasonId: epin.seasonId!,
       referralPolicyVersionId: epin.referralPolicyVersionId,
       currencyCode: epin.currencyCodeSnapshot!,
-      paidAmount: this.money(paidAmount),
+      paidAmount: this.money(activationPaidAmount),
       epinId: epin.id,
       seasonStartDate,
+      requiredInstallmentCount,
+      catchUpInstallmentCount: catchUpEpins.length,
     };
   }
 
