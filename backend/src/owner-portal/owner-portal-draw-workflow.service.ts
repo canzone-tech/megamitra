@@ -223,6 +223,349 @@ export class OwnerPortalDrawWorkflowService {
     return this.portal.drawRun(runId);
   }
 
+  async recordExternalWinner(
+    runId: string,
+    dto: RecordExternalDrawWinnerDto,
+    actorUserId: string,
+  ) {
+    const recorded = await this.db.transaction(async (connection) => {
+      const runRows = await connection.query<Array<DrawRunRow & {
+        engineStatus: string;
+        snapshotHash: string | null;
+        drawAt: Date;
+      }>>(
+        `SELECT odr.id, odr.seasonId, odr.monthNumber, odr.policyId, odr.policyVersionId,
+                odr.drawId, odr.status, odr.selectionMode,
+                ldi.status AS engineStatus, ldi.snapshotHash, ldi.drawAt
+         FROM owner_draw_runs odr
+         JOIN lucky_draw_instances ldi ON ldi.id=odr.drawId
+         WHERE odr.id=? FOR UPDATE`,
+        [runId],
+      );
+      const run = runRows[0];
+      if (!run) throw new NotFoundException('Draw run not found');
+      if (run.selectionMode !== 'MANUAL_EXTERNAL') {
+        throw new ConflictException('External winners can only be recorded for a manual external draw');
+      }
+      if (run.status !== 'ELIGIBILITY_LOCKED' || run.engineStatus !== 'SNAPSHOTTED') {
+        throw new ConflictException('Lock eligibility before recording external draw winners');
+      }
+      if (!run.snapshotHash) throw new ConflictException('Lucky draw snapshot hash is missing');
+      if (new Date(run.drawAt).getTime() > Date.now()) {
+        throw new ConflictException('External draw winners cannot be recorded before the scheduled draw time');
+      }
+
+      const tierRows = await connection.query<Array<{
+        id: string;
+        tierOrder: number;
+        code: string;
+        name: string;
+        winnerCount: number;
+      }>>(
+        `SELECT id, tierOrder, code, name, winnerCount
+         FROM lucky_draw_prize_tiers
+         WHERE policyVersionId=? AND code=? LIMIT 1 FOR UPDATE`,
+        [run.policyVersionId, dto.prizeCode.trim().toUpperCase()],
+      );
+      const tier = tierRows[0];
+      if (!tier) throw new NotFoundException('Prize tier not found for this draw');
+
+      const tierCountRows = await connection.query<Array<{ count: number | string | bigint }>>(
+        'SELECT COUNT(*) AS count FROM lucky_draw_winners WHERE drawId=? AND prizeTierId=?',
+        [run.drawId, tier.id],
+      );
+      const tierCount = Number(tierCountRows[0]?.count ?? 0);
+      if (tierCount >= Number(tier.winnerCount)) {
+        throw new ConflictException(`${tier.name} already has all configured winners`);
+      }
+
+      const entryRows = await connection.query<Array<{
+        id: string;
+        userId: string;
+        drawToken: string;
+        entrySequence: number | null;
+      }>>(
+        `SELECT id, userId, drawToken, entrySequence
+         FROM lucky_draw_entries
+         WHERE drawId=? AND drawToken=? AND disposition='ELIGIBLE'
+         LIMIT 1 FOR UPDATE`,
+        [run.drawId, dto.drawToken],
+      );
+      const entry = entryRows[0];
+      if (!entry) {
+        throw new BadRequestException('Draw token is not an eligible token in this locked draw');
+      }
+
+      const duplicateRows = await connection.query<Array<{ id: string }>>(
+        `SELECT id FROM lucky_draw_winners
+         WHERE drawId=? AND (entryId=? OR userId=?) LIMIT 1 FOR UPDATE`,
+        [run.drawId, entry.id, entry.userId],
+      );
+      if (duplicateRows[0]) {
+        throw new ConflictException('This member is already recorded as a winner in this draw');
+      }
+
+      const rankRows = await connection.query<Array<{ nextRank: number | string | bigint }>>(
+        'SELECT COALESCE(MAX(overallRank), 0) + 1 AS nextRank FROM lucky_draw_winners WHERE drawId=?',
+        [run.drawId],
+      );
+      const overallRank = Number(rankRows[0]?.nextRank ?? 1);
+      const tierWinnerPosition = tierCount + 1;
+      const selectionScore = createHash('sha256')
+        .update([
+          'MANUAL_EXTERNAL_V1',
+          runId,
+          run.drawId,
+          run.snapshotHash,
+          entry.id,
+          entry.drawToken,
+          tier.id,
+          String(tierWinnerPosition),
+        ].join('|'))
+        .digest('hex');
+      const winnerId = randomUUID();
+      const outcomeSnapshot = {
+        policyVersionId: run.policyVersionId,
+        policyId: run.policyId,
+        snapshotHash: run.snapshotHash,
+        selectionAlgorithm: 'MANUAL_EXTERNAL_V1',
+        selectionMode: 'MANUAL_EXTERNAL',
+        entrySequence: entry.entrySequence,
+        drawToken: entry.drawToken,
+        prizeTier: {
+          id: tier.id,
+          tierOrder: Number(tier.tierOrder),
+          code: tier.code,
+          name: tier.name,
+        },
+        recordedByUserId: actorUserId,
+      };
+      await connection.query(
+        `INSERT INTO lucky_draw_winners
+           (id, drawId, entryId, userId, prizeTierId, overallRank, tierWinnerPosition,
+            selectionScore, outcomeSnapshot, createdAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP(3))`,
+        [
+          winnerId,
+          run.drawId,
+          entry.id,
+          entry.userId,
+          tier.id,
+          overallRank,
+          tierWinnerPosition,
+          selectionScore,
+          JSON.stringify(outcomeSnapshot),
+        ],
+      );
+      return {
+        winnerId,
+        drawToken: entry.drawToken,
+        prizeCode: tier.code,
+        prizeName: tier.name,
+        tierWinnerPosition,
+      };
+    });
+
+    await this.audit.log({
+      actorUserId,
+      action: AuditAction.CREATE,
+      entityType: 'OwnerExternalDrawWinner',
+      entityId: recorded.winnerId,
+      description: 'External draw winner recorded against locked eligible token',
+      metadata: {
+        drawRunId: runId,
+        drawToken: recorded.drawToken,
+        prizeCode: recorded.prizeCode,
+        prizeName: recorded.prizeName,
+        tierWinnerPosition: recorded.tierWinnerPosition,
+      },
+    });
+    return this.portal.drawRun(runId);
+  }
+
+  async removeExternalWinner(
+    runId: string,
+    winnerId: string,
+    actorUserId: string,
+  ) {
+    const removed = await this.db.transaction(async (connection) => {
+      const runRows = await connection.query<DrawRunRow[]>(
+        'SELECT id, seasonId, monthNumber, policyId, policyVersionId, drawId, status, selectionMode FROM owner_draw_runs WHERE id=? FOR UPDATE',
+        [runId],
+      );
+      const run = runRows[0];
+      if (!run) throw new NotFoundException('Draw run not found');
+      if (run.selectionMode !== 'MANUAL_EXTERNAL' || run.status !== 'ELIGIBILITY_LOCKED') {
+        throw new ConflictException('External winners can only be changed before manual selection is finalized');
+      }
+      const winnerRows = await connection.query<Array<{
+        id: string;
+        drawToken: string | null;
+        prizeCode: string;
+        prizeName: string;
+      }>>(
+        `SELECT w.id, e.drawToken, t.code AS prizeCode, t.name AS prizeName
+         FROM lucky_draw_winners w
+         JOIN lucky_draw_entries e ON e.id=w.entryId
+         JOIN lucky_draw_prize_tiers t ON t.id=w.prizeTierId
+         WHERE w.id=? AND w.drawId=? LIMIT 1 FOR UPDATE`,
+        [winnerId, run.drawId],
+      );
+      const winner = winnerRows[0];
+      if (!winner) throw new NotFoundException('External winner not found for this draw');
+      await connection.query('DELETE FROM lucky_draw_winners WHERE id=?', [winnerId]);
+      return winner;
+    });
+
+    await this.audit.log({
+      actorUserId,
+      action: AuditAction.UPDATE,
+      entityType: 'OwnerExternalDrawWinner',
+      entityId: winnerId,
+      description: 'External draw winner removed before finalization',
+      metadata: {
+        drawRunId: runId,
+        drawToken: removed.drawToken,
+        prizeCode: removed.prizeCode,
+        prizeName: removed.prizeName,
+      },
+    });
+    return this.portal.drawRun(runId);
+  }
+
+  async finalizeExternalDraw(
+    runId: string,
+    dto: FinalizeExternalDrawDto,
+    actorUserId: string,
+  ) {
+    const finalized = await this.db.transaction(async (connection) => {
+      const runRows = await connection.query<Array<DrawRunRow & {
+        engineStatus: string;
+        eligibleEntryCount: number;
+        drawAt: Date;
+      }>>(
+        `SELECT odr.id, odr.seasonId, odr.monthNumber, odr.policyId, odr.policyVersionId,
+                odr.drawId, odr.status, odr.selectionMode,
+                ldi.status AS engineStatus, ldi.eligibleEntryCount, ldi.drawAt
+         FROM owner_draw_runs odr
+         JOIN lucky_draw_instances ldi ON ldi.id=odr.drawId
+         WHERE odr.id=? FOR UPDATE`,
+        [runId],
+      );
+      const run = runRows[0];
+      if (!run) throw new NotFoundException('Draw run not found');
+      if (run.selectionMode !== 'MANUAL_EXTERNAL') {
+        throw new ConflictException('Only manual external draws can be finalized here');
+      }
+      if (run.status !== 'ELIGIBILITY_LOCKED' || run.engineStatus !== 'SNAPSHOTTED') {
+        throw new ConflictException('Manual selection must be open on a locked draw');
+      }
+      if (new Date(run.drawAt).getTime() > Date.now()) {
+        throw new ConflictException('External draw cannot be finalized before the scheduled draw time');
+      }
+
+      const tiers = await connection.query<Array<{
+        id: string;
+        tierOrder: number;
+        code: string;
+        name: string;
+        winnerCount: number;
+      }>>(
+        `SELECT id, tierOrder, code, name, winnerCount
+         FROM lucky_draw_prize_tiers
+         WHERE policyVersionId=? ORDER BY tierOrder ASC FOR UPDATE`,
+        [run.policyVersionId],
+      );
+      if (!tiers.length) throw new ConflictException('Lucky draw policy has no prize tiers');
+
+      const winnerCounts = await connection.query<Array<{
+        prizeTierId: string;
+        selectedCount: number | string | bigint;
+      }>>(
+        `SELECT prizeTierId, COUNT(*) AS selectedCount
+         FROM lucky_draw_winners WHERE drawId=? GROUP BY prizeTierId`,
+        [run.drawId],
+      );
+      const selectedByTier = new Map(
+        winnerCounts.map((row) => [row.prizeTierId, Number(row.selectedCount)]),
+      );
+      const configuredWinnerCount = tiers.reduce(
+        (sum, tier) => sum + Number(tier.winnerCount),
+        0,
+      );
+      const targetWinnerCount = Math.min(
+        configuredWinnerCount,
+        Number(run.eligibleEntryCount),
+      );
+
+      let remaining = targetWinnerCount;
+      for (const tier of tiers) {
+        const expected = Math.min(Number(tier.winnerCount), remaining);
+        const selected = selectedByTier.get(tier.id) ?? 0;
+        if (selected !== expected) {
+          throw new ConflictException(
+            `${tier.name} requires ${expected} recorded winner(s) before external draw finalization; currently ${selected}`,
+          );
+        }
+        remaining -= expected;
+      }
+
+      const selectedTotal = [...selectedByTier.values()].reduce((sum, count) => sum + count, 0);
+      if (selectedTotal !== targetWinnerCount) {
+        throw new ConflictException(
+          `External draw requires ${targetWinnerCount} winner(s); currently ${selectedTotal} are recorded`,
+        );
+      }
+
+      await connection.query(
+        `UPDATE lucky_draw_instances
+         SET status='DRAWN', selectionAlgorithm='MANUAL_EXTERNAL_V1', winnerCount=?,
+             drawnAt=CURRENT_TIMESTAMP(3), updatedAt=CURRENT_TIMESTAMP(3)
+         WHERE id=? AND status='SNAPSHOTTED'`,
+        [selectedTotal, run.drawId],
+      );
+      await connection.query(
+        `UPDATE owner_draw_runs
+         SET status='SELECTED', externalDrawReference=?, externalDrawNote=?,
+             externalDrawFinalizedAt=CURRENT_TIMESTAMP(3), externalDrawRecordedByUserId=?
+         WHERE id=?`,
+        [
+          dto.externalReference.trim(),
+          dto.note?.trim() || null,
+          actorUserId,
+          runId,
+        ],
+      );
+      await connection.query(
+        `INSERT IGNORE INTO owner_winner_verifications
+           (winnerId, drawRunId, eligibilityStatus, identityStatus, paymentStatus, status)
+         SELECT w.id, ?, 'PASS', 'PENDING', 'PASS', 'PENDING'
+         FROM lucky_draw_winners w WHERE w.drawId=?`,
+        [runId, run.drawId],
+      );
+      return {
+        drawId: run.drawId,
+        winnerCount: selectedTotal,
+        externalReference: dto.externalReference.trim(),
+      };
+    });
+
+    await this.audit.log({
+      actorUserId,
+      action: AuditAction.CREATE,
+      entityType: 'OwnerExternalDrawOutcome',
+      entityId: runId,
+      description: 'Externally conducted draw finalized with prize-mapped winners',
+      metadata: {
+        drawId: finalized.drawId,
+        winnerCount: finalized.winnerCount,
+        externalReference: finalized.externalReference,
+        note: dto.note?.trim() || null,
+      },
+    });
+    return this.portal.drawRun(runId);
+  }
+
   async verifyWinner(
     runId: string,
     winnerId: string,
