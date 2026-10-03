@@ -113,6 +113,8 @@ export class MemberRegistrationService {
       paidActivation: {
         registrationFeeAndFirstInstallmentFromEpin: true,
         sessionBound: true,
+        lateJoinCatchUpMode: 'SESSION_CALENDAR',
+        installmentEpinRequiredForEachCatchUpMonth: true,
       },
     };
   }
@@ -807,13 +809,29 @@ export class MemberRegistrationService {
     const seasonStartDate = this.dateOnly(epin.seasonStartDate!);
     const seasonStartAt = new Date(`${seasonStartDate}T00:00:00.000Z`);
     const businessDate = this.businessDate(occurredAt, epin.drawTimezone || 'Asia/Kolkata');
+    const intervalUnit = epin.installmentIntervalUnit ?? 'MONTH';
+    const intervalCount = Math.max(1, Number(epin.installmentIntervalCount ?? 1));
+
+    if (intervalUnit === 'MONTH') {
+      const [businessYear, businessMonth] = businessDate.split('-').map(Number);
+      const startYear = seasonStartAt.getUTCFullYear();
+      const startMonth = seasonStartAt.getUTCMonth() + 1;
+      const monthDifference =
+        (businessYear - startYear) * 12 + (businessMonth - startMonth);
+      if (monthDifference < 0) return 1;
+      return Math.min(
+        installmentCount,
+        Math.max(1, Math.floor(monthDifference / intervalCount) + 1),
+      );
+    }
+
     let required = 1;
     for (let sequence = 1; sequence <= installmentCount; sequence += 1) {
       const dueDate = this.installmentDueDate(
         seasonStartAt,
         Number(epin.firstInstallmentOffsetDays ?? 0),
-        epin.installmentIntervalUnit ?? 'MONTH',
-        Number(epin.installmentIntervalCount ?? 1),
+        intervalUnit,
+        intervalCount,
         sequence,
       );
       if (dueDate <= businessDate) required = sequence;
