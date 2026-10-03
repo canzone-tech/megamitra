@@ -29,6 +29,7 @@ export const OWNER_NOTIFICATION_AUDIENCES = ['ALL_ACTIVE_MEMBERS', 'SEASON_MEMBE
 export const OWNER_SUPPORT_PRIORITIES = ['NORMAL', 'HIGH', 'URGENT'] as const;
 export const OWNER_SUPPORT_STATUSES = ['OPEN', 'IN_PROGRESS', 'RESOLVED', 'CLOSED'] as const;
 export const OWNER_AUTH_PURPOSES = ['PAYMENT_AUTHORIZATION', 'WINNER_APPROVAL', 'SEASON_CHANGE', 'EPIN_OPERATION'] as const;
+export const OWNER_DRAW_SELECTION_MODES = ['AUTO', 'MANUAL_EXTERNAL'] as const;
 
 export class CreateOwnerMemberDto {
   @IsOptional() @IsString() @MinLength(3) username?: string;
@@ -91,6 +92,17 @@ export class PrepareOwnerDrawDto {
   @IsISO8601() entryWindowEnd!: string;
   @IsISO8601() drawAt!: string;
   @IsInt() @Min(0) @Max(36500) claimWindowDays!: number;
+  @IsOptional() @IsIn(OWNER_DRAW_SELECTION_MODES) selectionMode?: (typeof OWNER_DRAW_SELECTION_MODES)[number];
+}
+
+export class RecordExternalDrawWinnerDto {
+  @IsString() @Matches(/^\d{5}$/) drawToken!: string;
+  @IsString() @Length(1, 50) prizeCode!: string;
+}
+
+export class FinalizeExternalDrawDto {
+  @IsString() @Length(1, 191) externalReference!: string;
+  @IsOptional() @IsString() @MaxLength(1000) note?: string;
 }
 
 export class VerifyOwnerWinnerDto {
