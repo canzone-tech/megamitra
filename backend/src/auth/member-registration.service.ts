@@ -11,6 +11,7 @@ import { AuditService } from '../audit/audit.service';
 import { CaptchaService } from '../captcha/captcha.service';
 import { PrismaService } from '../database/prisma.service';
 import { GenealogyService } from '../genealogy/genealogy.service';
+import { LuckyDrawTokenService } from '../lucky-draw/lucky-draw-token.service';
 import {
   AuditAction,
   PasswordCreationMode,
@@ -43,7 +44,7 @@ type EpinRow = {
   registrationFeeSnapshot: string | null;
   installmentAmountSnapshot: string | null;
   seasonStatus: string | null;
-  registrationClosesAt: Date | null;
+  seasonStartDate: Date | string | null;
   programVersionId: string | null;
   referralPolicyVersionId: string | null;
   programLifecycle: string | null;
@@ -64,6 +65,7 @@ type ActivationResult = {
   currencyCode: string;
   paidAmount: string;
   epinId: string;
+  seasonStartDate: string;
 };
 
 @Injectable()
@@ -77,6 +79,7 @@ export class MemberRegistrationService {
     private readonly recovery: AuthRecoveryService,
     private readonly genealogy: GenealogyService,
     private readonly referralRewards: ReferralRewardService,
+    private readonly drawTokens: LuckyDrawTokenService,
   ) {}
 
   async registrationConfig() {
@@ -200,7 +203,7 @@ export class MemberRegistrationService {
           `SELECT e.id, e.status, e.assignedUserId, e.expiresAt, e.seasonId,
                   e.paymentSubmissionId, e.currencyCodeSnapshot, e.registrationFeeSnapshot,
                   e.installmentAmountSnapshot, s.status AS seasonStatus,
-                  s.registrationClosesAt, s.programVersionId, s.referralPolicyVersionId,
+                  s.startDate AS seasonStartDate, s.programVersionId, s.referralPolicyVersionId,
                   pv.lifecycle AS programLifecycle, pv.currencyCode AS programCurrencyCode,
                   pv.installmentCount, pv.installmentIntervalUnit, pv.installmentIntervalCount,
                   pv.firstInstallmentOffsetDays, pv.gracePeriodDays, pv.eligibilityRules
@@ -289,6 +292,30 @@ export class MemberRegistrationService {
       });
 
       const placement = await this.autoPlaceWithRetry(registered.user.id, sponsor.id);
+      let installmentDrawTokens: Array<{
+        token: string;
+        installmentSequence: number | null;
+        status: string;
+        drawId: string | null;
+        entryId: string | null;
+      }> = [];
+      try {
+        installmentDrawTokens = await this.drawTokens.ensurePaymentRecordInstallmentTokens(
+          registered.activation.paymentRecordId,
+        );
+      } catch (error) {
+        await this.audit.log({
+          actorUserId: registered.user.id,
+          action: AuditAction.UPDATE,
+          entityType: 'ProgramEnrollment',
+          entityId: registered.activation.enrollmentId,
+          description: 'Paid registration draw token allocation requires reconciliation',
+          metadata: {
+            paymentRecordId: registered.activation.paymentRecordId,
+            reason: error instanceof Error ? error.message.slice(0, 500) : 'Unknown token allocation error',
+          },
+        });
+      }
       let referralRewardId: string | null = null;
       if (registered.activation.referralPolicyVersionId) {
         const reward = await this.referralRewards.createEvent(
@@ -346,6 +373,12 @@ export class MemberRegistrationService {
           currencyCode: registered.activation.currencyCode,
           registrationFeePaid: true,
           firstInstallmentPaid: true,
+          seasonStartDate: registered.activation.seasonStartDate,
+          drawTokens: installmentDrawTokens.map((item) => ({
+            token: item.token,
+            installmentSequence: item.installmentSequence,
+            status: item.status,
+          })),
         },
         ...(generatedPassword ? { initialPassword: password } : {}),
       };
@@ -369,9 +402,6 @@ export class MemberRegistrationService {
     ) {
       throw new BadRequestException('E-PIN is not bound to an active published session');
     }
-    if (epin.registrationClosesAt && new Date(epin.registrationClosesAt).getTime() <= now.getTime()) {
-      throw new BadRequestException('Session registration is closed');
-    }
     if (
       !epin.currencyCodeSnapshot ||
       epin.registrationFeeSnapshot === null ||
@@ -384,6 +414,9 @@ export class MemberRegistrationService {
     }
     if (!epin.installmentCount || epin.installmentCount < 1) {
       throw new ConflictException('E-PIN session installment schedule is invalid');
+    }
+    if (!epin.seasonStartDate || !Number.isFinite(new Date(epin.seasonStartDate).getTime())) {
+      throw new ConflictException('E-PIN session start date is invalid');
     }
   }
 
@@ -403,6 +436,8 @@ export class MemberRegistrationService {
       throw new ConflictException('E-PIN paid activation amount is invalid');
     }
     const enrollmentDate = occurredAt.toISOString().slice(0, 10);
+    const seasonStartAt = new Date(`${String(epin.seasonStartDate).slice(0, 10)}T00:00:00.000Z`);
+    const seasonStartDate = seasonStartAt.toISOString().slice(0, 10);
     const enrollmentSource = `epin-enrollment:${epin.id}`;
     const enrollmentFingerprint = this.fingerprint({
       epinId: epin.id,
@@ -430,6 +465,7 @@ export class MemberRegistrationService {
         seasonId: epin.seasonId,
         epinId: epin.id,
         rules: epin.eligibilityRules ?? {},
+        seasonStartDate,
       }),
       epin.currencyCodeSnapshot,
       this.money(registrationFee),
@@ -441,6 +477,8 @@ export class MemberRegistrationService {
         epinId: epin.id,
         paymentSubmissionId: epin.paymentSubmissionId,
         paidActivation: true,
+        seasonStartDate,
+        installmentScheduleAnchor: 'SEASON_START',
       }),
       userId,
     );
@@ -457,7 +495,7 @@ export class MemberRegistrationService {
         enrollmentId,
         sequence,
         this.installmentDueDate(
-          occurredAt,
+          seasonStartAt,
           Number(epin.firstInstallmentOffsetDays ?? 0),
           epin.installmentIntervalUnit ?? 'MONTH',
           Number(epin.installmentIntervalCount ?? 1),
@@ -539,6 +577,8 @@ export class MemberRegistrationService {
         seasonId: epin.seasonId,
         epinId: epin.id,
         activationAt: occurredAt.toISOString(),
+        seasonStartDate,
+        installmentScheduleAnchor: 'SEASON_START',
       }),
     );
     await tx.$executeRawUnsafe(
@@ -568,6 +608,7 @@ export class MemberRegistrationService {
       currencyCode: epin.currencyCodeSnapshot!,
       paidAmount: this.money(paidAmount),
       epinId: epin.id,
+      seasonStartDate,
     };
   }
 
