@@ -270,12 +270,21 @@ export class OwnerPortalDrawWorkflowService {
       const tier = tierRows[0];
       if (!tier) throw new NotFoundException('Prize tier not found for this draw');
 
-      const tierCountRows = await connection.query<Array<{ count: number | string | bigint }>>(
-        'SELECT COUNT(*) AS count FROM lucky_draw_winners WHERE drawId=? AND prizeTierId=?',
+      const tierWinnerRows = await connection.query<Array<{ tierWinnerPosition: number }>>(
+        `SELECT tierWinnerPosition
+         FROM lucky_draw_winners
+         WHERE drawId=? AND prizeTierId=?
+         ORDER BY tierWinnerPosition ASC FOR UPDATE`,
         [run.drawId, tier.id],
       );
-      const tierCount = Number(tierCountRows[0]?.count ?? 0);
-      if (tierCount >= Number(tier.winnerCount)) {
+      const occupiedTierPositions = new Set(
+        tierWinnerRows.map((row) => Number(row.tierWinnerPosition)),
+      );
+      const tierWinnerPosition = Array.from(
+        { length: Number(tier.winnerCount) },
+        (_, index) => index + 1,
+      ).find((position) => !occupiedTierPositions.has(position));
+      if (!tierWinnerPosition) {
         throw new ConflictException(`${tier.name} already has all configured winners`);
       }
 
@@ -310,7 +319,6 @@ export class OwnerPortalDrawWorkflowService {
         [run.drawId],
       );
       const overallRank = Number(rankRows[0]?.nextRank ?? 1);
-      const tierWinnerPosition = tierCount + 1;
       const selectionScore = createHash('sha256')
         .update([
           'MANUAL_EXTERNAL_V1',
