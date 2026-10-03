@@ -281,7 +281,7 @@ describe('MegaGoldenClub owner lucky draw workflow integration', () => {
       seasonId,
       `FEB${suffix}`,
     );
-    secondPrizeCode = `FEB${suffix}`;
+    secondPrizeCode = `FEB${suffix}`.toUpperCase();
   });
 
   afterAll(async () => {
