@@ -1018,7 +1018,7 @@ export class OwnerPortalService {
 
   async listEpins() {
     return this.rows<Record<string, unknown>>(
-      `SELECT e.id, e.displaySuffix, e.status, e.expiresAt, e.usedAt, e.revokedAt, e.createdAt,
+      `SELECT e.id, e.displaySuffix, e.pinType, e.status, e.expiresAt, e.usedAt, e.revokedAt, e.createdAt,
               s.code AS seasonCode, s.name AS seasonName,
               assigned.username AS assignedUsername, used.username AS usedByUsername
        FROM owner_epins e
