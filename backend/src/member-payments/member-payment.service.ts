@@ -143,7 +143,6 @@ export class MemberPaymentService {
          FROM owner_seasons s
          JOIN program_versions pv ON pv.id=s.programVersionId
          WHERE s.status='ACTIVE' AND pv.lifecycle='PUBLISHED'
-           AND (s.registrationClosesAt IS NULL OR s.registrationClosesAt>CURRENT_TIMESTAMP(3))
          ORDER BY s.startDate ASC, s.createdAt ASC`,
       ),
       this.findEnrollment(userId, false),
@@ -782,7 +781,7 @@ export class MemberPaymentService {
     if (Math.abs(expected - Number(submission.amount)) > 0.001) {
       throw new ConflictException('E-PIN purchase amount no longer matches the submitted commercial snapshot');
     }
-    const expiresAt = await this.resolveRegistrationClose(season);
+    const expiresAt = await this.resolveEpinExpiry(season);
     const generated = await this.db.transaction(async (connection) => {
       const currentRows = await connection.query<SubmissionRow[]>(
         'SELECT * FROM member_payment_submissions WHERE id=? LIMIT 1 FOR UPDATE',
@@ -936,46 +935,19 @@ export class MemberPaymentService {
     if (season.status !== 'ACTIVE' || season.lifecycle !== 'PUBLISHED') {
       throw new ConflictException('Session is not open for paid joining');
     }
-    const close = await this.resolveRegistrationClose(season, false);
-    if (close && close.getTime() <= Date.now()) {
-      throw new ConflictException('Session registration is closed');
-    }
     return season;
   }
 
-  private resolveRegistrationClose(
-    season: SeasonCommercialRow,
-    required?: true,
-  ): Promise<Date>;
-  private resolveRegistrationClose(
-    season: SeasonCommercialRow,
-    required: false,
-  ): Promise<Date | null>;
-  private async resolveRegistrationClose(
-    season: SeasonCommercialRow,
-    required = true,
-  ): Promise<Date | null> {
-    if (season.registrationClosesAt) return new Date(season.registrationClosesAt);
-    const drawRows = await this.rows<{ drawAt: Date }>(
-      `SELECT ldi.drawAt
-       FROM owner_draw_runs odr
-       JOIN lucky_draw_instances ldi ON ldi.id=odr.drawId
-       WHERE odr.seasonId=? AND odr.monthNumber=? LIMIT 1`,
-      [season.id, Number(season.installmentCount)],
-    );
-    if (drawRows[0]?.drawAt) return new Date(drawRows[0].drawAt);
+  private async resolveEpinExpiry(season: SeasonCommercialRow): Promise<Date> {
     if (season.endDate) {
-      const close = new Date(season.endDate);
-      close.setUTCHours(23, 59, 59, 999);
-      return close;
+      const expiry = new Date(season.endDate);
+      expiry.setUTCHours(23, 59, 59, 999);
+      return expiry;
     }
     if (season.effectiveTo) return new Date(season.effectiveTo);
-    if (required) {
-      throw new ConflictException(
-        'Session registration close is not configured; set the session end/registration boundary first',
-      );
-    }
-    return null;
+    throw new ConflictException(
+      'Session end date is required before paid E-PINs can be issued',
+    );
   }
 
   private async resolveActiveMember(reference: string) {
