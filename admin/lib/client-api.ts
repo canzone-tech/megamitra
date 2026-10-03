@@ -14,7 +14,7 @@ export async function apiJson<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(path, {
     ...init,
     headers: {
-      ...(init?.body ? { 'content-type': 'application/json' } : {}),
+      ...(typeof init?.body === 'string' ? { 'content-type': 'application/json' } : {}),
       ...init?.headers,
     },
     cache: 'no-store',
