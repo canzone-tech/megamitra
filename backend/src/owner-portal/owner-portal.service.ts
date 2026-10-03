@@ -1470,16 +1470,37 @@ export class OwnerPortalService {
 
   private formatSeason(row: SeasonRow) {
     const pairValue = Number(row.pairPayoutAmount ?? 0);
+    const totalMonths = Number(row.installmentCount ?? 0);
     return {
       ...row,
+      endDate: row.endDate ?? this.deriveSeasonEndDate(row.startDate, totalMonths),
       monthlyEmi: String(row.installmentAmount ?? '0.00'),
       registrationFee: String(row.registrationFee ?? '0.00'),
-      totalMonths: Number(row.installmentCount ?? 0),
+      totalMonths,
       pairValue: String(row.pairPayoutAmount ?? '0.00'),
       directReferral: String(row.fixedAmount ?? '0.00'),
       dailyCap: pairValue * Number(row.dailyPairCap ?? 0),
       carryForward: Boolean(row.carryForwardEnabled),
     };
+  }
+
+  private deriveSeasonEndDate(startDate: Date | string, totalMonths: number) {
+    if (!Number.isInteger(totalMonths) || totalMonths < 1) return null;
+    const start = startDate instanceof Date
+      ? startDate.toISOString().slice(0, 10)
+      : String(startDate).slice(0, 10);
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(start);
+    if (!match) return null;
+    const year = Number(match[1]);
+    const month = Number(match[2]);
+    const day = Number(match[3]);
+    const parsed = new Date(Date.UTC(year, month - 1, day));
+    if (
+      parsed.getUTCFullYear() !== year ||
+      parsed.getUTCMonth() !== month - 1 ||
+      parsed.getUTCDate() !== day
+    ) return null;
+    return new Date(Date.UTC(year, month - 1 + totalMonths, 0)).toISOString().slice(0, 10);
   }
 
   private validateSeasonMoney(dto: CreateOwnerSeasonDto | UpdateOwnerSeasonDto) {
