@@ -30,7 +30,7 @@ WHERE t.seasonId IS NULL;
 
 ALTER TABLE `lucky_draw_tokens`
   ADD COLUMN `tokenScopeId` CHAR(36)
-    AS (IFNULL(`seasonId`, '00000000-0000-0000-0000-000000000000')) PERSISTENT
+    GENERATED ALWAYS AS (IFNULL(`seasonId`, '00000000-0000-0000-0000-000000000000')) STORED
     AFTER `seasonId`,
   ADD UNIQUE INDEX `lucky_draw_tokens_season_token_key` (`seasonId`, `token`),
   ADD UNIQUE INDEX `lucky_draw_tokens_scope_token_key` (`tokenScopeId`, `token`),
