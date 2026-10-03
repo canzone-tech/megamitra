@@ -145,7 +145,7 @@ export function OwnerMembersPortal({ extension }: { extension?: ReactNode }) {
             {activeTab === 'member-register' ? (
               <div className={styles.card}>
                 <div className={styles.sectionHead}>
-                  <div className={styles.sectionTitle}><span className={styles.sectionIcon}>+</span><h2>Create Member</h2></div>
+                  <div className={styles.sectionTitle}><span className={styles.sectionIcon}>➕</span><h2>Create Member</h2></div>
                   <small>Role is fixed to MEMBER</small>
                 </div>
                 <div className={styles.notice}>Binary 1:4: A/B are Left, C/D are Right. Auto Placement searches A → B → C → D, then continues breadth-first.</div>
@@ -176,7 +176,7 @@ export function OwnerMembersPortal({ extension }: { extension?: ReactNode }) {
             {activeTab === 'member-directory' ? (
               <div className={styles.card}>
                 <div className={styles.sectionHead}>
-                  <div className={styles.sectionTitle}><span className={styles.sectionIcon}>●</span><h2>Member Directory</h2></div>
+                  <div className={styles.sectionTitle}><span className={styles.sectionIcon}>👥</span><h2>Member Directory</h2></div>
                   <small>{members.length} recent MEMBER accounts</small>
                 </div>
                 {members.length ? (

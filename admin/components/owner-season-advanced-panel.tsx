@@ -173,7 +173,7 @@ export function OwnerSeasonAdvancedPanel({ embedded = false }: { embedded?: bool
       <div className={styles.card}>
         <div className={styles.sectionHead}>
           <div className={styles.sectionTitle}>
-            <span className={styles.sectionIcon}>⚙</span>
+            <span className={styles.sectionIcon}>⚙️</span>
             <div><h2>Advanced Season Policy</h2><small>Binary 1:4 fixed topology + lucky draw calendar + payment-event automation</small></div>
           </div>
           <span className={styles.tag}>{rules?.configured ? `${rules.lifecycle ?? 'DRAFT'} AUTOMATIC RULES` : 'CONFIGURATION REQUIRED'}</span>
@@ -199,7 +199,7 @@ export function OwnerSeasonAdvancedPanel({ embedded = false }: { embedded?: bool
             ]}>
               {(activeTab) => <>
                 <div hidden={activeTab !== 'binary-engine'}>
-                  <div className={styles.sectionHead}><div className={styles.sectionTitle}><span className={styles.sectionIcon}>◇</span><h2>Binary 1:4</h2></div><small>Fixed placement and pair lanes</small></div>
+                  <div className={styles.sectionHead}><div className={styles.sectionTitle}><span className={styles.sectionIcon}>🌳</span><h2>Binary 1:4</h2></div><small>Fixed placement and pair lanes</small></div>
                   <div className={styles.summary}>
                     <div><small>SLOT A</small><b>LEFT</b></div>
                     <div><small>SLOT B</small><b>LEFT</b></div>
@@ -216,7 +216,7 @@ export function OwnerSeasonAdvancedPanel({ embedded = false }: { embedded?: bool
                 </div>
 
                 <div hidden={activeTab !== 'draw-calendar'}>
-                  <div className={styles.sectionHead}><div className={styles.sectionTitle}><span className={styles.sectionIcon}>◆</span><h2>Monthly Lucky Draw Calendar</h2></div><small>Calendar recurrence locked into the Season version</small></div>
+                  <div className={styles.sectionHead}><div className={styles.sectionTitle}><span className={styles.sectionIcon}>📅</span><h2>Monthly Lucky Draw Calendar</h2></div><small>Calendar recurrence locked into the Season version</small></div>
                   <div className={styles.notice}><b>Default MegaGoldenClub rule:</b> January start • every month • third Sunday. These calendar values are configurable while the Season is DRAFT or REVIEW. Draw time, eligibility window and claim window remain configurable per prepared draw. Season Setup no longer asks for a fixed “Draw Day”; this recurrence is the authoritative draw calendar.</div>
                   <div className={styles.summary}>
                     <div><small>START MONTH</small><b>{MONTHS[drawSchedule.startMonth - 1] ?? drawSchedule.startMonth}</b></div>
@@ -234,7 +234,7 @@ export function OwnerSeasonAdvancedPanel({ embedded = false }: { embedded?: bool
                 </div>
 
                 <div hidden={activeTab !== 'automatic-rules'}>
-                  <div className={styles.sectionHead}><div className={styles.sectionTitle}><span className={styles.sectionIcon}>↗</span><h2>Automatic Rules on Confirmed Payment</h2></div><small>Versioned and published with Season activation</small></div>
+                  <div className={styles.sectionHead}><div className={styles.sectionTitle}><span className={styles.sectionIcon}>⚡</span><h2>Automatic Rules on Confirmed Payment</h2></div><small>Versioned and published with Season activation</small></div>
                   <div className={styles.fields}>
                     <div className={styles.field}><label>Binary Qualifying Units / Payment</label><input name="binaryUnitsPerEvent" className={styles.input} type="number" min="0" required disabled={!editable} value={rules.binaryUnitsPerEvent} onChange={(event) => patchRules('binaryUnitsPerEvent', Number(event.target.value) || 0)} /></div>
                     <div className={styles.field}><label>Direct Referral Hand-off</label><select name="referralHookEnabled" className={styles.select} disabled={!editable} value={String(rules.referralHookEnabled)} onChange={(event) => patchRules('referralHookEnabled', event.target.value === 'true')}><option value="false">Disabled</option><option value="true">Enabled</option></select></div>

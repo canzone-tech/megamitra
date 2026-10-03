@@ -118,7 +118,7 @@ export function SettingsGovernancePortal() {
       {(activeTab) => <>
         {activeTab === 'general' ? <>
           <section className={styles.card}>
-            <div className={styles.sectionHead}><div className={styles.sectionTitle}><span className={styles.sectionIcon}>⚙</span><h2>Portal Configuration</h2></div><small>Single source for global portal preferences</small></div>
+            <div className={styles.sectionHead}><div className={styles.sectionTitle}><span className={styles.sectionIcon}>⚙️</span><h2>Portal Configuration</h2></div><small>Single source for global portal preferences</small></div>
             <form key={text(settings.updatedAt, 'settings')} method="post" onSubmit={saveSettings}>
               <div className={styles.fields}>
                 <div className={styles.field}><label>Company Name</label><input name="companyName" className={styles.input} required defaultValue={text(settings.companyName, 'MegaGoldenClub')} /></div>
@@ -142,12 +142,12 @@ export function SettingsGovernancePortal() {
         </> : null}
 
         {activeTab === 'security' ? <section style={{ display: 'grid', gap: 18 }}>
-          <div className={styles.sectionHead}><div className={styles.sectionTitle}><span className={styles.sectionIcon}>◇</span><h2>Authentication, Security & Registration</h2></div><small>Platform-wide SuperAdmin configuration</small></div>
+          <div className={styles.sectionHead}><div className={styles.sectionTitle}><span className={styles.sectionIcon}>🔐</span><h2>Authentication, Security & Registration</h2></div><small>Platform-wide SuperAdmin configuration</small></div>
           <PlatformConfigAdmin />
         </section> : null}
 
         {activeTab === 'account' ? <section style={{ display: 'grid', gap: 18 }}>
-          <div className={styles.sectionHead}><div className={styles.sectionTitle}><span className={styles.sectionIcon}>A</span><h2>SuperAdmin Account</h2></div><small>Account-specific actions stay separate from platform policy</small></div>
+          <div className={styles.sectionHead}><div className={styles.sectionTitle}><span className={styles.sectionIcon}>👤</span><h2>SuperAdmin Account</h2></div><small>Account-specific actions stay separate from platform policy</small></div>
           <section className="mm-card">
             <div className="mm-card-head"><div><h2>SuperAdmin account email</h2><p className="mm-note">Change the signed-in SuperAdmin email without mixing this action into registration policy.</p></div><span className="mm-chip warning">ACCOUNT ACTION</span></div>
             <div className="mm-card-body"><AdminEmailChangeForm /></div>
@@ -155,12 +155,12 @@ export function SettingsGovernancePortal() {
         </section> : null}
 
         {activeTab === 'appearance' ? <section style={{ display: 'grid', gap: 18 }}>
-          <div className={styles.sectionHead}><div className={styles.sectionTitle}><span className={styles.sectionIcon}>◐</span><h2>Portal Appearance</h2></div><small>Versioned member portal theme, layout and copy</small></div>
+          <div className={styles.sectionHead}><div className={styles.sectionTitle}><span className={styles.sectionIcon}>🎨</span><h2>Portal Appearance</h2></div><small>Versioned member portal theme, layout and copy</small></div>
           <AppearanceSettingsPanel />
         </section> : null}
 
         {activeTab === 'governance' ? <section className={styles.card}>
-          <div className={styles.sectionHead}><div className={styles.sectionTitle}><span className={styles.sectionIcon}>✓</span><h2>Governance Checklist</h2></div><small>Runtime capability status — unsupported controls are not marked complete.</small></div>
+          <div className={styles.sectionHead}><div className={styles.sectionTitle}><span className={styles.sectionIcon}>✅</span><h2>Governance Checklist</h2></div><small>Runtime capability status — unsupported controls are not marked complete.</small></div>
           {controls.length ? <div className={styles.tableBox}><table className={styles.table}><thead><tr><th>CONTROL</th><th>STATUS</th><th>DETAIL</th></tr></thead><tbody>{controls.map((row) => {
             const status = text(row.status);
             const activeStatus = ['ACTIVE', 'ENFORCED', 'RUNBOOK'].includes(status);
