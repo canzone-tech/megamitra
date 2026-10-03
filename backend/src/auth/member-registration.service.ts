@@ -39,12 +39,16 @@ type EpinRow = {
   assignedUserId: string | null;
   expiresAt: Date;
   seasonId: string | null;
+  pinType: 'ACTIVATION' | 'INSTALLMENT';
   paymentSubmissionId: string | null;
   currencyCodeSnapshot: string | null;
   registrationFeeSnapshot: string | null;
   installmentAmountSnapshot: string | null;
   seasonStatus: string | null;
+  seasonCode: string | null;
+  seasonName: string | null;
   seasonStartDate: Date | string | null;
+  drawTimezone: string | null;
   programVersionId: string | null;
   referralPolicyVersionId: string | null;
   programLifecycle: string | null;
@@ -60,12 +64,15 @@ type EpinRow = {
 type ActivationResult = {
   enrollmentId: string;
   paymentRecordId: string;
+  paymentRecordIds: string[];
   seasonId: string;
   referralPolicyVersionId: string | null;
   currencyCode: string;
   paidAmount: string;
   epinId: string;
   seasonStartDate: string;
+  requiredInstallmentCount: number;
+  catchUpInstallmentCount: number;
 };
 
 @Injectable()
@@ -107,6 +114,31 @@ export class MemberRegistrationService {
         registrationFeeAndFirstInstallmentFromEpin: true,
         sessionBound: true,
       },
+    };
+  }
+
+  async registrationEpinPreview(rawEpin: string) {
+    const value = rawEpin.trim();
+    if (!value) throw new BadRequestException('Activation E-PIN is required');
+    const now = new Date();
+    const rows = await this.prisma.$queryRawUnsafe<EpinRow[]>(
+      this.epinLookupSql(false),
+      this.epinHash(value),
+    );
+    const epin = rows[0];
+    this.assertPaidEpin(epin, now, 'ACTIVATION');
+    const requiredInstallmentCount = this.requiredInstallmentCount(epin!, now);
+    return {
+      seasonId: epin!.seasonId,
+      seasonCode: epin!.seasonCode,
+      seasonName: epin!.seasonName,
+      seasonStartDate: this.dateOnly(epin!.seasonStartDate!),
+      pinType: epin!.pinType,
+      requiredInstallmentCount,
+      activationPinInstallments: 1,
+      additionalInstallmentEpinsRequired: Math.max(0, requiredInstallmentCount - 1),
+      installmentAmount: epin!.installmentAmountSnapshot,
+      currencyCode: epin!.currencyCodeSnapshot,
     };
   }
 
@@ -200,23 +232,49 @@ export class MemberRegistrationService {
     try {
       const registered = await this.prisma.$transaction(async (tx) => {
         const epins = await tx.$queryRawUnsafe<EpinRow[]>(
-          `SELECT e.id, e.status, e.assignedUserId, e.expiresAt, e.seasonId,
-                  e.paymentSubmissionId, e.currencyCodeSnapshot, e.registrationFeeSnapshot,
-                  e.installmentAmountSnapshot, s.status AS seasonStatus,
-                  s.startDate AS seasonStartDate, s.programVersionId, s.referralPolicyVersionId,
-                  pv.lifecycle AS programLifecycle, pv.currencyCode AS programCurrencyCode,
-                  pv.installmentCount, pv.installmentIntervalUnit, pv.installmentIntervalCount,
-                  pv.firstInstallmentOffsetDays, pv.gracePeriodDays, pv.eligibilityRules
-           FROM owner_epins e
-           LEFT JOIN owner_seasons s ON s.id=e.seasonId
-           LEFT JOIN program_versions pv ON pv.id=s.programVersionId
-           WHERE e.pinHash=?
-           LIMIT 1
-           FOR UPDATE`,
+          this.epinLookupSql(true),
           epinHash,
         );
         const epin = epins[0];
-        this.assertPaidEpin(epin, activationAt);
+        this.assertPaidEpin(epin, activationAt, 'ACTIVATION');
+
+        const rawInstallmentEpins = (dto.installmentEpins ?? []).map((value) => value.trim());
+        if (rawInstallmentEpins.some((value) => !value)) {
+          throw new BadRequestException('Installment E-PINs cannot be blank');
+        }
+        const uniqueRawPins = new Set([rawEpin, ...rawInstallmentEpins]);
+        if (uniqueRawPins.size !== rawInstallmentEpins.length + 1) {
+          throw new BadRequestException('Each E-PIN can only be entered once');
+        }
+
+        const requiredInstallmentCount = this.requiredInstallmentCount(epin!, activationAt);
+        const requiredCatchUpCount = Math.max(0, requiredInstallmentCount - 1);
+        if (rawInstallmentEpins.length !== requiredCatchUpCount) {
+          throw new BadRequestException(
+            `This session requires ${requiredCatchUpCount} additional installment E-PIN(s) to join now`,
+          );
+        }
+
+        const catchUpEpins: EpinRow[] = [];
+        for (const rawInstallmentEpin of rawInstallmentEpins) {
+          const rows = await tx.$queryRawUnsafe<EpinRow[]>(
+            this.epinLookupSql(true),
+            this.epinHash(rawInstallmentEpin),
+          );
+          const installmentEpin = rows[0];
+          this.assertPaidEpin(installmentEpin, activationAt, 'INSTALLMENT');
+          if (installmentEpin!.seasonId !== epin!.seasonId) {
+            throw new BadRequestException('All registration E-PINs must belong to the same session');
+          }
+          if (
+            installmentEpin!.currencyCodeSnapshot !== epin!.currencyCodeSnapshot ||
+            Number(installmentEpin!.installmentAmountSnapshot) !== Number(epin!.installmentAmountSnapshot) ||
+            Number(installmentEpin!.registrationFeeSnapshot ?? 0) !== 0
+          ) {
+            throw new ConflictException('Installment E-PIN commercial value does not match the activation session');
+          }
+          catchUpEpins.push(installmentEpin!);
+        }
 
         let username = dto.username?.trim();
         const mustAutoUsername =
@@ -277,45 +335,60 @@ export class MemberRegistrationService {
           },
         });
 
-        const activation = await this.createPaidEnrollment(tx, created.id, epin!, activationAt);
-        const consumed = await tx.$executeRawUnsafe(
-          `UPDATE owner_epins
-           SET status='USED', usedByUserId=?, usedAt=?, updatedAt=CURRENT_TIMESTAMP(3)
-           WHERE id=? AND status='ACTIVE' AND usedByUserId IS NULL AND expiresAt>?`,
+        const activation = await this.createPaidEnrollment(
+          tx,
           created.id,
-          activationAt,
-          epin!.id,
+          epin!,
+          catchUpEpins,
+          requiredInstallmentCount,
           activationAt,
         );
-        if (consumed !== 1) throw new ConflictException('E-PIN was already used during registration');
+        for (const registrationEpin of [epin!, ...catchUpEpins]) {
+          const consumed = await tx.$executeRawUnsafe(
+            `UPDATE owner_epins
+             SET status='USED', usedByUserId=?, usedAt=?, updatedAt=CURRENT_TIMESTAMP(3)
+             WHERE id=? AND status='ACTIVE' AND usedByUserId IS NULL AND expiresAt>?`,
+            created.id,
+            activationAt,
+            registrationEpin.id,
+            activationAt,
+          );
+          if (consumed !== 1) {
+            throw new ConflictException('An E-PIN was already used during registration');
+          }
+        }
         return { user: created, activation };
       });
 
       const placement = await this.autoPlaceWithRetry(registered.user.id, sponsor.id);
-      let installmentDrawTokens: Array<{
+      const installmentDrawTokens: Array<{
         token: string;
         installmentSequence: number | null;
         status: string;
         drawId: string | null;
         entryId: string | null;
       }> = [];
-      try {
-        installmentDrawTokens = await this.drawTokens.ensurePaymentRecordInstallmentTokens(
-          registered.activation.paymentRecordId,
-        );
-      } catch (error) {
-        await this.audit.log({
-          actorUserId: registered.user.id,
-          action: AuditAction.UPDATE,
-          entityType: 'ProgramEnrollment',
-          entityId: registered.activation.enrollmentId,
-          description: 'Paid registration draw token allocation requires reconciliation',
-          metadata: {
-            paymentRecordId: registered.activation.paymentRecordId,
-            reason: error instanceof Error ? error.message.slice(0, 500) : 'Unknown token allocation error',
-          },
-        });
+      for (const paymentRecordId of registered.activation.paymentRecordIds) {
+        try {
+          const tokens = await this.drawTokens.ensurePaymentRecordInstallmentTokens(paymentRecordId);
+          installmentDrawTokens.push(...tokens);
+        } catch (error) {
+          await this.audit.log({
+            actorUserId: registered.user.id,
+            action: AuditAction.UPDATE,
+            entityType: 'ProgramEnrollment',
+            entityId: registered.activation.enrollmentId,
+            description: 'Paid registration draw token allocation requires reconciliation',
+            metadata: {
+              paymentRecordId,
+              reason: error instanceof Error ? error.message.slice(0, 500) : 'Unknown token allocation error',
+            },
+          });
+        }
       }
+      installmentDrawTokens.sort(
+        (left, right) => Number(left.installmentSequence ?? 0) - Number(right.installmentSequence ?? 0),
+      );
       let referralRewardId: string | null = null;
       if (registered.activation.referralPolicyVersionId) {
         const reward = await this.referralRewards.createEvent(
@@ -373,6 +446,8 @@ export class MemberRegistrationService {
           currencyCode: registered.activation.currencyCode,
           registrationFeePaid: true,
           firstInstallmentPaid: true,
+          paidInstallmentCount: registered.activation.requiredInstallmentCount,
+          catchUpInstallmentCount: registered.activation.catchUpInstallmentCount,
           seasonStartDate: registered.activation.seasonStartDate,
           drawTokens: installmentDrawTokens.map((item) => ({
             token: item.token,
@@ -390,9 +465,20 @@ export class MemberRegistrationService {
     }
   }
 
-  private assertPaidEpin(epin: EpinRow | undefined, now: Date) {
+  private assertPaidEpin(
+    epin: EpinRow | undefined,
+    now: Date,
+    expectedType: 'ACTIVATION' | 'INSTALLMENT',
+  ) {
     if (!epin || epin.status !== 'ACTIVE' || new Date(epin.expiresAt).getTime() <= now.getTime()) {
       throw new BadRequestException('E-PIN is invalid, used, cancelled, or expired');
+    }
+    if (epin.pinType !== expectedType) {
+      throw new BadRequestException(
+        expectedType === 'ACTIVATION'
+          ? 'An activation E-PIN is required'
+          : 'A valid installment E-PIN is required for catch-up',
+      );
     }
     if (
       !epin.seasonId ||
