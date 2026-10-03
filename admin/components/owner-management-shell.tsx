@@ -59,7 +59,7 @@ export function OwnerManagementShell({
                   className={classNames(styles.navItem, currentSection === item.section && styles.activeNav)}
                   href={ownerManagementHref(item.section)}
                 >
-                  <span>{item.symbol}</span><span>{item.label}</span>
+                  <span aria-hidden="true">{item.symbol}</span><span>{item.label}</span>
                 </Link>
               ))}
             </div>
@@ -86,7 +86,7 @@ export function OwnerManagementShell({
           const item = OWNER_MANAGEMENT_NAV.find((entry) => entry.section === key)!;
           return (
             <Link key={key} className={currentSection === key ? styles.activeBottom : ''} href={ownerManagementHref(key)}>
-              <strong>{item.symbol}</strong>{key === 'dashboard' ? 'Home' : item.label.split(' ')[0]}
+              <strong aria-hidden="true">{item.symbol}</strong>{key === 'dashboard' ? 'Home' : item.label.split(' ')[0]}
             </Link>
           );
         })}
@@ -99,7 +99,7 @@ export function OwnerManagementShell({
           <div className={styles.drawerHead}><b>All management tools</b><button type="button" onClick={() => setMobileMore(false)}>×</button></div>
           {OWNER_MANAGEMENT_NAV.map((item) => (
             <Link key={item.section} className={classNames(styles.navItem, currentSection === item.section && styles.activeNav)} href={ownerManagementHref(item.section)} onClick={() => setMobileMore(false)}>
-              <span>{item.symbol}</span><span>{item.label}</span>
+              <span aria-hidden="true">{item.symbol}</span><span>{item.label}</span>
             </Link>
           ))}
           <button className={classNames(styles.button, styles.dark)} type="button" onClick={logout}>LOG OUT</button>

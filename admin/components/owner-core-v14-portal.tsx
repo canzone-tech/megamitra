@@ -200,12 +200,12 @@ export function OwnerCoreV14Portal({ section, extension }: { section: OwnerCoreV
       </div>
       <div className={styles.grid2}>
         <div className={styles.card}>
-          <SectionHead icon="◇" title="Binary 1:4 Rule" note="Client revised topology" />
+          <SectionHead icon="🌳" title="Binary 1:4 Rule" note="Client revised topology" />
           <div className={styles.notice}><b>A + B = LEFT</b> • <b>C + D = RIGHT</b></div>
           <div className={classNames(styles.notice, styles.success)}><b>Valid pair lanes:</b> A:C and B:D only.</div>
         </div>
         <div className={styles.card}>
-          <SectionHead icon="i" title="Current Configuration" />
+          <SectionHead icon="ℹ️" title="Current Configuration" />
           <div className={styles.notice}><b>Joining:</b> {money(number(active.registrationFee) + number(active.installmentAmount), currency)} = {money(active.installmentAmount, currency)} monthly EMI + {money(active.registrationFee, currency)} registration.</div>
           <div className={classNames(styles.notice, styles.warn)}>Income / Reward Types remain informational; editable financial truth lives in versioned Season policies.</div>
         </div>
@@ -221,7 +221,7 @@ export function OwnerCoreV14Portal({ section, extension }: { section: OwnerCoreV
       <Hero title="9 Income / Reward Types" subtitle="Read-only overview. No standalone income editor exists." pill="INFORMATIONAL • NOT AN EDITOR" />
       <div className={styles.card}><IncomeCards season={active} currencyCode={currency} /></div>
       <div className={styles.card}>
-        <SectionHead icon="=" title="Core Calculation" />
+        <SectionHead icon="🧮" title="Core Calculation" />
         <div className={styles.notice}><b>Direct Referral:</b> {money(active.directReferral, currency)} per qualifying direct referral. <b>Binary Pair:</b> A:C or B:D = one qualifying pair at {money(active.pairValue, currency)}. <b>Daily cap:</b> {money(active.dailyCap, currency)}.</div>
         <div className={classNames(styles.notice, styles.warn)}>A:D and B:C never form a qualifying pair.</div>
       </div>
@@ -242,7 +242,7 @@ export function OwnerCoreV14Portal({ section, extension }: { section: OwnerCoreV
       <WorkspaceTabs ariaLabel="Member management workspace" tabs={tabs}>
         {(activeTab) => <>
           {activeTab === 'member-register' ? <div className={styles.card}>
-            <SectionHead icon="+" title="Create Member" />
+            <SectionHead icon="➕" title="Create Member" />
             <div className={styles.notice}>Binary 1:4: A/B are Left, C/D are Right. Auto Placement searches A → B → C → D, then continues breadth-first.</div>
             <form method="post" autoComplete="off" onSubmit={submitMember}>
               <div className={styles.fields}>
@@ -264,7 +264,7 @@ export function OwnerCoreV14Portal({ section, extension }: { section: OwnerCoreV
             {generatedPassword ? <div className={classNames(styles.notice, styles.success)}>One-time generated password: <b>{generatedPassword}</b>.</div> : null}
           </div> : null}
           {activeTab === 'member-directory' ? <div className={styles.card}>
-            <SectionHead icon="●" title="Member Directory" note={`${rows.length} recent records`} />
+            <SectionHead icon="👥" title="Member Directory" note={`${rows.length} recent records`} />
             {rows.length ? <div className={styles.tableBox}><table className={styles.table}><thead><tr><th>USER ID</th><th>NAME</th><th>SPONSOR</th><th>SLOT</th><th>SIDE</th><th>PARENT</th><th>SEASON</th><th>KYC</th><th>STATUS</th></tr></thead><tbody>{rows.map((row) => <tr key={text(row.id)}><td>{text(row.username)}</td><td>{[text(row.firstName, ''), text(row.lastName, '')].filter(Boolean).join(' ') || '—'}</td><td>{text(row.sponsorUsername)}</td><td><b>{text(row.placementSlot, 'Pending')}</b></td><td>{text(row.placementSide)}</td><td>{text(row.placementParentUsername)}</td><td>{text(row.seasonName, 'Not enrolled')}</td><td><span className={styles.tag}>{text(row.kycStatus, 'NOT_STARTED')}</span></td><td className={text(row.status) === 'ACTIVE' ? styles.status : styles.statusOff}>{text(row.status)}</td></tr>)}</tbody></table></div> : <Empty />}
           </div> : null}
           {activeTab === 'member-kyc' && extension ? <div className="ownerEmbeddedExtension">{extension}</div> : null}
@@ -281,7 +281,7 @@ export function OwnerCoreV14Portal({ section, extension }: { section: OwnerCoreV
     return <>
       <Hero title="Binary 1:4" subtitle="Four direct slots: A/B on Left and C/D on Right. Pair lanes are fixed." pill="A:C + B:D ONLY" />
       <div className={styles.card}>
-        <SectionHead icon="◇" title="Binary 1:4 Structure" />
+        <SectionHead icon="🌳" title="Binary 1:4 Structure" />
         <div className={styles.binaryBox}>
           <div className={styles.binaryRow}><div className={classNames(styles.node, styles.root)}><b>YOU</b><span>Reference member</span></div></div>
           <div className={styles.binaryRow}>
@@ -295,7 +295,7 @@ export function OwnerCoreV14Portal({ section, extension }: { section: OwnerCoreV
         <div className={classNames(styles.notice, styles.warn)}>A:D and B:C are intentionally invalid and cannot be matched by the settlement engine.</div>
       </div>
       <div className={styles.card}>
-        <SectionHead icon="⌁" title="Pair Ledger" note="Fixed-lane qualified pair records" />
+        <SectionHead icon="🔗" title="Pair Ledger" note="Fixed-lane qualified pair records" />
         {rows.length ? <div className={styles.tableBox}><table className={styles.table}><thead><tr><th>PAIR</th><th>MEMBER</th><th>LANE</th><th>LEFT SLOT</th><th>RIGHT SLOT</th><th>VALUE</th><th>STATUS</th></tr></thead><tbody>{rows.map((row) => <tr key={text(row.id)}><td>{text(row.pairSequence)}</td><td>{text(row.username)}</td><td><b>{text(row.pairLane, text(row.crossMatch))}</b></td><td>{text(row.leftSlot)}</td><td>{text(row.rightSlot)}</td><td>{money(row.payoutAmount, text(row.currencyCode, currency))}</td><td className={row.payable ? styles.status : styles.statusOff}>{row.payable ? 'QUALIFIED' : 'CAP LIMITED'}</td></tr>)}</tbody></table></div> : <Empty>No pair records yet.</Empty>}
       </div>
     </>;
@@ -319,7 +319,7 @@ export function OwnerCoreV14Portal({ section, extension }: { section: OwnerCoreV
           <div className={styles.buttonLine}><button className={styles.button} disabled={busy}>SAVE PLACEMENT</button></div>
         </form>
       </div>
-      <div className={styles.card}><SectionHead icon="✓" title="Pairing Controls" /><div className={styles.notice}>The genealogy engine persists A/B/C/D ancestry. Settlement accepts only A:C and B:D; generic Left × Right matching is disabled.</div></div>
+      <div className={styles.card}><SectionHead icon="✅" title="Pairing Controls" /><div className={styles.notice}>The genealogy engine persists A/B/C/D ancestry. Settlement accepts only A:C and B:D; generic Left × Right matching is disabled.</div></div>
     </>;
   }
 
