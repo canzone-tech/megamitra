@@ -148,7 +148,7 @@ export class OwnerPortalFinanceService {
 
   async listEpins() {
     return this.rows<Record<string, unknown>>(
-      `SELECT e.id, e.displaySuffix,
+      `SELECT e.id, e.displaySuffix, e.pinType,
               CASE
                 WHEN e.status='ACTIVE' AND e.expiresAt<=CURRENT_TIMESTAMP(3) THEN 'EXPIRED'
                 ELSE e.status
