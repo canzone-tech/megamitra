@@ -123,6 +123,11 @@ export async function createPaidRegistrationFixture(
     });
     const enrollmentIds = enrollments.map((item) => item.id);
     if (!enrollmentIds.length) return;
+    await prisma.$executeRawUnsafe(
+      `DELETE FROM lucky_draw_tokens
+       WHERE enrollmentId IN (${enrollmentIds.map(() => '?').join(',')})`,
+      ...enrollmentIds,
+    );
     await prisma.programBusinessEvent.deleteMany({ where: { enrollmentId: { in: enrollmentIds } } });
     await prisma.programPaymentAllocation.deleteMany({ where: { enrollmentId: { in: enrollmentIds } } });
     await prisma.programPaymentRecord.deleteMany({ where: { enrollmentId: { in: enrollmentIds } } });
