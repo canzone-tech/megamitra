@@ -1,4 +1,17 @@
-import { Body, Controller, Get, Param, Patch, Post, Put, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Put,
+  Query,
+  StreamableFile,
+  UploadedFile,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import type { AuthUser } from '../auth/auth-user';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { Permissions } from '../rbac/permissions.decorator';
@@ -157,6 +170,28 @@ export class OwnerPortalController {
     @CurrentUser() actor: AuthUser,
   ) {
     return this.portal.saveSeasonPrizes(id, dto.prizes, actor.id);
+  }
+
+  @Permissions('draw.policy.manage')
+  @Post('seasons/:id/prize-media')
+  @UseInterceptors(FileInterceptor('file', { limits: { files: 1, fileSize: 5 * 1024 * 1024 } }))
+  uploadPrizeMedia(
+    @Param('id') id: string,
+    @UploadedFile() file: { buffer: Buffer; originalname: string; mimetype: string; size: number } | undefined,
+    @CurrentUser() actor: AuthUser,
+  ) {
+    return this.portal.uploadSeasonPrizeMedia(id, file, actor.id);
+  }
+
+  @Permissions('draw.policy.read')
+  @Get('prize-media/:mediaId')
+  async prizeMedia(@Param('mediaId') mediaId: string) {
+    const media = await this.portal.openPrizeMedia(mediaId);
+    return new StreamableFile(media.stream, {
+      type: media.info.contentType,
+      length: media.info.length,
+      disposition: `inline; filename*=UTF-8''${encodeURIComponent(media.info.filename)}`,
+    });
   }
 
   @Permissions('draw.execution.read')
