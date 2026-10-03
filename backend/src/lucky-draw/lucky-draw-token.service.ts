@@ -1,4 +1,5 @@
 import { ConflictException, Injectable } from '@nestjs/common';
+import { createHash, randomUUID } from 'node:crypto';
 import type { PoolConnection } from 'mariadb';
 import { FinancialDbService } from '../database/financial-db.service';
 import {
@@ -41,6 +42,36 @@ type DrawEntryRow = {
 };
 
 type AffectedRows = { affectedRows?: number };
+
+type OwnerDrawSnapshotRow = {
+  drawStatus: 'SCHEDULED' | 'SNAPSHOTTED' | 'DRAWN' | 'VOIDED';
+  snapshotHash: string | null;
+  candidateCount: number;
+  eligibleEntryCount: number;
+  excludedEntryCount: number;
+  entryWindowEnd: Date;
+  policyLifecycle: string;
+  programVersionId: string;
+  seasonId: string | null;
+  monthNumber: number | null;
+};
+
+type OwnerDrawTokenCandidateRow = {
+  token: string;
+  userId: string;
+  enrollmentId: string;
+  installmentSequence: number;
+  tokenCreatedAt: Date;
+  enrollmentStatus: 'ACTIVE' | 'COMPLETED';
+};
+
+type OwnerDrawSnapshotResult = {
+  idempotent: boolean;
+  snapshotHash: string | null;
+  candidateCount: number;
+  eligibleEntryCount: number;
+  excludedEntryCount: number;
+};
 
 type TokenInsert = {
   sourceType: 'INSTALLMENT' | 'DRAW_ENTRY';
@@ -111,6 +142,189 @@ export class LuckyDrawTokenService {
     );
     const id = rows[0]?.id;
     return id ? this.tokensForSubmission(id) : [];
+  }
+
+
+  async snapshotOwnerMonthlyDrawEntrants(
+    drawId: string,
+  ): Promise<OwnerDrawSnapshotResult | null> {
+    return this.db.transaction(async (connection) => {
+      const rows = await connection.query<OwnerDrawSnapshotRow[]>(
+        `SELECT d.status AS drawStatus, d.snapshotHash, d.candidateCount,
+                d.eligibleEntryCount, d.excludedEntryCount, d.entryWindowEnd,
+                v.lifecycle AS policyLifecycle, v.programVersionId,
+                odr.seasonId, odr.monthNumber
+         FROM lucky_draw_instances d
+         JOIN lucky_draw_policy_versions v ON v.id=d.policyVersionId
+         LEFT JOIN owner_draw_runs odr ON odr.drawId=d.id
+         WHERE d.id=? LIMIT 1 FOR UPDATE`,
+        [drawId],
+      );
+      const draw = rows[0];
+      if (!draw) throw new ConflictException('Lucky draw instance was not found');
+      if (!draw.seasonId || !draw.monthNumber) return null;
+      if (draw.drawStatus === 'SNAPSHOTTED' || draw.drawStatus === 'DRAWN') {
+        return {
+          idempotent: true,
+          snapshotHash: draw.snapshotHash,
+          candidateCount: Number(draw.candidateCount),
+          eligibleEntryCount: Number(draw.eligibleEntryCount),
+          excludedEntryCount: Number(draw.excludedEntryCount),
+        };
+      }
+      if (draw.drawStatus === 'VOIDED') {
+        throw new ConflictException('Voided lucky draw cannot be snapshotted');
+      }
+      if (new Date(draw.entryWindowEnd).getTime() > Date.now()) {
+        throw new ConflictException('Lucky draw entry window has not closed yet');
+      }
+      if (draw.policyLifecycle !== 'PUBLISHED') {
+        throw new ConflictException('Lucky draw policy version is no longer published');
+      }
+
+      const candidates = await connection.query<OwnerDrawTokenCandidateRow[]>(
+        `SELECT t.token, t.userId, t.enrollmentId,
+                t.installmentSequence, t.createdAt AS tokenCreatedAt,
+                e.status AS enrollmentStatus
+         FROM lucky_draw_tokens t
+         JOIN program_enrollments e ON e.id=t.enrollmentId
+         JOIN users u ON u.id=t.userId
+         WHERE t.sourceType='INSTALLMENT'
+           AND t.installmentSequence=?
+           AND t.status='AVAILABLE'
+           AND t.drawId IS NULL
+           AND t.entryId IS NULL
+           AND t.createdAt<=?
+           AND e.programVersionId=?
+           AND e.status IN ('ACTIVE','COMPLETED')
+           AND u.status='ACTIVE'
+         ORDER BY t.createdAt ASC, t.token ASC
+         FOR UPDATE`,
+        [Number(draw.monthNumber), draw.entryWindowEnd, draw.programVersionId],
+      );
+
+      const priorWinnerRows = await connection.query<Array<{ userId: string }>>(
+        `SELECT DISTINCT w.userId
+         FROM lucky_draw_winners w
+         JOIN owner_draw_runs priorRun ON priorRun.drawId=w.drawId
+         WHERE priorRun.seasonId=? AND priorRun.monthNumber<?`,
+        [draw.seasonId, Number(draw.monthNumber)],
+      );
+      const priorWinners = new Set(priorWinnerRows.map((row) => row.userId));
+      const seenUsers = new Set<string>();
+      let sequence = 0;
+      const snapshotRows = candidates.map((candidate) => {
+        let disposition: 'ELIGIBLE' | 'DUPLICATE_USER' | 'PRIOR_WINNER' = 'ELIGIBLE';
+        let exclusionReason: string | null = null;
+        if (priorWinners.has(candidate.userId)) {
+          disposition = 'PRIOR_WINNER';
+          exclusionReason = 'PRIOR_SEASON_WINNER';
+        } else if (seenUsers.has(candidate.userId)) {
+          disposition = 'DUPLICATE_USER';
+          exclusionReason = 'ONE_ENTRY_PER_USER_POLICY';
+        }
+        seenUsers.add(candidate.userId);
+        const entrySequence = disposition === 'ELIGIBLE' ? ++sequence : null;
+        const eligibilitySnapshot = {
+          source: 'INSTALLMENT_TOKEN_REGISTRY',
+          seasonId: draw.seasonId,
+          monthNumber: Number(draw.monthNumber),
+          token: candidate.token,
+          installmentSequence: Number(candidate.installmentSequence),
+          enrollmentId: candidate.enrollmentId,
+          enrollmentStatus: candidate.enrollmentStatus,
+          tokenCreatedAt: new Date(candidate.tokenCreatedAt).toISOString(),
+        };
+        return {
+          candidate,
+          disposition,
+          exclusionReason,
+          entrySequence,
+          eligibilitySnapshot,
+        };
+      });
+
+      const snapshotHash = createHash('sha256')
+        .update(
+          snapshotRows
+            .map((row) =>
+              [
+                row.candidate.token,
+                row.candidate.userId,
+                row.candidate.enrollmentId,
+                String(row.candidate.installmentSequence),
+                new Date(row.candidate.tokenCreatedAt).toISOString(),
+                row.disposition,
+                row.entrySequence ?? '',
+                JSON.stringify(row.eligibilitySnapshot),
+              ].join('|'),
+            )
+            .join('\n'),
+        )
+        .digest('hex');
+
+      for (const row of snapshotRows) {
+        const entryId = randomUUID();
+        const drawToken = row.disposition === 'ELIGIBLE' ? row.candidate.token : null;
+        await connection.query(
+          `INSERT INTO lucky_draw_entries
+             (id, drawId, sourceHookId, userId, hookOccurredAt, disposition, exclusionReason,
+              entrySequence, drawToken, selectionScore, eligibilitySnapshot, createdAt)
+           VALUES (?, ?, NULL, ?, ?, ?, ?, ?, ?, NULL, ?, CURRENT_TIMESTAMP(3))`,
+          [
+            entryId,
+            drawId,
+            row.candidate.userId,
+            row.candidate.tokenCreatedAt,
+            row.disposition,
+            row.exclusionReason,
+            row.entrySequence,
+            drawToken,
+            JSON.stringify(row.eligibilitySnapshot),
+          ],
+        );
+        if (drawToken) {
+          const used = (await connection.query(
+            `UPDATE lucky_draw_tokens
+             SET status='USED', drawId=?, entryId=?, usedAt=CURRENT_TIMESTAMP(3)
+             WHERE token=? AND status='AVAILABLE' AND drawId IS NULL AND entryId IS NULL`,
+            [drawId, entryId, drawToken],
+          )) as AffectedRows;
+          if (Number(used.affectedRows ?? 0) !== 1) {
+            throw new ConflictException(
+              `Installment draw token ${drawToken} was consumed concurrently`,
+            );
+          }
+        }
+      }
+
+      const candidateCount = snapshotRows.length;
+      const eligibleEntryCount = snapshotRows.filter(
+        (row) => row.disposition === 'ELIGIBLE',
+      ).length;
+      const excludedEntryCount = candidateCount - eligibleEntryCount;
+      await connection.query(
+        `UPDATE lucky_draw_instances
+         SET status='SNAPSHOTTED', snapshotHash=?, candidateCount=?, eligibleEntryCount=?,
+             excludedEntryCount=?, snapshottedAt=CURRENT_TIMESTAMP(3), updatedAt=CURRENT_TIMESTAMP(3)
+         WHERE id=?`,
+        [
+          snapshotHash,
+          candidateCount,
+          eligibleEntryCount,
+          excludedEntryCount,
+          drawId,
+        ],
+      );
+
+      return {
+        idempotent: false,
+        snapshotHash,
+        candidateCount,
+        eligibleEntryCount,
+        excludedEntryCount,
+      };
+    });
   }
 
   async assignDrawTokens(drawId: string) {

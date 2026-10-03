@@ -474,7 +474,8 @@ export class OwnerSeasonConfigurationService {
             referralBasisMode: dto.referralBasisMode,
           }
         : {}),
-      drawEligibilityHookEnabled: dto.drawEligibilityHookEnabled,
+      // Owner monthly draws are sourced from immutable installment tokens, not payment-time draw hooks.
+      drawEligibilityHookEnabled: false,
       eligibilityRules,
     };
 
@@ -502,7 +503,8 @@ export class OwnerSeasonConfigurationService {
         rightVolumePerPair: dto.rightVolumePerPair,
         binaryUnitsPerEvent: dto.binaryUnitsPerEvent,
         referralHookEnabled: dto.referralHookEnabled,
-        drawEligibilityHookEnabled: dto.drawEligibilityHookEnabled,
+        drawEligibilityHookEnabled: false,
+        drawEligibilitySource: 'INSTALLMENT_TOKEN_REGISTRY',
       },
     });
     return this.getAdvancedConfiguration(id);
@@ -527,6 +529,10 @@ export class OwnerSeasonConfigurationService {
       throw new ConflictException(
         `Season cannot move from ${season.status} to ${target}`,
       );
+    }
+
+    if (target === 'REVIEW' || target === 'ACTIVE') {
+      await this.disableLegacyOwnerDrawHook(season, actorUserId);
     }
 
     if (target === 'ACTIVE' && season.status === 'REVIEW') {
@@ -657,6 +663,24 @@ export class OwnerSeasonConfigurationService {
       metadata: { from: season.status, to: target },
     });
     return this.portal.getSeason(id);
+  }
+
+  private async disableLegacyOwnerDrawHook(
+    season: SeasonRow,
+    actorUserId: string,
+  ) {
+    if (!season.programVersionId) return;
+    const policies = await this.orchestration.listPolicies(season.programVersionId);
+    const draft = policies.find(
+      (policy) =>
+        policy.triggerType === 'PAYMENT_CONFIRMED' && policy.lifecycle === 'DRAFT',
+    );
+    if (!draft || !this.truthy(draft.drawEligibilityHookEnabled)) return;
+    await this.orchestration.updateDraft(
+      draft.id,
+      { drawEligibilityHookEnabled: false },
+      actorUserId,
+    );
   }
 
   private async syncOrchestrationWindow(

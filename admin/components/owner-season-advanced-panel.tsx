@@ -146,7 +146,8 @@ export function OwnerSeasonAdvancedPanel({ embedded = false }: { embedded?: bool
         binaryUnitsPerEvent: Number(form.get('binaryUnitsPerEvent') ?? 0),
         referralHookEnabled: String(form.get('referralHookEnabled') ?? 'false') === 'true',
         referralBasisMode: String(form.get('referralBasisMode') ?? 'PAYMENT_AMOUNT'),
-        drawEligibilityHookEnabled: String(form.get('drawEligibilityHookEnabled') ?? 'false') === 'true',
+        // Owner monthly draw eligibility is derived from installment-specific 5-digit tokens.
+        drawEligibilityHookEnabled: false,
         drawStartMonth: Number(form.get('drawStartMonth') ?? config.drawSchedule.startMonth),
         drawWeekOfMonth: Number(form.get('drawWeekOfMonth') ?? config.drawSchedule.weekOfMonth),
         drawWeekday: String(form.get('drawWeekday') ?? config.drawSchedule.weekday),
@@ -239,7 +240,7 @@ export function OwnerSeasonAdvancedPanel({ embedded = false }: { embedded?: bool
                     <div className={styles.field}><label>Binary Qualifying Units / Payment</label><input name="binaryUnitsPerEvent" className={styles.input} type="number" min="0" required disabled={!editable} value={rules.binaryUnitsPerEvent} onChange={(event) => patchRules('binaryUnitsPerEvent', Number(event.target.value) || 0)} /></div>
                     <div className={styles.field}><label>Direct Referral Hand-off</label><select name="referralHookEnabled" className={styles.select} disabled={!editable} value={String(rules.referralHookEnabled)} onChange={(event) => patchRules('referralHookEnabled', event.target.value === 'true')}><option value="false">Disabled</option><option value="true">Enabled</option></select></div>
                     <div className={styles.field}><label>Referral Basis</label><select name="referralBasisMode" className={styles.select} disabled={!editable || !rules.referralHookEnabled} value={rules.referralBasisMode} onChange={(event) => patchRules('referralBasisMode', event.target.value)}><option value="PAYMENT_AMOUNT">Full Payment Amount</option><option value="REGISTRATION_ALLOCATION">Registration Allocation</option><option value="INSTALLMENT_ALLOCATION">Installment Allocation</option><option value="TOTAL_APPLIED_AMOUNT">Registration + Installment Applied</option></select></div>
-                    <div className={styles.field}><label>Lucky Draw Eligibility Hook</label><select name="drawEligibilityHookEnabled" className={styles.select} disabled={!editable} value={String(rules.drawEligibilityHookEnabled)} onChange={(event) => patchRules('drawEligibilityHookEnabled', event.target.value === 'true')}><option value="false">Disabled</option><option value="true">Enabled</option></select></div>
+                    <div className={styles.field}><label>Lucky Draw Eligibility</label><input className={styles.input} readOnly value="Installment token registry (automatic)" /></div>
                     <div className={styles.field}><label>Minimum Payment Amount (optional)</label><input name="minimumPaymentAmount" className={styles.input} inputMode="decimal" disabled={!editable} value={rules.minimumPaymentAmount ?? ''} onChange={(event) => patchRules('minimumPaymentAmount', event.target.value || null)} /></div>
                     <div className={styles.field}><label>Minimum Registration Allocation</label><input name="minimumRegistrationAllocation" className={styles.input} inputMode="decimal" disabled={!editable} value={rules.minimumRegistrationAllocation ?? ''} onChange={(event) => patchRules('minimumRegistrationAllocation', event.target.value || null)} /></div>
                     <div className={styles.field}><label>Minimum Installment Allocation</label><input name="minimumInstallmentAllocation" className={styles.input} inputMode="decimal" disabled={!editable} value={rules.minimumInstallmentAllocation ?? ''} onChange={(event) => patchRules('minimumInstallmentAllocation', event.target.value || null)} /></div>
@@ -249,7 +250,7 @@ export function OwnerSeasonAdvancedPanel({ embedded = false }: { embedded?: bool
               </>}
             </WorkspaceTabs>
 
-            <div className={styles.notice} style={{ marginTop: 14 }}>Season activation is blocked until the automatic-rule draft exists and every Season month has a prize schedule. Membership, Binary, Referral, Lucky Draw recurrence and Automatic Rules are governed together.</div>
+            <div className={styles.notice} style={{ marginTop: 14 }}>Season activation is blocked until the automatic-rule draft exists and every Season month has a prize schedule. Binary and Referral activation rules use the confirmed-payment filters above; monthly Lucky Draw eligibility is derived independently from each confirmed installment's permanent 5-digit token.</div>
             <div className={styles.buttonLine}><button className={styles.button} disabled={busy || !editable}>{busy ? 'SAVING…' : 'SAVE ADVANCED SEASON POLICY'}</button></div>
           </form>
         ) : <div className={styles.empty}>Create a Season draft before configuring advanced rules.</div>}

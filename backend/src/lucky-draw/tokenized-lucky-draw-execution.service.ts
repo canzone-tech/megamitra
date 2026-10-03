@@ -10,13 +10,37 @@ export class TokenizedLuckyDrawExecutionService extends LuckyDrawExecutionServic
   constructor(
     prisma: PrismaService,
     financialDb: FinancialDbService,
-    audit: AuditService,
+    private readonly tokenAudit: AuditService,
     private readonly drawTokens: LuckyDrawTokenService,
   ) {
-    super(prisma, financialDb, audit);
+    super(prisma, financialDb, tokenAudit);
   }
 
   async snapshotEntrants(drawId: string, actorUserId: string) {
+    const ownerSnapshot = await this.drawTokens.snapshotOwnerMonthlyDrawEntrants(drawId);
+    if (ownerSnapshot) {
+      if (!ownerSnapshot.idempotent) {
+        await this.tokenAudit.log({
+          actorUserId,
+          action: 'CREATE',
+          entityType: 'LuckyDrawEntrantSnapshot',
+          entityId: drawId,
+          description: 'Owner monthly draw entrant snapshot frozen from installment tokens',
+          metadata: {
+            source: 'INSTALLMENT_TOKEN_REGISTRY',
+            snapshotHash: ownerSnapshot.snapshotHash,
+            candidateCount: ownerSnapshot.candidateCount,
+            eligibleEntryCount: ownerSnapshot.eligibleEntryCount,
+            excludedEntryCount: ownerSnapshot.excludedEntryCount,
+          },
+        });
+      }
+      return {
+        draw: await this.getDraw(drawId),
+        idempotent: ownerSnapshot.idempotent,
+      };
+    }
+
     const result = await super.snapshotEntrants(drawId, actorUserId);
     await this.drawTokens.assignDrawTokens(drawId);
     return {

@@ -91,7 +91,8 @@ type PrizeTierRow = {
 type EntryRow = {
   id: string;
   drawId: string;
-  sourceHookId: string;
+  sourceHookId: string | null;
+  drawToken: string | null;
   userId: string;
   hookOccurredAt: Date;
   disposition: EntryDisposition;
@@ -512,7 +513,7 @@ export class LuckyDrawExecutionService {
               drawId,
               draw.snapshotHash,
               String(entry.entrySequence ?? ''),
-              entry.sourceHookId,
+              entry.sourceHookId ?? entry.drawToken ?? entry.id,
               entry.userId,
             ].join('|'),
           )
@@ -563,6 +564,7 @@ export class LuckyDrawExecutionService {
           revealedSeed: selectionSeed,
           entrySequence: entry.entrySequence,
           sourceHookId: entry.sourceHookId,
+          drawToken: entry.drawToken,
           prizeTier: {
             id: tier.id,
             tierOrder: Number(tier.tierOrder),
