@@ -123,7 +123,8 @@ export class FulfillOwnerWinnerDto {
 }
 
 export class GenerateEpinsDto {
-  @IsOptional() @IsString() seasonId?: string;
+  @IsString() @Length(36, 36) seasonId!: string;
+  @IsOptional() @IsIn(['ACTIVATION', 'INSTALLMENT']) pinType?: 'ACTIVATION' | 'INSTALLMENT';
   @IsInt() @Min(1) @Max(500) quantity!: number;
   @IsOptional() @IsString() @MaxLength(191) assignUserReference?: string;
   @IsISO8601() expiresAt!: string;
