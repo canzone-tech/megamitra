@@ -492,6 +492,7 @@ describe('MegaGoldenClub owner lucky draw workflow integration', () => {
           entryWindowEnd: '2026-02-15T22:00:00+05:30',
           drawAt: '2026-02-15T23:00:00+05:30',
           claimWindowDays: 36500,
+          selectionMode: 'MANUAL_EXTERNAL',
         }),
       },
     );
@@ -507,7 +508,8 @@ describe('MegaGoldenClub owner lucky draw workflow integration', () => {
       { method: 'POST', body: '{}' },
     );
     expect(secondLocked.status).toBe(201);
-    expect(Number(secondLocked.body.eligibleEntryCount)).toBe(0);
+    expect(secondLocked.body.selectionMode).toBe('MANUAL_EXTERNAL');
+    expect(Number(secondLocked.body.eligibleEntryCount)).toBe(1);
     expect(Number(secondLocked.body.excludedEntryCount)).toBe(1);
     const secondEntries = await prisma.$queryRawUnsafe<
       Array<{ disposition: string; drawToken: string | null }>
@@ -515,9 +517,11 @@ describe('MegaGoldenClub owner lucky draw workflow integration', () => {
       'SELECT disposition, drawToken FROM lucky_draw_entries WHERE drawId=?',
       secondDrawId,
     );
-    expect(secondEntries).toEqual([
+    expect(secondEntries).toHaveLength(2);
+    expect(secondEntries).toEqual(expect.arrayContaining([
       expect.objectContaining({ disposition: 'PRIOR_WINNER', drawToken: null }),
-    ]);
+      expect.objectContaining({ disposition: 'ELIGIBLE', drawToken: externalInstallmentToken }),
+    ]));
     const advanceToken = await prisma.$queryRawUnsafe<
       Array<{ status: string; drawId: string | null; entryId: string | null }>
     >(
@@ -528,6 +532,77 @@ describe('MegaGoldenClub owner lucky draw workflow integration', () => {
       status: 'AVAILABLE',
       drawId: null,
       entryId: null,
+    });
+    const externalTokenState = await prisma.$queryRawUnsafe<
+      Array<{ status: string; drawId: string | null; entryId: string | null }>
+    >(
+      'SELECT status, drawId, entryId FROM lucky_draw_tokens WHERE token=? LIMIT 1',
+      externalInstallmentToken,
+    );
+    expect(externalTokenState[0]).toMatchObject({
+      status: 'USED',
+      drawId: secondDrawId,
+    });
+    expect(externalTokenState[0]?.entryId).toBeTruthy();
+
+    const autoSelectionBlocked = await request(
+      `/admin/owner-portal/draws/${secondDrawRunId}/select-winners`,
+      adminToken,
+      { method: 'POST', body: '{}' },
+    );
+    expect(autoSelectionBlocked.status).toBe(409);
+
+    const externalRecorded = await request(
+      `/admin/owner-portal/draws/${secondDrawRunId}/external-winners`,
+      adminToken,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          drawToken: externalInstallmentToken,
+          prizeCode: secondPrizeCode,
+        }),
+      },
+    );
+    expect(externalRecorded.status).toBe(201);
+    expect(externalRecorded.body.status).toBe('ELIGIBILITY_LOCKED');
+    expect(externalRecorded.body.winners).toHaveLength(1);
+    expect(externalRecorded.body.winners[0]).toMatchObject({
+      drawToken: externalInstallmentToken,
+      prizeCode: secondPrizeCode,
+      prizeName: 'February Workflow Prize',
+      tierWinnerPosition: 1,
+      prizeWinnerCount: 1,
+    });
+    expect(externalRecorded.body.winners[0].verificationStatus).toBeNull();
+
+    const finalizedExternal = await request(
+      `/admin/owner-portal/draws/${secondDrawRunId}/finalize-external-selection`,
+      adminToken,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          externalReference: 'UAT-EXTERNAL-DRAW-REGISTER-001',
+          note: 'External draw result entered against the locked five-digit token',
+        }),
+      },
+    );
+    expect(finalizedExternal.status).toBe(201);
+    expect(finalizedExternal.body.status).toBe('SELECTED');
+    expect(finalizedExternal.body.engineStatus).toBe('DRAWN');
+    expect(finalizedExternal.body.winnerCount).toBe(1);
+    expect(finalizedExternal.body.externalDrawReference).toBe('UAT-EXTERNAL-DRAW-REGISTER-001');
+    expect(finalizedExternal.body.winners[0].verificationStatus).toBe('PENDING');
+
+    const externalOutcome = await prisma.$queryRawUnsafe<Array<{
+      selectionAlgorithm: string | null;
+      winnerCount: number;
+    }>>(
+      'SELECT selectionAlgorithm, winnerCount FROM lucky_draw_instances WHERE id=? LIMIT 1',
+      secondDrawId,
+    );
+    expect(externalOutcome[0]).toMatchObject({
+      selectionAlgorithm: 'MANUAL_EXTERNAL_V1',
+      winnerCount: 1,
     });
 
     const failedVerification = await request(
