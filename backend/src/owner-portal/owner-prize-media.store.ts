@@ -61,10 +61,7 @@ export class OwnerPrizeMediaStore implements OnModuleInit, OnModuleDestroy {
       originalName: filename,
       sha256,
     };
-    const stream = bucket.openUploadStream(filename, {
-      contentType: input.contentType,
-      metadata,
-    });
+    const stream = bucket.openUploadStream(filename, { metadata });
     await new Promise<void>((resolve, reject) => {
       stream.once('finish', () => resolve());
       stream.once('error', reject);
