@@ -47,6 +47,9 @@ type PrizeDraft = {
   description?: string;
   winnerCount: number;
   nominalValue?: string;
+  mediaId?: string;
+  mediaName?: string;
+  mediaMimeType?: string;
 };
 type NavItem = { section: Section; label: string; symbol: string; group: string };
 
@@ -153,6 +156,7 @@ export function OwnerCorePortal({ section, extension }: { section: OwnerCoreSect
   const [duplicatePrizes, setDuplicatePrizes] = useState<PrizeDraft[]>([]);
   const [selectedSeasonId, setSelectedSeasonId] = useState('');
   const [prizeDraft, setPrizeDraft] = useState<PrizeDraft[]>([]);
+  const [selectedPrizeMonth, setSelectedPrizeMonth] = useState(1);
   const [drawPrizes, setDrawPrizes] = useState<Row[]>([]);
   const [selectedDrawId, setSelectedDrawId] = useState('');
   const [selectedDraw, setSelectedDraw] = useState<Row | null>(null);
@@ -219,9 +223,14 @@ export function OwnerCorePortal({ section, extension }: { section: OwnerCoreSect
         const preferred = selectedSeasonId || text(seasons.find((row) => text(row.status) === 'ACTIVE')?.id, '') || text(seasons[0]?.id, '');
         if (preferred) {
           if (preferred !== selectedSeasonId) setSelectedSeasonId(preferred);
-          setPrizeDraft((await apiJson<Row[]>(`${API}/seasons/${encodeURIComponent(preferred)}/prizes`)).map(prizeFromRow));
+          const loadedPrizes = (await apiJson<Row[]>(`${API}/seasons/${encodeURIComponent(preferred)}/prizes`)).map(prizeFromRow);
+          setPrizeDraft(loadedPrizes);
+          setSelectedPrizeMonth((current) => loadedPrizes.some((prize) => prize.monthNumber === current)
+            ? current
+            : loadedPrizes[0]?.monthNumber ?? 1);
         } else {
           setPrizeDraft([]);
+          setSelectedPrizeMonth(1);
         }
       }
     } catch (err) {
@@ -449,11 +458,14 @@ export function OwnerCorePortal({ section, extension }: { section: OwnerCoreSect
     setSelectedSeasonId(id);
     if (!id) {
       setPrizeDraft([]);
+      setSelectedPrizeMonth(1);
       return;
     }
     setBusy(true);
     try {
-      setPrizeDraft((await apiJson<Row[]>(`${API}/seasons/${encodeURIComponent(id)}/prizes`)).map(prizeFromRow));
+      const loadedPrizes = (await apiJson<Row[]>(`${API}/seasons/${encodeURIComponent(id)}/prizes`)).map(prizeFromRow);
+      setPrizeDraft(loadedPrizes);
+      setSelectedPrizeMonth(loadedPrizes[0]?.monthNumber ?? 1);
     } catch (err) {
       handleApiError(err);
     } finally {
@@ -462,8 +474,23 @@ export function OwnerCorePortal({ section, extension }: { section: OwnerCoreSect
   }
 
   function addPrize() {
-    const nextMonth = Math.min(60, Math.max(0, ...prizeDraft.map((item) => item.monthNumber)) + 1);
-    setPrizeDraft((current) => [...current, { monthNumber: nextMonth || 1, prizeCode: `PRIZE_${Date.now()}`, category: 'Prize', name: 'New Prize', winnerCount: 1 }]);
+    const monthNumber = Math.min(60, Math.max(1, selectedPrizeMonth));
+    setPrizeDraft((current) => {
+      let sequence = current.filter((item) => item.monthNumber === monthNumber).length + 1;
+      let prizeCode = `MONTH_${monthNumber}_PRIZE_${sequence}`;
+      const codes = new Set(current.map((item) => item.prizeCode.trim().toUpperCase()));
+      while (codes.has(prizeCode)) {
+        sequence += 1;
+        prizeCode = `MONTH_${monthNumber}_PRIZE_${sequence}`;
+      }
+      return [...current, {
+        monthNumber,
+        prizeCode,
+        category: 'Prize',
+        name: 'New Prize',
+        winnerCount: 1,
+      }];
+    });
   }
   function updatePrize(index: number, key: keyof PrizeDraft, value: string | number) {
     setPrizeDraft((current) => current.map((item, itemIndex) => itemIndex === index ? { ...item, [key]: value } : item));
@@ -471,11 +498,48 @@ export function OwnerCorePortal({ section, extension }: { section: OwnerCoreSect
   function removePrize(index: number) {
     setPrizeDraft((current) => current.filter((_, itemIndex) => itemIndex !== index));
   }
+  function clearPrizeMedia(index: number) {
+    setPrizeDraft((current) => current.map((item, itemIndex) => itemIndex === index
+      ? { ...item, mediaId: undefined, mediaName: undefined, mediaMimeType: undefined }
+      : item));
+  }
+  async function uploadPrizeMedia(index: number, file: File | undefined) {
+    if (!selectedSeasonId || !file) return;
+    setBusy(true);
+    setError('');
+    setNotice('');
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const media = await apiJson<{ id: string; filename: string; contentType: string }>(
+        `${API}/seasons/${encodeURIComponent(selectedSeasonId)}/prize-media`,
+        { method: 'POST', body: form },
+      );
+      setPrizeDraft((current) => current.map((item, itemIndex) => itemIndex === index
+        ? { ...item, mediaId: media.id, mediaName: media.filename, mediaMimeType: media.contentType }
+        : item));
+      setNotice('Prize attachment uploaded. Save the prize schedule to attach it to this prize.');
+    } catch (err) {
+      handleApiError(err);
+    } finally {
+      setBusy(false);
+    }
+  }
   async function savePrizes() {
     if (!selectedSeasonId) return;
+    const prizes = prizeDraft.map((prize) => ({
+      monthNumber: prize.monthNumber,
+      prizeCode: prize.prizeCode,
+      category: prize.category,
+      name: prize.name,
+      description: prize.description,
+      winnerCount: prize.winnerCount,
+      nominalValue: prize.nominalValue,
+      mediaId: prize.mediaId,
+    }));
     await run(() => apiJson(`${API}/seasons/${encodeURIComponent(selectedSeasonId)}/prizes`, {
       method: 'PUT',
-      body: JSON.stringify({ prizes: prizeDraft }),
+      body: JSON.stringify({ prizes }),
     }), 'Prize schedule saved');
   }
 
@@ -632,15 +696,63 @@ export function OwnerCorePortal({ section, extension }: { section: OwnerCoreSect
   function renderPrizes() {
     const seasons = (Array.isArray(data) ? data : []) as Row[];
     const selectedSeason = seasons.find((row) => text(row.id) === selectedSeasonId) ?? {};
-    const monthTabs = prizeDraft.map((prize, index) => ({ id: `prize-editor-${index + 1}`, label: `Month ${prize.monthNumber}` }));
-    return <><Hero title="Prize Catalogue" subtitle="Manage prize categories, values, quantities, winner limits and monthly allocation." />
+    const monthNumbers = [...new Set(prizeDraft.map((prize) => prize.monthNumber))].sort((left, right) => left - right);
+    const monthTabs = monthNumbers.map((monthNumber) => ({
+      id: `prize-editor-month-${monthNumber}`,
+      label: `Month ${monthNumber}`,
+      count: prizeDraft.filter((prize) => prize.monthNumber === monthNumber).length,
+    }));
+    return <><Hero title="Prize Catalogue" subtitle="Manage prize categories, values, quantities, winner limits, attachments and monthly allocation." />
       <WorkspaceTabs ariaLabel="Prize catalogue workspace" tabs={[
         { id: 'prize-season', label: 'Season & Export' },
         { id: 'prize-editor', label: 'Monthwise Editor', count: prizeDraft.length },
       ]}>
         {(activeTab) => <>
           {activeTab === 'prize-season' ? <div className={styles.card}><SectionHead icon="🎁" title="Prize Schedule" action={<button type="button" className={classNames(styles.button, styles.outline)} disabled={!prizeDraft.length} onClick={() => exportCsv(prizeDraft as unknown as Row[], `${text(selectedSeason.code, 'season').toLowerCase()}-prize-schedule.csv`)}>EXPORT SCHEDULE</button>} /><Field label="Season"><select className={styles.select} value={selectedSeasonId} onChange={(event) => void changePrizeSeason(event.target.value)}><option value="">Select season</option>{seasons.map((row) => <option key={text(row.id)} value={text(row.id)}>{text(row.name)} • {text(row.status)}</option>)}</select></Field><div className={styles.buttonLine}><button type="button" className={styles.button} disabled={!selectedSeasonId} onClick={() => showTab('prize-editor')}>OPEN MONTHWISE EDITOR</button></div></div> : null}
-          {activeTab === 'prize-editor' ? selectedSeasonId ? <div className={styles.card}><SectionHead icon="🎁" title="Monthwise Prizes" action={<button type="button" className={styles.button} onClick={addPrize}>+ ADD PRIZE</button>} />{prizeDraft.length ? <WorkspaceTabs ariaLabel="Prize editor months" tabs={monthTabs}>{(monthTab) => { const index = Math.max(0, Number(monthTab.replace('prize-editor-', '')) - 1); const prize = prizeDraft[index]; return prize ? <div className={styles.month}><span className={styles.monthNo}>{prize.monthNumber}</span><h3>MONTH {prize.monthNumber}</h3><div className={styles.prizeVisual}>🎁</div><Field label="Month"><input className={styles.input} type="number" min="1" max="60" value={prize.monthNumber} onChange={(event) => updatePrize(index, 'monthNumber', Number(event.target.value) || 1)} /></Field><Field label="Prize Code"><input className={styles.input} value={prize.prizeCode} onChange={(event) => updatePrize(index, 'prizeCode', event.target.value)} /></Field><Field label="Prize Name"><input className={styles.input} value={prize.name} onChange={(event) => updatePrize(index, 'name', event.target.value)} /></Field><Field label="Category"><input className={styles.input} value={prize.category} onChange={(event) => updatePrize(index, 'category', event.target.value)} /></Field><Field label="Winner Count"><input className={styles.input} type="number" min="1" value={prize.winnerCount} onChange={(event) => updatePrize(index, 'winnerCount', Number(event.target.value) || 1)} /></Field><Field label="Approx. Value (optional)"><input className={styles.input} inputMode="decimal" value={prize.nominalValue ?? ''} onChange={(event) => updatePrize(index, 'nominalValue', event.target.value)} /></Field><Field label="Description"><input className={styles.input} value={prize.description ?? ''} onChange={(event) => updatePrize(index, 'description', event.target.value)} /></Field><div className={styles.buttonLine}><button type="button" className={classNames(styles.button, styles.red)} onClick={() => removePrize(index)}>REMOVE</button></div></div> : null; }}</WorkspaceTabs> : <Empty>No prizes yet. Use “+ ADD PRIZE” to build the monthwise schedule.</Empty>}<div className={styles.buttonLine}><button type="button" className={styles.button} disabled={busy || !prizeDraft.length} onClick={() => void savePrizes()}>SAVE PRIZE SCHEDULE</button></div></div> : <div className={styles.card}><Empty>Select a Season first.</Empty></div> : null}
+          {activeTab === 'prize-editor' ? selectedSeasonId ? <div className={styles.card}>
+            <SectionHead icon="🎁" title="Monthwise Prizes" action={<button type="button" className={styles.button} disabled={busy || !monthNumbers.length} onClick={addPrize}>+ ADD PRIZE TO MONTH {selectedPrizeMonth}</button>} />
+            <div className={styles.notice}>“Add Prize” adds another prize inside the selected month. It does not create another month.</div>
+            {prizeDraft.length ? <WorkspaceTabs
+              ariaLabel="Prize editor months"
+              tabs={monthTabs}
+              initialTab={`prize-editor-month-${selectedPrizeMonth}`}
+              onTabChange={(monthTab) => {
+                const monthNumber = Number(monthTab.replace('prize-editor-month-', ''));
+                if (Number.isInteger(monthNumber) && monthNumber >= 1 && monthNumber <= 60) setSelectedPrizeMonth(monthNumber);
+              }}
+            >{(monthTab) => {
+              const monthNumber = Number(monthTab.replace('prize-editor-month-', ''));
+              const prizesForMonth = prizeDraft
+                .map((prize, index) => ({ prize, index }))
+                .filter((entry) => entry.prize.monthNumber === monthNumber);
+              return <div className={styles.prizeStack}>{prizesForMonth.map(({ prize, index }, position) => {
+                const mediaUrl = prize.mediaId ? `${API}/prize-media/${encodeURIComponent(prize.mediaId)}` : '';
+                const isImage = Boolean(prize.mediaMimeType?.startsWith('image/'));
+                return <div className={styles.month} key={`${prize.prizeCode}-${index}`}>
+                  <span className={styles.monthNo}>{position + 1}</span>
+                  <h3>MONTH {prize.monthNumber} • PRIZE {position + 1}</h3>
+                  <div className={styles.prizeVisual}>
+                    {mediaUrl && isImage
+                      ? <span className={styles.prizeImagePreview} role="img" aria-label={prize.mediaName || prize.name} style={{ backgroundImage: `url("${mediaUrl}")` }} />
+                      : mediaUrl ? <span className={styles.prizeAttachmentIcon}>📎</span> : '🎁'}
+                  </div>
+                  <div className={styles.fields}>
+                    <Field label="Month"><input className={styles.input} type="number" min="1" max="60" value={prize.monthNumber} onChange={(event) => updatePrize(index, 'monthNumber', Number(event.target.value) || 1)} /></Field>
+                    <Field label="Prize Code"><input className={styles.input} value={prize.prizeCode} onChange={(event) => updatePrize(index, 'prizeCode', event.target.value)} /></Field>
+                    <Field label="Prize Name"><input className={styles.input} value={prize.name} onChange={(event) => updatePrize(index, 'name', event.target.value)} /></Field>
+                    <Field label="Category"><input className={styles.input} value={prize.category} onChange={(event) => updatePrize(index, 'category', event.target.value)} /></Field>
+                    <Field label="Winner Count"><input className={styles.input} type="number" min="1" value={prize.winnerCount} onChange={(event) => updatePrize(index, 'winnerCount', Number(event.target.value) || 1)} /></Field>
+                    <Field label="Approx. Value (optional)"><input className={styles.input} inputMode="decimal" value={prize.nominalValue ?? ''} onChange={(event) => updatePrize(index, 'nominalValue', event.target.value)} /></Field>
+                    <Field label="Description" full><input className={styles.input} value={prize.description ?? ''} onChange={(event) => updatePrize(index, 'description', event.target.value)} /></Field>
+                    <Field label="Prize Image / File" full><input className={styles.input} type="file" accept="image/jpeg,image/png,image/webp,application/pdf" disabled={busy} onChange={(event) => void uploadPrizeMedia(index, event.target.files?.[0])} /></Field>
+                  </div>
+                  {prize.mediaId ? <div className={styles.attachmentRow}><span><b>{prize.mediaName || 'Prize attachment'}</b><small>{prize.mediaMimeType || 'file'}</small></span><div className={styles.buttonLine}><a className={classNames(styles.button, styles.outline, styles.linkButton)} href={mediaUrl} target="_blank" rel="noreferrer">OPEN FILE</a><button type="button" className={classNames(styles.button, styles.outline)} onClick={() => clearPrizeMedia(index)}>REMOVE FILE</button></div></div> : null}
+                  <div className={styles.buttonLine}><button type="button" className={classNames(styles.button, styles.red)} onClick={() => removePrize(index)}>REMOVE PRIZE</button></div>
+                </div>;
+              })}</div>;
+            }}</WorkspaceTabs> : <Empty>No prizes yet.</Empty>}
+            <div className={styles.buttonLine}><button type="button" className={styles.button} disabled={busy || !prizeDraft.length} onClick={() => void savePrizes()}>SAVE PRIZE SCHEDULE</button></div>
+          </div> : <div className={styles.card}><Empty>Select a Season first.</Empty></div> : null}
         </>}
       </WorkspaceTabs>
     </>;
@@ -673,6 +785,11 @@ function prizeFromRow(row: Row): PrizeDraft {
     description: text(row.description, ''),
     winnerCount: number(row.winnerCount, 1),
     ...(row.nominalValue ? { nominalValue: text(row.nominalValue) } : {}),
+    ...(row.mediaId ? {
+      mediaId: text(row.mediaId),
+      mediaName: text(row.mediaName, 'Prize attachment'),
+      mediaMimeType: text(row.mediaMimeType, 'application/octet-stream'),
+    } : {}),
   };
 }
 function exportCsv(rows: Row[], filename: string) {
