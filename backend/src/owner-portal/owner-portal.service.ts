@@ -25,6 +25,7 @@ import { ProgramPaymentService } from '../program/program-payment.service';
 import { ProgramPolicyService } from '../program/program-policy.service';
 import { ReferralRewardPolicyService } from '../referral-reward/referral-reward-policy.service';
 import { UsersService } from '../users/users.service';
+import { OwnerPrizeMediaStore } from './owner-prize-media.store';
 import type {
   ApproveOwnerDrawDto,
   ConsumeOwnerAuthCodeDto,
@@ -48,6 +49,12 @@ import type {
 
 type SqlValue = string | number | bigint | boolean | Date | null;
 type SeasonStatus = 'DRAFT' | 'REVIEW' | 'ACTIVE' | 'PAUSED' | 'CLOSED' | 'ARCHIVED';
+type PrizeMediaUpload = {
+  buffer: Buffer;
+  originalname: string;
+  mimetype: string;
+  size: number;
+};
 
 type SeasonRow = {
   id: string;
@@ -147,6 +154,7 @@ export class OwnerPortalService {
     private readonly drawPolicies: LuckyDrawPolicyService,
     private readonly draws: LuckyDrawExecutionService,
     private readonly ledger: LedgerService,
+    private readonly prizeMedia: OwnerPrizeMediaStore,
   ) {}
 
   async dashboard() {
@@ -605,10 +613,51 @@ export class OwnerPortalService {
 
   async listSeasonPrizes(seasonId: string) {
     return this.rows<Record<string, unknown>>(
-      `SELECT id, seasonId, monthNumber, prizeCode, category, name, description, winnerCount, nominalValue, currencyCode, status
+      `SELECT id, seasonId, monthNumber, prizeCode, category, name, description,
+              mediaId, mediaName, mediaMimeType,
+              winnerCount, nominalValue, currencyCode, status
        FROM owner_season_prizes WHERE seasonId=? ORDER BY monthNumber ASC, createdAt ASC`,
       [seasonId],
     );
+  }
+
+  async uploadSeasonPrizeMedia(
+    seasonId: string,
+    file: PrizeMediaUpload | undefined,
+    actorUserId: string,
+  ) {
+    const season = await this.requireSeason(seasonId);
+    if (!['DRAFT', 'REVIEW'].includes(season.status)) {
+      throw new ConflictException('Prize media is locked after season activation');
+    }
+    if (!file?.buffer?.length) throw new BadRequestException('Choose a prize image or PDF to upload');
+    if (file.size > 5 * 1024 * 1024) throw new BadRequestException('Prize attachment must be 5 MB or smaller');
+    const contentType = this.detectPrizeMediaType(file.buffer);
+    if (!contentType || contentType !== file.mimetype.toLowerCase()) {
+      throw new BadRequestException('Prize attachment must be a valid JPEG, PNG, WEBP or PDF file');
+    }
+    const media = await this.prizeMedia.upload({
+      seasonId,
+      actorUserId,
+      originalName: file.originalname,
+      contentType,
+      buffer: file.buffer,
+    });
+    await this.audit.log({
+      actorUserId,
+      action: AuditAction.CREATE,
+      entityType: 'OwnerSeasonPrizeMedia',
+      entityId: media.id,
+      description: 'Prize catalogue attachment uploaded',
+      metadata: { seasonId, contentType: media.contentType, length: media.length, sha256: media.sha256 },
+    });
+    return media;
+  }
+
+  async openPrizeMedia(mediaId: string) {
+    const media = await this.prizeMedia.open(mediaId);
+    if (!media) throw new NotFoundException('Prize attachment not found');
+    return media;
   }
 
   async saveSeasonPrizes(seasonId: string, prizes: OwnerSeasonPrizeDto[], actorUserId: string) {
@@ -1305,13 +1354,25 @@ export class OwnerPortalService {
     currencyCode: string,
   ) {
     const normalizedCurrency = currencyCode.trim().toUpperCase();
+    const media = new Map<string, { filename: string; contentType: string }>();
+    for (const mediaId of [...new Set(prizes.flatMap((prize) => prize.mediaId ? [prize.mediaId] : []))]) {
+      const info = await this.prizeMedia.info(mediaId);
+      if (!info || info.seasonId !== seasonId) {
+        throw new BadRequestException('Prize attachment does not belong to this season');
+      }
+      media.set(mediaId, { filename: info.filename, contentType: info.contentType });
+    }
+
     await this.db.transaction(async (connection) => {
       await connection.query('DELETE FROM owner_season_prizes WHERE seasonId=?', [seasonId]);
       for (const prize of prizes) {
+        const attachment = prize.mediaId ? media.get(prize.mediaId) : undefined;
         await connection.query(
           `INSERT INTO owner_season_prizes
-           (id, seasonId, monthNumber, prizeCode, category, name, description, winnerCount, nominalValue, currencyCode, status)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVE')`,
+           (id, seasonId, monthNumber, prizeCode, category, name, description,
+            mediaId, mediaName, mediaMimeType,
+            winnerCount, nominalValue, currencyCode, status)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVE')`,
           [
             randomUUID(),
             seasonId,
@@ -1320,6 +1381,9 @@ export class OwnerPortalService {
             prize.category.trim(),
             prize.name.trim(),
             prize.description?.trim() || null,
+            prize.mediaId ?? null,
+            attachment?.filename ?? null,
+            attachment?.contentType ?? null,
             prize.winnerCount,
             prize.nominalValue ?? null,
             normalizedCurrency,
@@ -1327,6 +1391,21 @@ export class OwnerPortalService {
         );
       }
     });
+  }
+
+  private detectPrizeMediaType(buffer: Buffer): string | null {
+    if (buffer.length >= 4 && buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return 'image/jpeg';
+    if (
+      buffer.length >= 8 &&
+      buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
+    ) return 'image/png';
+    if (
+      buffer.length >= 12 &&
+      buffer.subarray(0, 4).toString('ascii') === 'RIFF' &&
+      buffer.subarray(8, 12).toString('ascii') === 'WEBP'
+    ) return 'image/webp';
+    if (buffer.length >= 5 && buffer.subarray(0, 5).toString('ascii') === '%PDF-') return 'application/pdf';
+    return null;
   }
 
   private defaultPrizes(totalMonths: number): OwnerSeasonPrizeDto[] {
