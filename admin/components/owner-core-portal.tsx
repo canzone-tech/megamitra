@@ -716,6 +716,7 @@ export function OwnerCorePortal({ section, extension }: { section: OwnerCoreSect
             <SectionHead icon="🎁" title="Monthwise Prizes" action={<button type="button" className={styles.button} disabled={busy} onClick={addPrize}>+ ADD PRIZE TO MONTH {selectedPrizeMonth}</button>} />
             <div className={styles.notice}>“Add Prize” adds another prize inside the selected month. It does not create another month.</div>
             {prizeDraft.length ? <WorkspaceTabs
+              key={`prize-months-${selectedSeasonId}`}
               ariaLabel="Prize editor months"
               tabs={monthTabs}
               initialTab={`prize-editor-month-${selectedPrizeMonth}`}
