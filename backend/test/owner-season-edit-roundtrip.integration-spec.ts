@@ -126,7 +126,7 @@ describe('MegaGoldenClub owner season edit round-trip integration', () => {
       code: seasonCode.toUpperCase(),
       name: payload.name,
       startDate: '2027-01-01',
-      endDate: null,
+      endDate: '2028-06-30',
       monthlyEmi: '1000.00',
       registrationFee: '1000.00',
       totalMonths: 18,
@@ -146,11 +146,14 @@ describe('MegaGoldenClub owner season edit round-trip integration', () => {
     referralPolicyId = String(created.body.referralPolicyId);
     referralPolicyVersionId = String(created.body.referralPolicyVersionId);
 
-    const stored = await prisma.$queryRawUnsafe<Array<{ startDate: string }>>(
-      "SELECT DATE_FORMAT(startDate, '%Y-%m-%d') AS startDate FROM owner_seasons WHERE id = ?",
+    const stored = await prisma.$queryRawUnsafe<Array<{ startDate: string; endDate: string }>>(
+      "SELECT DATE_FORMAT(startDate, '%Y-%m-%d') AS startDate, DATE_FORMAT(endDate, '%Y-%m-%d') AS endDate FROM owner_seasons WHERE id = ?",
       seasonId,
     );
-    expect(stored[0]?.startDate).toBe('2027-01-01');
+    expect(stored[0]).toMatchObject({
+      startDate: '2027-01-01',
+      endDate: '2028-06-30',
+    });
 
     const register = await request('/admin/owner-portal/seasons', adminToken);
     expect(register.status).toBe(200);
@@ -159,6 +162,7 @@ describe('MegaGoldenClub owner season edit round-trip integration', () => {
     );
     expect(listed).toMatchObject({
       startDate: '2027-01-01',
+      endDate: '2028-06-30',
       monthlyEmi: '1000.00',
       registrationFee: '1000.00',
       totalMonths: 18,
@@ -172,6 +176,7 @@ describe('MegaGoldenClub owner season edit round-trip integration', () => {
     expect(editSource.status).toBe(200);
     expect(editSource.body).toMatchObject({
       startDate: '2027-01-01',
+      endDate: '2028-06-30',
       monthlyEmi: '1000.00',
       registrationFee: '1000.00',
       totalMonths: 18,
