@@ -422,6 +422,220 @@ describe('MegaGoldenClub auth integration', () => {
     expect(correctButLocked.status).toBe(401);
   });
 
+  it('requires atomic sequential catch-up E-PINs for a late session join', async () => {
+    const late = await createPaidRegistrationFixture(
+      prisma,
+      config,
+      'latejoin',
+      { seasonStartOffsetMonths: -3 },
+    );
+    const suffix = randomUUID().replaceAll('-', '').slice(0, 12);
+    const activationPin = `ACT-${suffix}`;
+    const installmentPins = [
+      `EMI2-${suffix}`,
+      `EMI3-${suffix}`,
+      `EMI4-${suffix}`,
+    ];
+    const lateEpinIds = [
+      await late.createEpin(activationPin, 'ACTIVATION'),
+      ...(await Promise.all(
+        installmentPins.map((pin) => late.createEpin(pin, 'INSTALLMENT')),
+      )),
+    ];
+    let lateUserId = '';
+
+    try {
+      const preview = await request('/auth/registration-epin-preview', {
+        method: 'POST',
+        body: JSON.stringify({ epin: activationPin }),
+      });
+      expect(preview.status).toBe(200);
+      expect(preview.body).toMatchObject({
+        seasonId: late.seasonId,
+        seasonStartDate: late.seasonStartDate,
+        requiredInstallmentCount: 4,
+        activationPinInstallments: 1,
+        additionalInstallmentEpinsRequired: 3,
+      });
+
+      const incompleteUsername = `late_incomplete_${suffix}`;
+      const incomplete = await request('/auth/register', {
+        method: 'POST',
+        body: JSON.stringify({
+          username: incompleteUsername,
+          email: `${incompleteUsername}@example.test`,
+          password: 'Integration-Pass-123!',
+          fullName: 'Late Incomplete Member',
+          sponsorReference: late.sponsorUsername,
+          epin: activationPin,
+          installmentEpins: installmentPins.slice(0, 2),
+        }),
+      });
+      expect(incomplete.status).toBe(400);
+      expect(
+        await prisma.user.findUnique({ where: { username: incompleteUsername } }),
+      ).toBeNull();
+
+      const pinStatesAfterRejectedAttempt = await prisma.$queryRawUnsafe<
+        Array<{ status: string; usedByUserId: string | null }>
+      >(
+        `SELECT status, usedByUserId FROM owner_epins
+         WHERE id IN (${lateEpinIds.map(() => '?').join(',')})
+         ORDER BY id`,
+        ...lateEpinIds,
+      );
+      expect(pinStatesAfterRejectedAttempt).toHaveLength(4);
+      expect(
+        pinStatesAfterRejectedAttempt.every(
+          (pin) => pin.status === 'ACTIVE' && pin.usedByUserId === null,
+        ),
+      ).toBe(true);
+
+      const username = `late_complete_${suffix}`;
+      const registered = await request('/auth/register', {
+        method: 'POST',
+        body: JSON.stringify({
+          username,
+          email: `${username}@example.test`,
+          password: 'Integration-Pass-123!',
+          fullName: 'Late Complete Member',
+          sponsorReference: late.sponsorUsername,
+          epin: activationPin,
+          installmentEpins: installmentPins,
+        }),
+      });
+      expect(registered.status).toBe(201);
+      lateUserId = String(registered.body.user.id);
+      expect(registered.body.enrollment).toMatchObject({
+        seasonId: late.seasonId,
+        seasonStartDate: late.seasonStartDate,
+        paidInstallmentCount: 4,
+        catchUpInstallmentCount: 3,
+        registrationFeePaid: true,
+        firstInstallmentPaid: true,
+      });
+
+      const drawTokens = registered.body.enrollment.drawTokens as Array<{
+        token: string;
+        installmentSequence: number;
+        status: string;
+      }>;
+      expect(drawTokens).toHaveLength(4);
+      expect(drawTokens.map((item) => item.installmentSequence)).toEqual([1, 2, 3, 4]);
+      for (const item of drawTokens) {
+        expect(item.token).toMatch(/^\d{5}$/);
+        expect(item.status).toBe('AVAILABLE');
+      }
+
+      const enrollmentId = String(registered.body.enrollment.id);
+      const installmentRows = await prisma.$queryRawUnsafe<
+        Array<{ sequence: number; paid: string | number }>
+      >(
+        `SELECT i.sequence, COALESCE(SUM(a.amount), 0) AS paid
+         FROM program_installments i
+         LEFT JOIN program_payment_allocations a
+           ON a.installmentId=i.id AND a.allocationType='INSTALLMENT'
+         WHERE i.enrollmentId=?
+         GROUP BY i.id, i.sequence
+         ORDER BY i.sequence ASC`,
+        enrollmentId,
+      );
+      expect(installmentRows.slice(0, 5).map((row) => ({
+        sequence: Number(row.sequence),
+        paid: Number(row.paid),
+      }))).toEqual([
+        { sequence: 1, paid: 1000 },
+        { sequence: 2, paid: 1000 },
+        { sequence: 3, paid: 1000 },
+        { sequence: 4, paid: 1000 },
+        { sequence: 5, paid: 0 },
+      ]);
+
+      const persistedTokens = await prisma.$queryRawUnsafe<
+        Array<{ installmentSequence: number; token: string; status: string }>
+      >(
+        `SELECT installmentSequence, token, status
+         FROM lucky_draw_tokens
+         WHERE seasonId=? AND enrollmentId=?
+         ORDER BY installmentSequence ASC`,
+        late.seasonId,
+        enrollmentId,
+      );
+      expect(persistedTokens).toHaveLength(4);
+      expect(persistedTokens.map((item) => Number(item.installmentSequence))).toEqual([
+        1, 2, 3, 4,
+      ]);
+
+      const consumedPins = await prisma.$queryRawUnsafe<
+        Array<{ pinType: string; status: string; usedByUserId: string | null }>
+      >(
+        `SELECT pinType, status, usedByUserId FROM owner_epins
+         WHERE id IN (${lateEpinIds.map(() => '?').join(',')})
+         ORDER BY pinType, id`,
+        ...lateEpinIds,
+      );
+      expect(consumedPins).toHaveLength(4);
+      expect(
+        consumedPins.every(
+          (pin) => pin.status === 'USED' && pin.usedByUserId === lateUserId,
+        ),
+      ).toBe(true);
+      expect(consumedPins.filter((pin) => pin.pinType === 'ACTIVATION')).toHaveLength(1);
+      expect(consumedPins.filter((pin) => pin.pinType === 'INSTALLMENT')).toHaveLength(3);
+    } finally {
+      const lateUserIds = [late.sponsorUserId, lateUserId].filter(Boolean);
+      if (lateUserIds.length) {
+        await prisma.auditLog.deleteMany({
+          where: {
+            OR: [
+              { actorUserId: { in: lateUserIds } },
+              { entityId: { in: lateUserIds } },
+            ],
+          },
+        });
+      }
+      if (lateUserId) {
+        await late.cleanupUserEnrollments([lateUserId]);
+      }
+      await prisma.$executeRawUnsafe(
+        `DELETE FROM owner_epins
+         WHERE id IN (${lateEpinIds.map(() => '?').join(',')})`,
+        ...lateEpinIds,
+      );
+      if (lateUserIds.length) {
+        const placeholders = lateUserIds.map(() => '?').join(',');
+        await prisma.$executeRawUnsafe(
+          `DELETE FROM binary_ancestry
+           WHERE ancestorUserId IN (${placeholders}) OR descendantUserId IN (${placeholders})`,
+          ...lateUserIds,
+          ...lateUserIds,
+        );
+        await prisma.$executeRawUnsafe(
+          `DELETE FROM binary_placements
+           WHERE memberUserId IN (${placeholders}) OR parentUserId IN (${placeholders})`,
+          ...lateUserIds,
+          ...lateUserIds,
+        );
+        await prisma.$executeRawUnsafe(
+          `DELETE FROM sponsor_relationships
+           WHERE memberUserId IN (${placeholders}) OR sponsorUserId IN (${placeholders})`,
+          ...lateUserIds,
+          ...lateUserIds,
+        );
+        await prisma.$executeRawUnsafe(
+          `DELETE FROM member_profiles WHERE userId IN (${placeholders})`,
+          ...lateUserIds,
+        );
+        await prisma.userRole.deleteMany({ where: { userId: { in: lateUserIds } } });
+        await prisma.authSession.deleteMany({ where: { userId: { in: lateUserIds } } });
+      }
+      await late.cleanupDomain();
+      if (lateUserIds.length) {
+        await prisma.user.deleteMany({ where: { id: { in: lateUserIds } } });
+      }
+    }
+  });
+
   it('uses MEMBER-only registration, safe sponsor lookup, E-PIN replay protection, and seeds AGENT', async () => {
     const suffix = randomUUID().replaceAll('-', '').slice(0, 12);
     const [memberRole, agentRole] = await Promise.all([
