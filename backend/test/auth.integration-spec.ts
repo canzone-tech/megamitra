@@ -267,6 +267,46 @@ describe('MegaGoldenClub auth integration', () => {
     const userId = String(registered.body.user.id);
     createdUserIds.push(userId);
 
+    expect(registered.body.enrollment).toMatchObject({
+      seasonId: paidRegistration.seasonId,
+      seasonStartDate: paidRegistration.seasonStartDate,
+      registrationFeePaid: true,
+      firstInstallmentPaid: true,
+    });
+    expect(registered.body.enrollment.drawTokens).toEqual([
+      expect.objectContaining({
+        token: expect.stringMatching(/^\d{5}$/),
+        installmentSequence: 1,
+        status: 'AVAILABLE',
+      }),
+    ]);
+
+    const enrollmentId = String(registered.body.enrollment.id);
+    const firstInstallment = await prisma.programInstallment.findFirstOrThrow({
+      where: { enrollmentId, sequence: 1 },
+      select: { dueDate: true },
+    });
+    const firstDueDate =
+      firstInstallment.dueDate instanceof Date
+        ? firstInstallment.dueDate.toISOString().slice(0, 10)
+        : String(firstInstallment.dueDate).slice(0, 10);
+    expect(firstDueDate).toBe(paidRegistration.seasonStartDate);
+
+    const drawTokenRows = await prisma.$queryRawUnsafe<
+      Array<{ token: string; installmentSequence: number; status: string }>
+    >(
+      `SELECT token, installmentSequence, status
+       FROM lucky_draw_tokens
+       WHERE enrollmentId=? AND installmentSequence=1`,
+      enrollmentId,
+    );
+    expect(drawTokenRows).toHaveLength(1);
+    expect(drawTokenRows[0]).toMatchObject({
+      installmentSequence: 1,
+      status: 'AVAILABLE',
+    });
+    expect(drawTokenRows[0]?.token).toMatch(/^\d{5}$/);
+
     const memberRole = await prisma.userRole.findFirst({
       where: { userId },
       include: { role: true },
