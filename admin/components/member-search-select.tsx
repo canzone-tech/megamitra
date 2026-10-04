@@ -36,7 +36,7 @@ export function MemberSearchSelect({
   name,
   required = false,
   disabled = false,
-  placeholder = 'Search User ID, name, mobile or email',
+  placeholder = 'Select existing member — search ID, name, mobile or email',
 }: MemberSearchSelectProps) {
   const listId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -163,7 +163,30 @@ export function MemberSearchSelect({
             setOpen(Boolean(event.target.value.trim()));
           }}
           onFocus={() => {
-            if (!selected && query.trim().length >= 2) setOpen(true);
+            if (selected) return;
+            if (query.trim().length >= 2) {
+              setOpen(true);
+              return;
+            }
+            if (!query.trim() && !results.length && !loading) {
+              setLoading(true);
+              setSearchError('');
+              void apiJson<MemberOption[]>('/api/backend/admin/owner-portal/core/members')
+                .then((rows) => {
+                  setResults(rows.slice(0, 12));
+                  setOpen(true);
+                  setActiveIndex(rows.length ? 0 : -1);
+                })
+                .catch((error: unknown) => {
+                  setResults([]);
+                  setOpen(true);
+                  setActiveIndex(-1);
+                  setSearchError(error instanceof Error ? error.message : 'Member search failed');
+                })
+                .finally(() => setLoading(false));
+              return;
+            }
+            setOpen(true);
           }}
           onBlur={() => {
             window.setTimeout(() => setOpen(false), 120);
