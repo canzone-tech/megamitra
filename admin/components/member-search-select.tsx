@@ -93,7 +93,7 @@ export function MemberSearchSelect({
       setLoading(true);
       setSearchError('');
       void apiJson<MemberOption[]>(
-        `/api/backend/admin/owner-portal/members?q=${encodeURIComponent(value)}`,
+        `/api/backend/admin/owner-portal/core/members?q=${encodeURIComponent(value)}`,
         { signal: controller.signal },
       )
         .then((rows) => {
