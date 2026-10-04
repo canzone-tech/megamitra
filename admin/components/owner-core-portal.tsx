@@ -521,7 +521,7 @@ export function OwnerCorePortal({ section, extension }: { section: OwnerCoreSect
     }
     setBusy(true);
     try {
-      const loadedPrizes = (await apiJson<Row[]>(`${API}/seasons/${encodeURIComponent(id)}/prizes`)).map(prizeFromRow);
+      const loadedPrizes = sortPrizeDraft((await apiJson<Row[]>(`${API}/seasons/${encodeURIComponent(id)}/prizes`)).map(prizeFromRow));
       setPrizeDraft(loadedPrizes);
       setSelectedPrizeMonth(loadedPrizes[0]?.monthNumber ?? 1);
     } catch (err) {
@@ -600,7 +600,7 @@ export function OwnerCorePortal({ section, extension }: { section: OwnerCoreSect
       body: JSON.stringify({ prizes }),
     }), 'Prize schedule saved', false);
     if (saved) {
-      setPrizeDraft(saved.map(prizeFromRow));
+      setPrizeDraft(sortPrizeDraft(saved.map(prizeFromRow)));
       setNotice('Prize schedule saved and reloaded from the server.');
     }
   }
@@ -851,7 +851,11 @@ export function OwnerCorePortal({ section, extension }: { section: OwnerCoreSect
               const monthNumber = Number(monthTab.replace('prize-editor-month-', ''));
               const prizesForMonth = prizeDraft
                 .map((prize, index) => ({ prize, index }))
-                .filter((entry) => entry.prize.monthNumber === monthNumber);
+                .filter((entry) => entry.prize.monthNumber === monthNumber)
+                .sort((left, right) =>
+                  prizeSequence(left.prize) - prizeSequence(right.prize)
+                  || left.prize.prizeCode.localeCompare(right.prize.prizeCode)
+                );
               return <div className={styles.prizeStack}>{prizesForMonth.map(({ prize, index }, position) => {
                 const mediaUrl = prize.mediaId ? `${API}/prize-media/${encodeURIComponent(prize.mediaId)}` : '';
                 const isImage = Boolean(prize.mediaMimeType?.startsWith('image/'));
@@ -918,6 +922,18 @@ function prizeFromRow(row: Row): PrizeDraft {
       mediaMimeType: text(row.mediaMimeType, 'application/octet-stream'),
     } : {}),
   };
+}
+function prizeSequence(prize: PrizeDraft) {
+  const match = /^MONTH_(\d+)_PRIZE_(\d+)$/i.exec(prize.prizeCode.trim());
+  if (!match || Number(match[1]) !== prize.monthNumber) return Number.MAX_SAFE_INTEGER;
+  return Number(match[2]);
+}
+function sortPrizeDraft(prizes: PrizeDraft[]) {
+  return [...prizes].sort((left, right) =>
+    left.monthNumber - right.monthNumber
+    || prizeSequence(left) - prizeSequence(right)
+    || left.prizeCode.localeCompare(right.prizeCode)
+  );
 }
 function exportCsv(rows: Row[], filename: string) {
   if (!rows.length) return;
