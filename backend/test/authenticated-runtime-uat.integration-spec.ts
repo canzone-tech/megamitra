@@ -563,12 +563,15 @@ describe('MegaGoldenClub authenticated runtime UAT', () => {
       expect(memberAdminDenied.status).toBe(403);
 
       const adminMemberUsername = `uat_added_member_${suffix}`;
+      const adminMemberEmail = `${adminMemberUsername}@example.test`;
+      const adminMemberPhone = `+91${String(parseInt(suffix.slice(0, 8), 16)).padStart(10, '0').slice(-10)}`;
       const adminAddMember = await request('/admin/owner-portal/core/members', {
         method: 'POST',
         headers: adminHeaders,
         body: JSON.stringify({
           username: adminMemberUsername,
-          email: `${adminMemberUsername}@example.test`,
+          email: adminMemberEmail,
+          phone: adminMemberPhone,
           password: 'Uat-Added-Member-123!',
           fullName: 'Runtime Admin Added Member',
           sponsorReference: sponsorUsername,
