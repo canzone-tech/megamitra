@@ -595,10 +595,14 @@ export function OwnerCorePortal({ section, extension }: { section: OwnerCoreSect
       nominalValue: prize.nominalValue,
       mediaId: prize.mediaId,
     }));
-    await run(() => apiJson(`${API}/seasons/${encodeURIComponent(selectedSeasonId)}/prizes`, {
+    const saved = await run(() => apiJson<Row[]>(`${API}/seasons/${encodeURIComponent(selectedSeasonId)}/prizes`, {
       method: 'PUT',
       body: JSON.stringify({ prizes }),
-    }), 'Prize schedule saved');
+    }), 'Prize schedule saved', false);
+    if (saved) {
+      setPrizeDraft(saved.map(prizeFromRow));
+      setNotice('Prize schedule saved and reloaded from the server.');
+    }
   }
 
   return (
@@ -866,7 +870,7 @@ export function OwnerCorePortal({ section, extension }: { section: OwnerCoreSect
                     <Field label="Category"><input className={styles.input} value={prize.category} onChange={(event) => updatePrize(index, 'category', event.target.value)} /></Field>
                     <Field label="Winner Count"><input className={styles.input} type="number" min="1" value={prize.winnerCount} onChange={(event) => updatePrize(index, 'winnerCount', Number(event.target.value) || 1)} /></Field>
                     <Field label="Approx. Value (optional)"><input className={styles.input} inputMode="decimal" value={prize.nominalValue ?? ''} onChange={(event) => updatePrize(index, 'nominalValue', event.target.value)} /></Field>
-                    <Field label="Description" full><input className={styles.input} value={prize.description ?? ''} onChange={(event) => updatePrize(index, 'description', event.target.value)} /></Field>
+                    <Field label="Description" full><textarea className={styles.textarea} rows={3} maxLength={5000} value={prize.description ?? ''} onChange={(event) => updatePrize(index, 'description', event.target.value)} /></Field>
                     <Field label="Prize Image / File" full><input className={styles.input} type="file" accept="image/jpeg,image/png,image/webp,application/pdf" disabled={busy} onChange={(event) => void uploadPrizeMedia(index, event.target.files?.[0])} /></Field>
                   </div>
                   {prize.mediaId ? <div className={styles.attachmentRow}><span><b>{prize.mediaName || 'Prize attachment'}</b><small>{prize.mediaMimeType || 'file'}</small></span><div className={styles.buttonLine}><a className={classNames(styles.button, styles.outline, styles.linkButton)} href={mediaUrl} target="_blank" rel="noreferrer">OPEN FILE</a><button type="button" className={classNames(styles.button, styles.outline)} onClick={() => clearPrizeMedia(index)}>REMOVE FILE</button></div></div> : null}
