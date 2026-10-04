@@ -1,0 +1,124 @@
+.root {
+  position: relative;
+  width: 100%;
+}
+
+.control {
+  position: relative;
+}
+
+.input {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid #d8d9e7;
+  border-radius: 10px;
+  background: #fff;
+  color: #17172b;
+  padding: 10px 42px 10px 12px;
+  font: inherit;
+  outline: none;
+}
+
+.input:focus {
+  border-color: #7c3aed;
+  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.12);
+}
+
+.input:disabled {
+  background: #f4f4f8;
+  cursor: not-allowed;
+}
+
+.clear {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 50%;
+  background: #f1eef9;
+  color: #5b21b6;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.menu {
+  position: absolute;
+  z-index: 50;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  max-height: 320px;
+  overflow-y: auto;
+  border: 1px solid #dedfea;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 14px 34px rgba(20, 18, 48, 0.16);
+}
+
+.option {
+  display: block;
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid #f0f0f5;
+  background: #fff;
+  padding: 10px 12px;
+  text-align: left;
+  color: #202036;
+  cursor: pointer;
+}
+
+.option:last-child {
+  border-bottom: 0;
+}
+
+.option:hover,
+.active {
+  background: #f6f1ff;
+}
+
+.primary,
+.secondary {
+  display: block;
+}
+
+.primary {
+  font-size: 13px;
+}
+
+.secondary {
+  margin-top: 3px;
+  color: #6f7083;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.selected {
+  margin-top: 5px;
+  color: #23734d;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.message,
+.error {
+  padding: 11px 12px;
+  font-size: 12px;
+}
+
+.message {
+  color: #6f7083;
+}
+
+.error {
+  color: #9f1d31;
+}
+
+.hint {
+  margin-top: 5px;
+  color: #77788a;
+  font-size: 11px;
+}
