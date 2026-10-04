@@ -40,6 +40,7 @@ export function MemberSearchSelect({
 }: MemberSearchSelectProps) {
   const listId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
+  const requestSequence = useRef(0);
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<MemberOption | null>(null);
   const [results, setResults] = useState<MemberOption[]>([]);
@@ -84,6 +85,7 @@ export function MemberSearchSelect({
 
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
+      const requestId = ++requestSequence.current;
       setLoading(true);
       setSearchError('');
       void apiJson<MemberOption[]>(
@@ -91,20 +93,20 @@ export function MemberSearchSelect({
         { signal: controller.signal },
       )
         .then((rows) => {
-          if (controller.signal.aborted) return;
+          if (controller.signal.aborted || requestId !== requestSequence.current) return;
           setResults(rows.slice(0, 12));
           setOpen(true);
           setActiveIndex(rows.length ? 0 : -1);
         })
         .catch((error: unknown) => {
-          if (controller.signal.aborted) return;
+          if (controller.signal.aborted || requestId !== requestSequence.current) return;
           setResults([]);
           setOpen(true);
           setActiveIndex(-1);
           setSearchError(error instanceof Error ? error.message : 'Member search failed');
         })
         .finally(() => {
-          if (!controller.signal.aborted) setLoading(false);
+          if (!controller.signal.aborted && requestId === requestSequence.current) setLoading(false);
         });
     }, 250);
 
@@ -125,6 +127,7 @@ export function MemberSearchSelect({
   }
 
   function clear() {
+    requestSequence.current += 1;
     setSelected(null);
     setQuery('');
     setResults([]);
@@ -153,6 +156,7 @@ export function MemberSearchSelect({
           aria-activedescendant={open && activeIndex >= 0 ? `${listId}-${activeIndex}` : undefined}
           onChange={(event) => {
             const value = event.target.value;
+            requestSequence.current += 1;
             setSelected(null);
             setQuery(value);
             setSearchError('');
@@ -171,21 +175,26 @@ export function MemberSearchSelect({
               return;
             }
             if (!query.trim() && !results.length && !loading) {
+              const requestId = ++requestSequence.current;
               setLoading(true);
               setSearchError('');
               void apiJson<MemberOption[]>('/api/backend/admin/owner-portal/core/members')
                 .then((rows) => {
+                  if (requestId !== requestSequence.current) return;
                   setResults(rows.slice(0, 12));
                   setOpen(true);
                   setActiveIndex(rows.length ? 0 : -1);
                 })
                 .catch((error: unknown) => {
+                  if (requestId !== requestSequence.current) return;
                   setResults([]);
                   setOpen(true);
                   setActiveIndex(-1);
                   setSearchError(error instanceof Error ? error.message : 'Member search failed');
                 })
-                .finally(() => setLoading(false));
+                .finally(() => {
+                  if (requestId === requestSequence.current) setLoading(false);
+                });
               return;
             }
             setOpen(true);
