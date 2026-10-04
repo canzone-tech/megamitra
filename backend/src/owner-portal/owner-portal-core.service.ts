@@ -135,11 +135,11 @@ export class OwnerPortalCoreService {
     )`;
     if (q) {
       where += ` AND (
-        u.username LIKE ? OR u.email LIKE ? OR u.phone LIKE ?
+        u.id LIKE ? OR u.username LIKE ? OR u.email LIKE ? OR u.phone LIKE ?
         OR CONCAT(COALESCE(u.firstName,''), ' ', COALESCE(u.lastName,'')) LIKE ?
       )`;
       const like = `%${q}%`;
-      values.push(like, like, like, like);
+      values.push(like, like, like, like, like);
     }
 
     return this.rows<Record<string, unknown>>(
