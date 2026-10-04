@@ -617,6 +617,32 @@ describe('MegaGoldenClub authenticated runtime UAT', () => {
         usedByUserId: adminAddedMemberId,
       });
 
+      const searchQueries = [
+        adminMemberUsername,
+        adminAddedMemberId,
+        'Runtime Admin Added',
+        adminMemberPhone,
+        adminMemberEmail,
+      ];
+      for (const query of searchQueries) {
+        const memberSearch = await request(
+          `/admin/owner-portal/core/members?q=${encodeURIComponent(query)}`,
+          { headers: adminHeaders },
+        );
+        expect(memberSearch.status).toBe(200);
+        expect(memberSearch.body).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({
+              id: adminAddedMemberId,
+              username: adminMemberUsername,
+              email: adminMemberEmail,
+              phone: adminMemberPhone,
+              accountRole: 'MEMBER',
+            }),
+          ]),
+        );
+      }
+
       const ownerAdminConsole = await request('/admin/users', { headers: ownerHeaders });
       expect(ownerAdminConsole.status).toBe(200);
       const ownerMemberPortalDenied = await request('/member/portal-overview', {
