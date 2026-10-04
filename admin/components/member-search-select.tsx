@@ -80,13 +80,7 @@ export function MemberSearchSelect({
   useEffect(() => {
     if (selected || disabled) return;
     const value = query.trim();
-    if (value.length < 2) {
-      setResults([]);
-      setOpen(false);
-      setActiveIndex(-1);
-      setSearchError('');
-      return;
-    }
+    if (value.length < 2) return;
 
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
@@ -158,9 +152,17 @@ export function MemberSearchSelect({
           aria-controls={listId}
           aria-activedescendant={open && activeIndex >= 0 ? `${listId}-${activeIndex}` : undefined}
           onChange={(event) => {
+            const value = event.target.value;
             setSelected(null);
-            setQuery(event.target.value);
-            setOpen(Boolean(event.target.value.trim()));
+            setQuery(value);
+            setSearchError('');
+            if (value.trim().length < 2) {
+              setResults([]);
+              setActiveIndex(-1);
+              setOpen(false);
+            } else {
+              setOpen(true);
+            }
           }}
           onFocus={() => {
             if (selected) return;
