@@ -200,7 +200,16 @@ describe('MegaGoldenClub owner season edit round-trip integration', () => {
       {
         method: 'PUT',
         body: JSON.stringify({
+          // Deliberately submit out of order. The API must return and reload
+          // the deterministic prize-code sequence used by the UI and draw tiers.
           prizes: [
+            {
+              monthNumber: 1,
+              prizeCode: 'MONTH_1_PRIZE_3',
+              category: 'Prize',
+              name: 'Kitchen Appliances',
+              winnerCount: 1,
+            },
             {
               monthNumber: 1,
               prizeCode: 'MONTH_1_PRIZE_1',
@@ -209,28 +218,52 @@ describe('MegaGoldenClub owner season edit round-trip integration', () => {
               description: longPrizeDescription,
               winnerCount: 1,
             },
+            {
+              monthNumber: 1,
+              prizeCode: 'MONTH_1_PRIZE_2',
+              category: 'Prize',
+              name: 'Gold Jewellery',
+              winnerCount: 1,
+            },
           ],
         }),
       },
     );
     expect(savedPrizes.status).toBe(200);
-    expect(savedPrizes.body).toEqual([
-      expect.objectContaining({
-        seasonId,
-        monthNumber: 1,
-        prizeCode: 'MONTH_1_PRIZE_1',
-        name: 'EV Scooter',
-        description: longPrizeDescription,
-        winnerCount: 1,
-      }),
+    expect(savedPrizes.body.map((prize: { prizeCode: string }) => prize.prizeCode)).toEqual([
+      'MONTH_1_PRIZE_1',
+      'MONTH_1_PRIZE_2',
+      'MONTH_1_PRIZE_3',
     ]);
+    expect(savedPrizes.body[0]).toMatchObject({
+      seasonId,
+      monthNumber: 1,
+      prizeCode: 'MONTH_1_PRIZE_1',
+      name: 'EV Scooter',
+      description: longPrizeDescription,
+      winnerCount: 1,
+    });
+    expect(savedPrizes.body[1]).toMatchObject({
+      prizeCode: 'MONTH_1_PRIZE_2',
+      name: 'Gold Jewellery',
+    });
+    expect(savedPrizes.body[2]).toMatchObject({
+      prizeCode: 'MONTH_1_PRIZE_3',
+      name: 'Kitchen Appliances',
+    });
 
     const reloadedPrizes = await request(
       `/admin/owner-portal/seasons/${seasonId}/prizes`,
       adminToken,
     );
     expect(reloadedPrizes.status).toBe(200);
+    expect(reloadedPrizes.body.map((prize: { prizeCode: string }) => prize.prizeCode)).toEqual([
+      'MONTH_1_PRIZE_1',
+      'MONTH_1_PRIZE_2',
+      'MONTH_1_PRIZE_3',
+    ]);
     expect(reloadedPrizes.body[0]).toMatchObject({
+      name: 'EV Scooter',
       description: longPrizeDescription,
     });
 
