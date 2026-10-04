@@ -185,5 +185,60 @@ describe('MegaGoldenClub owner season edit round-trip integration', () => {
       dailyCap: 5000,
       carryForward: true,
     });
+
+    const longPrizeDescription = [
+      'The Indian electric scooter market features affordable city commuters and premium long-range models.',
+      'Modern EV scooters can provide lower running costs, connected features, practical storage and different battery ranges.',
+      'This catalogue description intentionally exceeds the original two-hundred-and-fifty-five-character placeholder limit',
+      'so product information entered by the owner must round-trip exactly through save, database storage and reload.',
+    ].join(' ');
+    expect(longPrizeDescription.length).toBeGreaterThan(255);
+
+    const savedPrizes = await request(
+      `/admin/owner-portal/seasons/${seasonId}/prizes`,
+      adminToken,
+      {
+        method: 'PUT',
+        body: JSON.stringify({
+          prizes: [
+            {
+              monthNumber: 1,
+              prizeCode: 'MONTH_1_PRIZE_1',
+              category: 'Prize',
+              name: 'EV Scooter',
+              description: longPrizeDescription,
+              winnerCount: 1,
+            },
+          ],
+        }),
+      },
+    );
+    expect(savedPrizes.status).toBe(200);
+    expect(savedPrizes.body).toEqual([
+      expect.objectContaining({
+        seasonId,
+        monthNumber: 1,
+        prizeCode: 'MONTH_1_PRIZE_1',
+        name: 'EV Scooter',
+        description: longPrizeDescription,
+        winnerCount: 1,
+      }),
+    ]);
+
+    const reloadedPrizes = await request(
+      `/admin/owner-portal/seasons/${seasonId}/prizes`,
+      adminToken,
+    );
+    expect(reloadedPrizes.status).toBe(200);
+    expect(reloadedPrizes.body[0]).toMatchObject({
+      description: longPrizeDescription,
+    });
+
+    const storedPrizeDescription = await prisma.$queryRawUnsafe<Array<{ description: string }>>(
+      'SELECT description FROM owner_season_prizes WHERE seasonId = ? AND prizeCode = ? LIMIT 1',
+      seasonId,
+      'MONTH_1_PRIZE_1',
+    );
+    expect(storedPrizeDescription[0]?.description).toBe(longPrizeDescription);
   });
 });
