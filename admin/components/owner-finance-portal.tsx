@@ -79,6 +79,14 @@ export function OwnerFinancePortal({ section }: { section: OwnerFinanceSection }
   const [wallet, setWallet] = useState<Row | null>(null);
   const [receipt, setReceipt] = useState<Row | null>(null);
   const [generatedEpins, setGeneratedEpins] = useState<string[]>([]);
+  const [epinStatusFilter, setEpinStatusFilter] = useState('ALL');
+  const [epinMemberFilter, setEpinMemberFilter] = useState('');
+  const [epinSeasonFilter, setEpinSeasonFilter] = useState('');
+  const [epinTypeFilter, setEpinTypeFilter] = useState('ALL');
+  const [epinPage, setEpinPage] = useState(1);
+  const [epinPageSize, setEpinPageSize] = useState(25);
+  const [epinTotal, setEpinTotal] = useState(0);
+  const [epinTotalPages, setEpinTotalPages] = useState(1);
   const [generatedAuthCode, setGeneratedAuthCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -104,11 +112,21 @@ export function OwnerFinancePortal({ section }: { section: OwnerFinanceSection }
         setData(rows);
         setSeasons([]);
       } else if (section === 'epins') {
-        const [rows, seasonRows] = await Promise.all([
-          apiJson<Row[]>(`${API}/epins`),
+        const params = new URLSearchParams({ page: String(epinPage), pageSize: String(epinPageSize) });
+        if (epinStatusFilter !== 'ALL') params.set('status', epinStatusFilter);
+        if (epinMemberFilter) params.set('memberUserId', epinMemberFilter);
+        if (epinSeasonFilter) params.set('seasonId', epinSeasonFilter);
+        if (epinTypeFilter !== 'ALL') params.set('pinType', epinTypeFilter);
+        const [inventory, seasonRows] = await Promise.all([
+          apiJson<{ items: Row[]; total: number; page: number; pageSize: number; totalPages: number }>(
+            `${API}/epins?${params.toString()}`,
+          ),
           apiJson<Row[]>(`${API}/seasons`),
         ]);
-        setData(rows);
+        setData(inventory.items);
+        setEpinTotal(inventory.total);
+        setEpinTotalPages(inventory.totalPages);
+        if (inventory.page !== epinPage) setEpinPage(inventory.page);
         setSeasons(seasonRows);
       } else if (section === 'auth-codes') {
         setData(await apiJson<Row[]>(`${API}/auth-codes`));
@@ -121,7 +139,16 @@ export function OwnerFinancePortal({ section }: { section: OwnerFinanceSection }
     } catch (err) {
       handleApiError(err);
     }
-  }, [handleApiError, section]);
+  }, [
+    epinMemberFilter,
+    epinPage,
+    epinPageSize,
+    epinSeasonFilter,
+    epinStatusFilter,
+    epinTypeFilter,
+    handleApiError,
+    section,
+  ]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 0);
@@ -236,6 +263,27 @@ export function OwnerFinancePortal({ section }: { section: OwnerFinanceSection }
     );
   }
 
+  function applyEpinFilters(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    setEpinStatusFilter(formString(form, 'status') || 'ALL');
+    setEpinMemberFilter(formString(form, 'memberUserId'));
+    setEpinSeasonFilter(formString(form, 'seasonId'));
+    setEpinTypeFilter(formString(form, 'pinType') || 'ALL');
+    setEpinPageSize(formNumber(form, 'pageSize', 25));
+    setEpinPage(1);
+  }
+
+  function clearEpinFilters(form: HTMLFormElement) {
+    form.reset();
+    setEpinStatusFilter('ALL');
+    setEpinMemberFilter('');
+    setEpinSeasonFilter('');
+    setEpinTypeFilter('ALL');
+    setEpinPageSize(25);
+    setEpinPage(1);
+  }
+
   async function generateAuthCode(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -299,11 +347,11 @@ export function OwnerFinancePortal({ section }: { section: OwnerFinanceSection }
     return <><Hero title="E-PIN Management" subtitle="Generate, assign, validate, expire, revoke and audit E-PINs." pill="SEASON-AWARE INVENTORY" />
       <WorkspaceTabs ariaLabel="E-PIN workspace" tabs={[
         { id: 'epin-generate', label: 'Generate E-PINs' },
-        { id: 'epin-inventory', label: 'Inventory', count: rows.length },
+        { id: 'epin-inventory', label: 'Inventory', count: epinTotal },
       ]}>
         {(activeTab) => <>
           {activeTab === 'epin-generate' ? <div className={styles.card}><SectionHead icon="➕" title="Generate E-PIN Batch" /><form method="post" onSubmit={generateEpins}><div className={styles.fields}><Field label="Season"><select name="seasonId" className={styles.select} required><option value="">Select active season</option>{seasons.filter((season) => text(season.status) === 'ACTIVE').map((season) => <option key={text(season.id)} value={text(season.id)}>{text(season.name)} • {text(season.status)}</option>)}</select></Field><Field label="E-PIN Type"><select name="pinType" className={styles.select} defaultValue="ACTIVATION"><option value="ACTIVATION">Activation — registration + installment #1</option><option value="INSTALLMENT">Installment — one monthly installment</option></select></Field><Field label="Quantity"><input name="quantity" className={styles.input} type="number" min="1" max="500" defaultValue="5" required /></Field><Field label="Assign Existing Member"><MemberSearchSelect name="assignUserReference" placeholder="Search existing member (optional)" /></Field><Field label="Expiry Date"><input name="expiresAt" className={styles.input} type="datetime-local" required /></Field></div><div className={styles.buttonLine}><button className={styles.button} disabled={busy}>GENERATE E-PINS</button></div></form>{generatedEpins.length ? <div className={classNames(styles.notice, styles.success)}><b>Copy these new E-PINs now:</b><br />{generatedEpins.join(' • ')}</div> : null}</div> : null}
-          {activeTab === 'epin-inventory' ? <div className={styles.card}><SectionHead icon="🔑" title="E-PIN Inventory" note="Expired entries are derived from their expiry timestamp" /><div className={styles.buttonLine}><button className={classNames(styles.button, styles.outline)} type="button" onClick={() => exportCsv(rows, 'epins.csv')}>DOWNLOAD CSV</button></div>{rows.length ? <div className={styles.tableBox}><table className={styles.table}><thead><tr><th>E-PIN</th><th>TYPE</th><th>ASSIGNED TO</th><th>SEASON</th><th>CREATED</th><th>EXPIRY</th><th>STATUS</th><th>ACTION</th></tr></thead><tbody>{rows.map((row) => <tr key={text(row.id)}><td>••••{text(row.displaySuffix)}</td><td>{text(row.pinType, 'ACTIVATION')}</td><td>{text(row.assignedUsername)}</td><td>{text(row.seasonName)}</td><td>{dateTime(row.createdAt)}</td><td>{dateTime(row.expiresAt)}</td><td className={text(row.status) === 'ACTIVE' ? styles.status : styles.statusOff}>{text(row.status)}</td><td>{text(row.status) === 'ACTIVE' ? <button type="button" className={classNames(styles.button, styles.red)} disabled={busy} onClick={() => void revokeEpin(text(row.id))}>REVOKE</button> : '—'}</td></tr>)}</tbody></table></div> : <Empty>No E-PINs generated yet.</Empty>}</div> : null}
+          {activeTab === 'epin-inventory' ? <div className={styles.card}><SectionHead icon="🔑" title="E-PIN Inventory" note="Expired entries are derived from their expiry timestamp" /><form method="get" onSubmit={applyEpinFilters}><div className={styles.fields}><Field label="Status"><select name="status" className={styles.select} defaultValue={epinStatusFilter}><option value="ALL">All</option><option value="UNUSED">Unused</option><option value="USED">Used</option></select></Field><Field label="Assigned To"><MemberSearchSelect name="memberUserId" placeholder="All members — search to filter" /></Field><Field label="Season"><select name="seasonId" className={styles.select} defaultValue={epinSeasonFilter}><option value="">All seasons</option>{seasons.map((season) => <option key={text(season.id)} value={text(season.id)}>{text(season.name)} • {text(season.status)}</option>)}</select></Field><Field label="Type"><select name="pinType" className={styles.select} defaultValue={epinTypeFilter}><option value="ALL">All types</option><option value="ACTIVATION">Activation</option><option value="INSTALLMENT">Installment</option></select></Field><Field label="Rows Per Page"><select name="pageSize" className={styles.select} defaultValue={String(epinPageSize)}><option value="25">25</option><option value="50">50</option><option value="100">100</option></select></Field></div><div className={styles.buttonLine}><button className={styles.button} type="submit" disabled={busy}>APPLY FILTERS</button><button className={classNames(styles.button, styles.outline)} type="button" disabled={busy} onClick={(event) => clearEpinFilters(event.currentTarget.form!)}>CLEAR</button><button className={classNames(styles.button, styles.outline)} type="button" onClick={() => exportCsv(rows, 'epins-page.csv')}>DOWNLOAD PAGE CSV</button></div></form>{rows.length ? <><div className={styles.tableBox}><table className={styles.table}><thead><tr><th>E-PIN</th><th>TYPE</th><th>ASSIGNED TO</th><th>SEASON</th><th>CREATED</th><th>EXPIRY</th><th>STATUS</th><th>ACTION</th></tr></thead><tbody>{rows.map((row) => <tr key={text(row.id)}><td>••••{text(row.displaySuffix)}</td><td>{text(row.pinType, 'ACTIVATION')}</td><td>{text(row.assignedToUsername)}</td><td>{text(row.seasonName)}</td><td>{dateTime(row.createdAt)}</td><td>{dateTime(row.expiresAt)}</td><td className={text(row.status) === 'ACTIVE' ? styles.status : styles.statusOff}>{text(row.status)}</td><td>{text(row.status) === 'ACTIVE' ? <button type="button" className={classNames(styles.button, styles.red)} disabled={busy} onClick={() => void revokeEpin(text(row.id))}>REVOKE</button> : '—'}</td></tr>)}</tbody></table></div><div className={styles.buttonLine}><button className={classNames(styles.button, styles.outline)} type="button" disabled={busy || epinPage <= 1} onClick={() => setEpinPage((page) => Math.max(1, page - 1))}>PREVIOUS</button><span>Page {epinPage} of {epinTotalPages} • {epinTotal} E-PINs</span><button className={classNames(styles.button, styles.outline)} type="button" disabled={busy || epinPage >= epinTotalPages} onClick={() => setEpinPage((page) => Math.min(epinTotalPages, page + 1))}>NEXT</button></div></> : <Empty>No E-PINs match these filters.</Empty>}</div> : null}
         </>}
       </WorkspaceTabs>
     </>;
