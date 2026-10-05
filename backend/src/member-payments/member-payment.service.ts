@@ -1040,7 +1040,7 @@ export class MemberPaymentService {
       .digest();
   }
 
-  private encryptPin(raw: string) {
+  encryptPin(raw: string) {
     const iv = randomBytes(12);
     const cipher = createCipheriv('aes-256-gcm', this.encryptionKey(), iv);
     const encrypted = Buffer.concat([cipher.update(raw, 'utf8'), cipher.final()]);
@@ -1048,7 +1048,7 @@ export class MemberPaymentService {
     return [iv, tag, encrypted].map((part) => part.toString('base64url')).join('.');
   }
 
-  private decryptPin(payload: string) {
+  decryptPin(payload: string) {
     try {
       const [ivRaw, tagRaw, encryptedRaw] = payload.split('.');
       if (!ivRaw || !tagRaw || !encryptedRaw) throw new Error('invalid payload');
