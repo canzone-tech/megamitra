@@ -452,7 +452,16 @@ describe('MegaGoldenClub authenticated runtime UAT', () => {
       );
       expect(inventoryPage1.status).toBe(200);
       expect(inventoryPage1.body).toMatchObject({ total: 7, page: 1, pageSize: 5, totalPages: 2 });
-      expect((inventoryPage1.body.items as Array<Record<string, any>>)).toHaveLength(5);
+      const inventoryItems1 = inventoryPage1.body.items as Array<Record<string, any>>;
+      expect(inventoryItems1).toHaveLength(5);
+      expect(
+        inventoryItems1.every(
+          (item) =>
+            typeof item.pin === 'string' &&
+            epins.some((epin) => epin.pin === item.pin) &&
+            item.pinCiphertext === undefined,
+        ),
+      ).toBe(true);
 
       const inventoryPage2 = await request(
         `/admin/owner-portal/epins?status=UNUSED&seasonId=${encodeURIComponent(paidRegistration.seasonId)}&pinType=ACTIVATION&page=2&pageSize=5`,
@@ -694,6 +703,10 @@ describe('MegaGoldenClub authenticated runtime UAT', () => {
         body: JSON.stringify({ quantity: 1, expiresAt: expiry }),
       });
       expect(agentStillCannotManage.status).toBe(403);
+      const agentCannotReadFullInventory = await request('/admin/owner-portal/epins?page=1&pageSize=25', {
+        headers: agentHeaders,
+      });
+      expect(agentCannotReadFullInventory.status).toBe(403);
     },
     60_000,
   );
