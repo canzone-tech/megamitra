@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { FinancialDbService } from '../database/financial-db.service';
 import { Prisma } from '../generated/prisma/client';
 import { ProgramPaymentService } from '../program/program-payment.service';
@@ -34,6 +34,15 @@ type PortalSettingsRow = {
 type WalletTotalsRow = {
   creditTotal: string | number | null;
   debitTotal: string | number | null;
+};
+
+type EpinInventoryQuery = {
+  status?: string;
+  memberUserId?: string;
+  seasonId?: string;
+  pinType?: string;
+  page?: string | number;
+  pageSize?: string | number;
 };
 
 @Injectable()
@@ -147,21 +156,61 @@ export class OwnerPortalFinanceService {
   }
 
   async listEpins() {
-    return this.rows<Record<string, unknown>>(
+    return (await this.listEpinsPage({ page: 1, pageSize: 500 })).items;
+  }
+
+  async listEpinsPage(query: EpinInventoryQuery = {}) {
+    const status = String(query.status ?? 'ALL').trim().toUpperCase();
+    const pinType = String(query.pinType ?? 'ALL').trim().toUpperCase();
+    if (!['ALL', 'UNUSED', 'USED'].includes(status)) throw new BadRequestException('E-PIN status filter is invalid');
+    if (!['ALL', 'ACTIVATION', 'INSTALLMENT'].includes(pinType)) throw new BadRequestException('E-PIN type filter is invalid');
+
+    const parsedPage = Number.parseInt(String(query.page ?? '1'), 10);
+    const parsedPageSize = Number.parseInt(String(query.pageSize ?? '25'), 10);
+    const requestedPage = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
+    const pageSize = Number.isFinite(parsedPageSize) ? Math.max(1, Math.min(100, parsedPageSize)) : 25;
+    const conditions: string[] = [];
+    const values: SqlValue[] = [];
+    if (status === 'UNUSED') conditions.push("e.status='ACTIVE' AND e.usedByUserId IS NULL AND e.expiresAt>CURRENT_TIMESTAMP(3)");
+    if (status === 'USED') conditions.push("e.status='USED'");
+    if (query.memberUserId?.trim()) {
+      conditions.push('(e.assignedUserId=? OR e.usedByUserId=?)');
+      values.push(query.memberUserId.trim(), query.memberUserId.trim());
+    }
+    if (query.seasonId?.trim()) {
+      conditions.push('e.seasonId=?');
+      values.push(query.seasonId.trim());
+    }
+    if (pinType !== 'ALL') {
+      conditions.push('e.pinType=?');
+      values.push(pinType);
+    }
+    const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+    const totals = await this.rows<{ total: bigint | number | string }>(
+      `SELECT COUNT(*) AS total FROM owner_epins e ${where}`,
+      values,
+    );
+    const total = Number(totals[0]?.total ?? 0);
+    const totalPages = Math.max(1, Math.ceil(total / pageSize));
+    const page = Math.min(requestedPage, totalPages);
+    const offset = (page - 1) * pageSize;
+    const items = await this.rows<Record<string, unknown>>(
       `SELECT e.id, e.displaySuffix, e.pinType,
-              CASE
-                WHEN e.status='ACTIVE' AND e.expiresAt<=CURRENT_TIMESTAMP(3) THEN 'EXPIRED'
-                ELSE e.status
-              END AS status,
+              CASE WHEN e.status='ACTIVE' AND e.expiresAt<=CURRENT_TIMESTAMP(3) THEN 'EXPIRED' ELSE e.status END AS status,
               e.expiresAt, e.usedAt, e.revokedAt, e.createdAt,
               s.id AS seasonId, s.code AS seasonCode, s.name AS seasonName,
-              assigned.username AS assignedUsername, used.username AS usedByUsername
+              assigned.username AS assignedUsername, used.username AS usedByUsername,
+              COALESCE(assigned.username, used.username) AS assignedToUsername
        FROM owner_epins e
        LEFT JOIN owner_seasons s ON s.id=e.seasonId
        LEFT JOIN users assigned ON assigned.id=e.assignedUserId
        LEFT JOIN users used ON used.id=e.usedByUserId
-       ORDER BY e.createdAt DESC LIMIT 500`,
+       ${where}
+       ORDER BY e.createdAt DESC, e.id DESC
+       LIMIT ? OFFSET ?`,
+      [...values, pageSize, offset],
     );
+    return { items, total, page, pageSize, totalPages };
   }
 
   async listAuthCodes() {
