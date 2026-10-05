@@ -446,6 +446,21 @@ describe('MegaGoldenClub authenticated runtime UAT', () => {
       expect(epins).toHaveLength(7);
       generatedEpinIds.push(...epins.map((epin) => epin.id));
 
+      const inventoryPage1 = await request(
+        `/admin/owner-portal/epins?status=UNUSED&seasonId=${encodeURIComponent(paidRegistration.seasonId)}&pinType=ACTIVATION&page=1&pageSize=5`,
+        { headers: adminHeaders },
+      );
+      expect(inventoryPage1.status).toBe(200);
+      expect(inventoryPage1.body).toMatchObject({ total: 7, page: 1, pageSize: 5, totalPages: 2 });
+      expect((inventoryPage1.body.items as Array<Record<string, any>>)).toHaveLength(5);
+
+      const inventoryPage2 = await request(
+        `/admin/owner-portal/epins?status=UNUSED&seasonId=${encodeURIComponent(paidRegistration.seasonId)}&pinType=ACTIVATION&page=2&pageSize=5`,
+        { headers: adminHeaders },
+      );
+      expect(inventoryPage2.status).toBe(200);
+      expect((inventoryPage2.body.items as Array<Record<string, any>>)).toHaveLength(2);
+
       const publicEpins = await Promise.all(
         Array.from({ length: 5 }, async (_, index) => {
           const pin = `UAT-PUB-${suffix}-${index + 1}`;
@@ -616,6 +631,16 @@ describe('MegaGoldenClub authenticated runtime UAT', () => {
         status: 'USED',
         usedByUserId: adminAddedMemberId,
       });
+
+      const usedInventory = await request(
+        `/admin/owner-portal/epins?status=USED&memberUserId=${encodeURIComponent(adminAddedMemberId)}&seasonId=${encodeURIComponent(paidRegistration.seasonId)}&pinType=ACTIVATION&page=1&pageSize=25`,
+        { headers: adminHeaders },
+      );
+      expect(usedInventory.status).toBe(200);
+      expect(usedInventory.body.total).toBe(1);
+      expect(usedInventory.body.items).toEqual([
+        expect.objectContaining({ status: 'USED', assignedToUsername: adminMemberUsername }),
+      ]);
 
       const searchQueries = [
         adminMemberUsername,
