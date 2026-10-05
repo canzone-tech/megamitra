@@ -81,6 +81,12 @@ describe('MegaGoldenClub owner season edit round-trip integration', () => {
         await prisma.$executeRawUnsafe('DELETE FROM owner_season_prizes WHERE seasonId = ?', seasonId);
         await prisma.$executeRawUnsafe('DELETE FROM owner_seasons WHERE id = ?', seasonId);
       }
+      if (programVersionId) {
+        await prisma.$executeRawUnsafe(
+          'DELETE FROM program_event_policy_versions WHERE programVersionId = ?',
+          programVersionId,
+        );
+      }
       if (referralPolicyVersionId) {
         await prisma.referralRewardPolicyVersion.deleteMany({ where: { id: referralPolicyVersionId } });
       }
