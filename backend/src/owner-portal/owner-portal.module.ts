@@ -17,6 +17,7 @@ import { OwnerPortalService } from './owner-portal.service';
 import { OwnerPrizeMediaStore } from './owner-prize-media.store';
 import { OwnerSeasonBinaryV14ConfigurationService } from './owner-season-binary-v14-configuration.service';
 import { OwnerSeasonConfigurationService } from './owner-season-configuration.service';
+import { OwnerSeasonDeploymentService } from './owner-season-deployment.service';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { OwnerSeasonConfigurationService } from './owner-season-configuration.se
     OwnerPortalFinanceService,
     OwnerPortalCoreService,
     OwnerPortalControlService,
+    OwnerSeasonDeploymentService,
     OwnerSeasonBinaryV14ConfigurationService,
     {
       provide: OwnerSeasonConfigurationService,
