@@ -15,7 +15,7 @@ Use this checklist against a release candidate after automated verification is g
 - [ ] `npm run uat:smoke` passes; authenticated admin/member runtime smoke is run when tokens are available.
 - [ ] Integration tests pass authenticated admin/member authorization, self-scoping and core read-model checks even when external UAT tokens are not supplied.
 - [ ] Owner lucky-draw schedule integration passes January/third-Sunday defaults, admin/member authorization, recurrence enforcement and exact-replay/conflicting-replay behavior.
-- [ ] Lucky-draw token contract verification confirms the immutable migration contract remains five non-zero-leading digits with global `token` primary-key uniqueness; migration deployment succeeds separately on the release database.
+- [ ] Lucky-draw token contract verification confirms five non-zero-leading digits and Season-scoped uniqueness by `(seasonId, token)` after migration `0034`; the same five-digit number may exist in another Season, while reuse inside the same Season is rejected; migration deployment succeeds separately on the release database.
 - [ ] Public receipt surface verification passes confirmed-only token rendering, pending/rejected token messaging, mobile layout and print layout contracts.
 - [ ] Backend CI authenticated browser UAT renders protected admin/member production builds at desktop and mobile widths, checks page-level horizontal overflow, exercises the admin mobile More drawer, verifies member mobile navigation actions remain visible, and uploads screenshots/metrics for the exact release commit.
 
