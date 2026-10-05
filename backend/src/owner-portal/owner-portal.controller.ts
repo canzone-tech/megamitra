@@ -46,6 +46,10 @@ import { AssignOwnerPlacementDto } from './owner-portal-placement.dto';
 import { OwnerPortalService } from './owner-portal.service';
 import { OwnerSeasonAdvancedConfigDto } from './owner-season-configuration.dto';
 import { OwnerSeasonConfigurationService } from './owner-season-configuration.service';
+import {
+  MAX_SEASON_DEPLOYMENT_PACKAGE_BYTES,
+  OwnerSeasonDeploymentService,
+} from './owner-season-deployment.service';
 
 @Controller('admin/owner-portal')
 export class OwnerPortalController {
@@ -55,6 +59,7 @@ export class OwnerPortalController {
     private readonly drawWorkflow: OwnerPortalDrawWorkflowService,
     private readonly finance: OwnerPortalFinanceService,
     private readonly seasonConfiguration: OwnerSeasonConfigurationService,
+    private readonly seasonDeployment: OwnerSeasonDeploymentService,
   ) {}
 
   @Permissions('operations.read')
@@ -157,6 +162,37 @@ export class OwnerPortalController {
     @CurrentUser() actor: AuthUser,
   ) {
     return this.seasonConfiguration.changeSeasonStatus(id, dto, actor.id);
+  }
+
+  @Permissions('program.manage')
+  @Get('seasons/:id/deployment-package')
+  exportSeasonDeployment(
+    @Param('id') id: string,
+    @CurrentUser() actor: AuthUser,
+  ) {
+    return this.seasonDeployment.exportPackage(id, actor.id);
+  }
+
+  @Permissions('program.manage')
+  @Post('season-deployment/import')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: { files: 1, fileSize: MAX_SEASON_DEPLOYMENT_PACKAGE_BYTES },
+    }),
+  )
+  importSeasonDeployment(
+    @UploadedFile()
+    file:
+      | {
+          buffer: Buffer;
+          originalname: string;
+          mimetype: string;
+          size: number;
+        }
+      | undefined,
+    @CurrentUser() actor: AuthUser,
+  ) {
+    return this.seasonDeployment.importPackage(file, actor.id);
   }
 
   @Permissions('draw.policy.read')
