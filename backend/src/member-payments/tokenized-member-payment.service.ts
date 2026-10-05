@@ -23,8 +23,7 @@ type ReceiptToken = {
 };
 
 @Injectable()
-export class TokenizedMemberPaymentService {
-  private readonly base: MemberPaymentService;
+export class TokenizedMemberPaymentService extends MemberPaymentService {
 
   constructor(
     prisma: PrismaService,
@@ -34,48 +33,12 @@ export class TokenizedMemberPaymentService {
     audit: AuditService,
     private readonly drawTokens: LuckyDrawTokenService,
   ) {
-    this.base = new MemberPaymentService(prisma, db, programPayments, config, audit);
-  }
-
-  memberPaymentConfig(...args: Parameters<MemberPaymentService['memberPaymentConfig']>) {
-    return this.base.memberPaymentConfig(...args);
-  }
-
-  paymentSettings(...args: Parameters<MemberPaymentService['paymentSettings']>) {
-    return this.base.paymentSettings(...args);
-  }
-
-  updatePaymentSettings(...args: Parameters<MemberPaymentService['updatePaymentSettings']>) {
-    return this.base.updatePaymentSettings(...args);
-  }
-
-  submitInstallment(...args: Parameters<MemberPaymentService['submitInstallment']>) {
-    return this.base.submitInstallment(...args);
-  }
-
-  submitEpinPurchase(...args: Parameters<MemberPaymentService['submitEpinPurchase']>) {
-    return this.base.submitEpinPurchase(...args);
-  }
-
-  memberEpins(...args: Parameters<MemberPaymentService['memberEpins']>) {
-    return this.base.memberEpins(...args);
-  }
-
-  reassignUnusedEpin(...args: Parameters<MemberPaymentService['reassignUnusedEpin']>) {
-    return this.base.reassignUnusedEpin(...args);
-  }
-
-  cancelUnusedEpin(...args: Parameters<MemberPaymentService['cancelUnusedEpin']>) {
-    return this.base.cancelUnusedEpin(...args);
-  }
-
-  cancelMember(...args: Parameters<MemberPaymentService['cancelMember']>) {
-    return this.base.cancelMember(...args);
+    super(prisma, db, programPayments, config, audit);
   }
 
   async reviewSubmission(...args: Parameters<MemberPaymentService['reviewSubmission']>) {
     const [submissionId] = args;
-    const receipt = (await this.base.reviewSubmission(...args)) as ReceiptRecord;
+    const receipt = (await super.reviewSubmission(...args)) as ReceiptRecord;
     if (receipt.purpose === 'INSTALLMENT' && receipt.status === 'CONFIRMED') {
       await this.drawTokens.ensureConfirmedInstallmentSubmission(submissionId);
     }
@@ -83,12 +46,12 @@ export class TokenizedMemberPaymentService {
   }
 
   async adminReceipt(id: string) {
-    const receipt = (await this.base.adminReceipt(id)) as ReceiptRecord;
+    const receipt = (await super.adminReceipt(id)) as ReceiptRecord;
     return this.withDrawTokens(receipt, await this.tokensForReceipt(receipt, id));
   }
 
   async publicReceipt(publicToken: string) {
-    const receipt = (await this.base.publicReceipt(publicToken)) as ReceiptRecord;
+    const receipt = (await super.publicReceipt(publicToken)) as ReceiptRecord;
     const tokens =
       receipt.purpose === 'INSTALLMENT' && receipt.status === 'CONFIRMED'
         ? await this.drawTokens.tokensForPublicReceipt(publicToken)
@@ -97,7 +60,7 @@ export class TokenizedMemberPaymentService {
   }
 
   async memberSubmissions(userId: string) {
-    const receipts = (await this.base.memberSubmissions(userId)) as ReceiptRecord[];
+    const receipts = (await super.memberSubmissions(userId)) as ReceiptRecord[];
     return Promise.all(
       receipts.map(async (receipt) => {
         const id = typeof receipt.id === 'string' ? receipt.id : null;
@@ -110,7 +73,7 @@ export class TokenizedMemberPaymentService {
   }
 
   async adminSubmissions(...args: Parameters<MemberPaymentService['adminSubmissions']>) {
-    const receipts = (await this.base.adminSubmissions(...args)) as ReceiptRecord[];
+    const receipts = (await super.adminSubmissions(...args)) as ReceiptRecord[];
     return Promise.all(
       receipts.map(async (receipt) => {
         const id = typeof receipt.id === 'string' ? receipt.id : null;
