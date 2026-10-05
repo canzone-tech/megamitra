@@ -21,6 +21,7 @@ import {
 import { LedgerService } from '../ledger/ledger.service';
 import { LuckyDrawExecutionService } from '../lucky-draw/lucky-draw-execution.service';
 import { LuckyDrawPolicyService } from '../lucky-draw/lucky-draw-policy.service';
+import { MemberPaymentService } from '../member-payments/member-payment.service';
 import { ProgramPaymentService } from '../program/program-payment.service';
 import { ProgramPolicyService } from '../program/program-policy.service';
 import { ReferralRewardPolicyService } from '../referral-reward/referral-reward-policy.service';
@@ -154,6 +155,7 @@ export class OwnerPortalService {
     private readonly referralPolicies: ReferralRewardPolicyService,
     private readonly drawPolicies: LuckyDrawPolicyService,
     private readonly draws: LuckyDrawExecutionService,
+    private readonly memberPayments: MemberPaymentService,
     private readonly ledger: LedgerService,
     private readonly prizeMedia: OwnerPrizeMediaStore,
   ) {}
@@ -1003,13 +1005,14 @@ export class OwnerPortalService {
       const raw = this.readableSecret('MGC-PIN');
       await this.db.execute(
         `INSERT INTO owner_epins
-         (id, pinHash, displaySuffix, seasonId, pinType, assignedUserId, status, expiresAt,
+         (id, pinHash, displaySuffix, pinCiphertext, seasonId, pinType, assignedUserId, status, expiresAt,
           currencyCodeSnapshot, registrationFeeSnapshot, installmentAmountSnapshot, createdByUserId)
-         VALUES (?, ?, ?, ?, ?, ?, 'ACTIVE', ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'ACTIVE', ?, ?, ?, ?, ?)`,
         [
           id,
           this.secretHash('epin', raw),
           raw.slice(-6),
+          this.memberPayments.encryptPin(raw),
           season.id,
           pinType,
           assigned?.id ?? null,
