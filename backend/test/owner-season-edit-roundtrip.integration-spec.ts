@@ -6,12 +6,14 @@ import { configureApp } from '../src/bootstrap/configure-app';
 import { PrismaService } from '../src/database/prisma.service';
 import { UserStatus } from '../src/generated/prisma/enums';
 import { OwnerPrizeMediaStore } from '../src/owner-portal/owner-prize-media.store';
+import { OwnerSeasonDeploymentService } from '../src/owner-portal/owner-season-deployment.service';
 
 describe('MegaGoldenClub owner season edit round-trip integration', () => {
   let app: Awaited<ReturnType<typeof NestFactory.create>>;
   let prisma: PrismaService;
   let passwords: PasswordService;
   let prizeMedia: OwnerPrizeMediaStore;
+  let seasonDeployment: OwnerSeasonDeploymentService;
   let baseUrl = '';
   let adminToken = '';
   let adminId = '';
@@ -40,26 +42,6 @@ describe('MegaGoldenClub owner season edit round-trip integration', () => {
     };
   }
 
-  async function requestPackageImport(
-    packageBody: Record<string, any>,
-    token: string,
-  ) {
-    const form = new FormData();
-    form.append(
-      'file',
-      new Blob([JSON.stringify(packageBody)], { type: 'application/json' }),
-      'season-deployment-v1.mgc.json',
-    );
-    const response = await fetch(`${baseUrl}/admin/owner-portal/season-deployment/import`, {
-      method: 'POST',
-      headers: { authorization: `Bearer ${token}` },
-      body: form,
-    });
-    return {
-      status: response.status,
-      body: (await response.json()) as Record<string, any>,
-    };
-  }
 
   beforeAll(async () => {
     app = await NestFactory.create(AppModule, { logger: false });
@@ -69,6 +51,7 @@ describe('MegaGoldenClub owner season edit round-trip integration', () => {
     prisma = app.get(PrismaService);
     passwords = app.get(PasswordService);
     prizeMedia = app.get(OwnerPrizeMediaStore);
+    seasonDeployment = app.get(OwnerSeasonDeploymentService);
 
     const password = 'Season-Roundtrip-123!';
     const admin = await prisma.user.create({
@@ -445,9 +428,17 @@ describe('MegaGoldenClub owner season edit round-trip integration', () => {
       mediaId: null,
     });
 
-    const imported = await requestPackageImport(exported.body, adminToken);
-    expect(imported.status).toBe(201);
-    expect(imported.body).toMatchObject({
+    const packageBuffer = Buffer.from(JSON.stringify(exported.body), 'utf8');
+    const importedBody = await seasonDeployment.importPackage(
+      {
+        buffer: packageBuffer,
+        originalname: 'season-deployment-v1.mgc.json',
+        mimetype: 'application/json',
+        size: packageBuffer.length,
+      },
+      adminId,
+    );
+    expect(importedBody).toMatchObject({
       mode: 'UPDATED',
       checksum: exported.body.checksum,
       season: {
@@ -481,9 +472,16 @@ describe('MegaGoldenClub owner season edit round-trip integration', () => {
       contentType: 'image/png',
     });
 
-    const importedAgain = await requestPackageImport(exported.body, adminToken);
-    expect(importedAgain.status).toBe(201);
-    expect(importedAgain.body.mode).toBe('UPDATED');
+    const importedAgain = await seasonDeployment.importPackage(
+      {
+        buffer: packageBuffer,
+        originalname: 'season-deployment-v1.mgc.json',
+        mimetype: 'application/json',
+        size: packageBuffer.length,
+      },
+      adminId,
+    );
+    expect(importedAgain.mode).toBe('UPDATED');
     const afterReplay = await request(
       `/admin/owner-portal/seasons/${seasonId}/prizes`,
       adminToken,
