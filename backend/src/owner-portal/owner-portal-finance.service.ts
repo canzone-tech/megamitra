@@ -1,6 +1,7 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { FinancialDbService } from '../database/financial-db.service';
 import { Prisma } from '../generated/prisma/client';
+import { MemberPaymentService } from '../member-payments/member-payment.service';
 import { ProgramPaymentService } from '../program/program-payment.service';
 import type { RecordOwnerPaymentDto } from './owner-portal.dto';
 import { OwnerPortalService } from './owner-portal.service';
@@ -51,6 +52,7 @@ export class OwnerPortalFinanceService {
     private readonly db: FinancialDbService,
     private readonly portal: OwnerPortalService,
     private readonly programPayments: ProgramPaymentService,
+    private readonly memberPayments: MemberPaymentService,
   ) {}
 
   async recordPayment(dto: RecordOwnerPaymentDto, actorUserId: string) {
@@ -194,8 +196,8 @@ export class OwnerPortalFinanceService {
     const totalPages = Math.max(1, Math.ceil(total / pageSize));
     const page = Math.min(requestedPage, totalPages);
     const offset = (page - 1) * pageSize;
-    const items = await this.rows<Record<string, unknown>>(
-      `SELECT e.id, e.displaySuffix, e.pinType,
+    const rows = await this.rows<Record<string, unknown> & { pinCiphertext: string | null }>(
+      `SELECT e.id, e.pinCiphertext, e.displaySuffix, e.pinType,
               CASE WHEN e.status='ACTIVE' AND e.expiresAt<=CURRENT_TIMESTAMP(3) THEN 'EXPIRED' ELSE e.status END AS status,
               e.expiresAt, e.usedAt, e.revokedAt, e.createdAt,
               s.id AS seasonId, s.code AS seasonCode, s.name AS seasonName,
@@ -210,6 +212,10 @@ export class OwnerPortalFinanceService {
        LIMIT ? OFFSET ?`,
       [...values, pageSize, offset],
     );
+    const items = rows.map(({ pinCiphertext, ...row }) => ({
+      ...row,
+      pin: pinCiphertext ? this.memberPayments.decryptPin(pinCiphertext) : null,
+    }));
     return { items, total, page, pageSize, totalPages };
   }
 
