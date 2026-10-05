@@ -128,7 +128,7 @@ export class OwnerSeasonConfigurationService {
     }
 
     const payload = {
-      format: 'MEGAMITRA_SEASON_DEPLOYMENT',
+      format: 'MEGAGOLDENCLUB_SEASON_DEPLOYMENT',
       version: 1,
       exportedAt: new Date().toISOString(),
       season: {
@@ -153,9 +153,20 @@ export class OwnerSeasonConfigurationService {
       advanced,
       prizes: packagedPrizes,
     };
+    const summary = {
+      months: Number(season.totalMonths),
+      configuredMonths: new Set(packagedPrizes.map((prize) => Number(prize.monthNumber))).size,
+      prizeCount: packagedPrizes.length,
+      winnerSlots: packagedPrizes.reduce(
+        (sum, prize) => sum + Number(prize.winnerCount ?? 0),
+        0,
+      ),
+      mediaCount: packagedPrizes.filter((prize) => prize.media).length,
+    };
+    const exportPayload = { ...payload, summary };
     return {
-      ...payload,
-      checksumSha256: createHash('sha256').update(JSON.stringify(payload)).digest('hex'),
+      ...exportPayload,
+      checksum: createHash('sha256').update(JSON.stringify(exportPayload)).digest('hex'),
     };
   }
 
@@ -179,13 +190,13 @@ export class OwnerSeasonConfigurationService {
     }
     const packageRecord = parsed as Record<string, unknown>;
     if (
-      packageRecord.format !== 'MEGAMITRA_SEASON_DEPLOYMENT' ||
+      packageRecord.format !== 'MEGAGOLDENCLUB_SEASON_DEPLOYMENT' ||
       Number(packageRecord.version) !== 1
     ) {
       throw new BadRequestException('Unsupported season deployment package');
     }
-    const checksum = String(packageRecord.checksumSha256 ?? '');
-    const { checksumSha256: _ignored, ...payload } = packageRecord;
+    const checksum = String(packageRecord.checksum ?? '');
+    const { checksum: _ignored, ...payload } = packageRecord;
     const calculatedChecksum = createHash('sha256')
       .update(JSON.stringify(payload))
       .digest('hex');
