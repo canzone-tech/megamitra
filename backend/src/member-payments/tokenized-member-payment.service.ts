@@ -22,6 +22,8 @@ type ReceiptToken = {
   entryId: string | null;
 };
 
+type MemberSubmissionRows = Awaited<ReturnType<MemberPaymentService['memberSubmissions']>>;
+
 @Injectable()
 export class TokenizedMemberPaymentService extends MemberPaymentService {
 
@@ -59,7 +61,7 @@ export class TokenizedMemberPaymentService extends MemberPaymentService {
     return this.withDrawTokens(receipt, tokens);
   }
 
-  async memberSubmissions(userId: string) {
+  async memberSubmissions(userId: string): Promise<MemberSubmissionRows> {
     const receipts = (await super.memberSubmissions(userId)) as ReceiptRecord[];
     return Promise.all(
       receipts.map(async (receipt) => {
@@ -69,7 +71,7 @@ export class TokenizedMemberPaymentService extends MemberPaymentService {
           id ? await this.tokensForReceipt(receipt, id) : [],
         );
       }),
-    );
+    ) as Promise<MemberSubmissionRows>;
   }
 
   async adminSubmissions(...args: Parameters<MemberPaymentService['adminSubmissions']>) {
