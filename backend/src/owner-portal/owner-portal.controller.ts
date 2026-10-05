@@ -128,22 +128,6 @@ export class OwnerPortalController {
     return this.seasonConfiguration.createSeason(dto, actor.id);
   }
 
-  @Permissions('program.read')
-  @Get('seasons/:id/deployment-package')
-  exportSeasonDeploymentPackage(@Param('id') id: string) {
-    return this.seasonConfiguration.exportDeploymentPackage(id);
-  }
-
-  @Permissions('program.manage')
-  @Post('season-deployment/import')
-  @UseInterceptors(FileInterceptor('file', { limits: { files: 1, fileSize: 100 * 1024 * 1024 } }))
-  importSeasonDeploymentPackage(
-    @UploadedFile() file: { buffer: Buffer; originalname: string; size: number } | undefined,
-    @CurrentUser() actor: AuthUser,
-  ) {
-    return this.seasonConfiguration.importDeploymentPackage(file, actor.id);
-  }
-
   @Permissions('program.manage')
   @Put('seasons/:id')
   updateSeason(
