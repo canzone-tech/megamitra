@@ -40,6 +40,20 @@ type RegistrationPolicy = {
   usernamePrefix?: string | null;
   defaultRoleName?: string;
 };
+type SeasonDeploymentPreview = {
+  format: string;
+  version: number;
+  checksum?: string;
+  season?: { code?: string; name?: string };
+  summary?: {
+    months?: number;
+    configuredMonths?: number;
+    prizeCount?: number;
+    winnerSlots?: number;
+    mediaCount?: number;
+  };
+};
+
 type PrizeDraft = {
   monthNumber: number;
   prizeCode: string;
@@ -177,6 +191,8 @@ export function OwnerCorePortal({ section, extension }: { section: OwnerCoreSect
   const [selectedSeasonId, setSelectedSeasonId] = useState('');
   const [prizeDraft, setPrizeDraft] = useState<PrizeDraft[]>([]);
   const [selectedPrizeMonth, setSelectedPrizeMonth] = useState(1);
+  const [deploymentFile, setDeploymentFile] = useState<File | null>(null);
+  const [deploymentPreview, setDeploymentPreview] = useState<SeasonDeploymentPreview | null>(null);
   const [drawPrizes, setDrawPrizes] = useState<Row[]>([]);
   const [selectedDrawId, setSelectedDrawId] = useState('');
   const [selectedDraw, setSelectedDraw] = useState<Row | null>(null);
@@ -531,6 +547,77 @@ export function OwnerCorePortal({ section, extension }: { section: OwnerCoreSect
     }
   }
 
+  async function exportSeasonDeployment() {
+    if (!selectedSeasonId) return;
+    const selectedSeason = ((Array.isArray(data) ? data : []) as Row[])
+      .find((row) => text(row.id, '') === selectedSeasonId);
+    const deploymentPackage = await run(
+      () => apiJson<Row>(
+        `${API}/seasons/${encodeURIComponent(selectedSeasonId)}/deployment-package`,
+      ),
+      'Season deployment package exported',
+      false,
+    );
+    if (!deploymentPackage) return;
+    const code = text(selectedSeason?.code, 'season')
+      .toLowerCase()
+      .replace(/[^a-z0-9_-]+/g, '-');
+    const blob = new Blob(
+      [JSON.stringify(deploymentPackage, null, 2)],
+      { type: 'application/json' },
+    );
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `${code}-deployment-v1.mgc.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function chooseSeasonDeploymentPackage(file: File | undefined) {
+    setDeploymentFile(file ?? null);
+    setDeploymentPreview(null);
+    setError('');
+    if (!file) return;
+    if (file.size > 150 * 1024 * 1024) {
+      setDeploymentFile(null);
+      setError('Season deployment package must be 150 MB or smaller.');
+      return;
+    }
+    try {
+      const parsed = JSON.parse(await file.text()) as SeasonDeploymentPreview;
+      if (
+        parsed.format !== 'MEGAGOLDENCLUB_SEASON_DEPLOYMENT'
+        || parsed.version !== 1
+        || !parsed.season?.code
+        || !parsed.summary
+      ) {
+        throw new Error('This is not a supported MegaGoldenClub season deployment package.');
+      }
+      setDeploymentPreview(parsed);
+    } catch (reason) {
+      setDeploymentFile(null);
+      setError(reason instanceof Error ? reason.message : 'Deployment package preview failed');
+    }
+  }
+
+  async function importSeasonDeployment() {
+    if (!deploymentFile) return;
+    const form = new FormData();
+    form.append('file', deploymentFile);
+    const imported = await run(
+      () => apiJson<Row>(`${API}/season-deployment/import`, {
+        method: 'POST',
+        body: form,
+      }),
+      'Season deployment package imported into a DRAFT / REVIEW season',
+    );
+    if (imported) {
+      setDeploymentFile(null);
+      setDeploymentPreview(null);
+    }
+  }
+
   function addPrize() {
     const monthNumber = Math.min(60, Math.max(1, selectedPrizeMonth));
     setPrizeDraft((current) => {
@@ -834,7 +921,31 @@ export function OwnerCorePortal({ section, extension }: { section: OwnerCoreSect
         { id: 'prize-editor', label: 'Monthwise Editor', count: monthNumbers.length },
       ]}>
         {(activeTab) => <>
-          {activeTab === 'prize-season' ? <div className={styles.card}><SectionHead icon="🎁" title="Prize Schedule" action={<button type="button" className={classNames(styles.button, styles.outline)} disabled={!prizeDraft.length} onClick={() => exportCsv(prizeDraft as unknown as Row[], `${text(selectedSeason.code, 'season').toLowerCase()}-prize-schedule.csv`)}>EXPORT SCHEDULE</button>} /><Field label="Season"><select className={styles.select} value={selectedSeasonId} onChange={(event) => void changePrizeSeason(event.target.value)}><option value="">Select season</option>{seasons.map((row) => <option key={text(row.id)} value={text(row.id)}>{text(row.name)} • {text(row.status)}</option>)}</select></Field><div className={styles.buttonLine}><button type="button" className={styles.button} disabled={!selectedSeasonId} onClick={() => showTab('prize-editor')}>OPEN MONTHWISE EDITOR</button></div></div> : null}
+          {activeTab === 'prize-season' ? <div className={styles.card}>
+            <SectionHead
+              icon="🎁"
+              title="Season Deployment & Prize Schedule"
+              action={<div className={styles.buttonLine}>
+                <button type="button" className={classNames(styles.button, styles.outline)} disabled={!selectedSeasonId || busy} onClick={() => void exportSeasonDeployment()}>EXPORT DEPLOYMENT PACKAGE</button>
+                <button type="button" className={classNames(styles.button, styles.outline)} disabled={!prizeDraft.length} onClick={() => exportCsv(prizeDraft as unknown as Row[], `${text(selectedSeason.code, 'season').toLowerCase()}-prize-schedule.csv`)}>EXPORT CSV</button>
+              </div>}
+            />
+            <div className={styles.notice}>
+              Deployment package moves the production-safe Season setup, advanced policy, draw calendar, prize schedule and prize media. Members, payments, wallets, E-PINs, draw tokens and winners are never exported.
+            </div>
+            <div className={styles.fields}>
+              <Field label="Season"><select className={styles.select} value={selectedSeasonId} onChange={(event) => void changePrizeSeason(event.target.value)}><option value="">Select season</option>{seasons.map((row) => <option key={text(row.id)} value={text(row.id)}>{text(row.name)} • {text(row.status)}</option>)}</select></Field>
+              <Field label="Import Deployment Package"><input className={styles.input} type="file" accept=".json,.mgc.json,application/json" disabled={busy} onChange={(event) => void chooseSeasonDeploymentPackage(event.target.files?.[0])} /></Field>
+            </div>
+            {deploymentPreview?.summary ? <div className={styles.notice}>
+              <b>{deploymentPreview.season?.name || deploymentPreview.season?.code}</b> • {deploymentPreview.season?.code}<br />
+              {deploymentPreview.summary.configuredMonths ?? 0}/{deploymentPreview.summary.months ?? 0} months • {deploymentPreview.summary.prizeCount ?? 0} prizes • {deploymentPreview.summary.winnerSlots ?? 0} winner slots • {deploymentPreview.summary.mediaCount ?? 0} media files
+            </div> : null}
+            <div className={styles.buttonLine}>
+              <button type="button" className={styles.button} disabled={!selectedSeasonId} onClick={() => showTab('prize-editor')}>OPEN MONTHWISE EDITOR</button>
+              <button type="button" className={classNames(styles.button, styles.green)} disabled={!deploymentFile || !deploymentPreview || busy} onClick={() => void importSeasonDeployment()}>IMPORT / SYNC PACKAGE</button>
+            </div>
+          </div> : null}
           {activeTab === 'prize-editor' ? selectedSeasonId ? <div className={styles.card}>
             <SectionHead icon="🎁" title="Monthwise Prizes" action={<button type="button" className={styles.button} disabled={busy} onClick={addPrize}>+ ADD PRIZE TO MONTH {selectedPrizeMonth}</button>} />
             <div className={styles.notice}>“Add Prize” adds another prize inside the selected month. It does not create another month.</div>
