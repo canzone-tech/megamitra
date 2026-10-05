@@ -670,6 +670,10 @@ export class OwnerPortalService {
     return media;
   }
 
+  async prizeMediaInfo(mediaId: string) {
+    return this.prizeMedia.info(mediaId);
+  }
+
   async saveSeasonPrizes(seasonId: string, prizes: OwnerSeasonPrizeDto[], actorUserId: string) {
     const season = await this.requireSeason(seasonId);
     if (!['DRAFT', 'REVIEW'].includes(season.status)) {
