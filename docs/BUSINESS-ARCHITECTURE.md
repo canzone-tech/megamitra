@@ -128,12 +128,12 @@ Lucky-draw entry tokens are permanent business identifiers, separate from the lo
 
 - Every production lucky-draw token is exactly five decimal digits.
 - The first digit is never zero; the valid namespace is `10000` through `99999`.
-- A token is globally unique across all sessions and all draws, not merely unique within one draw.
-- Once issued, a token is never recycled, even after use, cancellation, refund, rejection, archival or historical cleanup.
+- A token is unique within its Season. The authoritative identity is `seasonId + token`; the same five-digit number may be reused by a different Season.
+- Within one Season, once issued, a token is never recycled, even after use, cancellation, refund, rejection, archival or historical cleanup.
 - A confirmed installment payment receives one token per confirmed installment allocation. An advance/bulk payment therefore receives multiple different tokens rather than reusing one token across future draws.
 - When an owner monthly draw consumes the token corresponding to that installment sequence, the token becomes `USED` and remains permanently recorded.
-- Historical/generic draw entries that do not have an available installment token receive a fresh token from the same global namespace, so no draw can reuse an earlier number.
-- The five-digit namespace contains 90,000 possible values. Exhaustion is a hard error; the system must never silently recycle a prior token or expand the format without an explicit business-contract revision.
+- Historical/generic draw entries that are not Season-bound remain in the legacy global token scope. Season-bound owner draws always resolve tokens inside their `seasonId` scope.
+- The five-digit namespace contains 90,000 possible values per Season. Exhaustion inside a Season is a hard error; the system must never silently recycle a token within that Season or expand the format without an explicit business-contract revision.
 
 ## Policy lifecycle
 
