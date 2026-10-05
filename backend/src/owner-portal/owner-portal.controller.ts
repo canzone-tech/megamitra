@@ -353,8 +353,20 @@ export class OwnerPortalController {
 
   @Permissions('users.read')
   @Get('epins')
-  epins() {
-    return this.finance.listEpins();
+  epins(
+    @Query('status') status?: string,
+    @Query('memberUserId') memberUserId?: string,
+    @Query('seasonId') seasonId?: string,
+    @Query('pinType') pinType?: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    const paged = [status, memberUserId, seasonId, pinType, page, pageSize].some(
+      (value) => value !== undefined,
+    );
+    return paged
+      ? this.finance.listEpinsPage({ status, memberUserId, seasonId, pinType, page, pageSize })
+      : this.finance.listEpins();
   }
 
   @Permissions('users.manage')
