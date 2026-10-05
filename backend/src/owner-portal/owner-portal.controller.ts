@@ -351,7 +351,7 @@ export class OwnerPortalController {
     return this.portal.generateEpins(dto, actor.id);
   }
 
-  @Permissions('users.read')
+  @Permissions('users.manage')
   @Get('epins')
   epins(
     @Query('status') status?: string,
