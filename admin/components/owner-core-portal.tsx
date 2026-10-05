@@ -831,7 +831,7 @@ export function OwnerCorePortal({ section, extension }: { section: OwnerCoreSect
     return <><Hero title="Prize Catalogue" subtitle="Manage prize categories, values, quantities, winner limits, attachments and monthly allocation." />
       <WorkspaceTabs ariaLabel="Prize catalogue workspace" tabs={[
         { id: 'prize-season', label: 'Season & Export' },
-        { id: 'prize-editor', label: 'Monthwise Editor', count: prizeDraft.length },
+        { id: 'prize-editor', label: 'Monthwise Editor', count: monthNumbers.length },
       ]}>
         {(activeTab) => <>
           {activeTab === 'prize-season' ? <div className={styles.card}><SectionHead icon="🎁" title="Prize Schedule" action={<button type="button" className={classNames(styles.button, styles.outline)} disabled={!prizeDraft.length} onClick={() => exportCsv(prizeDraft as unknown as Row[], `${text(selectedSeason.code, 'season').toLowerCase()}-prize-schedule.csv`)}>EXPORT SCHEDULE</button>} /><Field label="Season"><select className={styles.select} value={selectedSeasonId} onChange={(event) => void changePrizeSeason(event.target.value)}><option value="">Select season</option>{seasons.map((row) => <option key={text(row.id)} value={text(row.id)}>{text(row.name)} • {text(row.status)}</option>)}</select></Field><div className={styles.buttonLine}><button type="button" className={styles.button} disabled={!selectedSeasonId} onClick={() => showTab('prize-editor')}>OPEN MONTHWISE EDITOR</button></div></div> : null}
