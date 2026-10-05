@@ -3,6 +3,7 @@ import { BinaryPolicyModule } from '../binary-policy/binary-policy.module';
 import { GenealogyModule } from '../genealogy/genealogy.module';
 import { LedgerModule } from '../ledger/ledger.module';
 import { LuckyDrawModule } from '../lucky-draw/lucky-draw.module';
+import { MemberPaymentModule } from '../member-payments/member-payment.module';
 import { ProgramModule } from '../program/program.module';
 import { ReferralRewardModule } from '../referral-reward/referral-reward.module';
 import { UsersModule } from '../users/users.module';
@@ -28,6 +29,7 @@ import { OwnerSeasonDeploymentService } from './owner-season-deployment.service'
     ReferralRewardModule,
     LuckyDrawModule,
     LedgerModule,
+    MemberPaymentModule,
   ],
   controllers: [
     OwnerPortalController,
