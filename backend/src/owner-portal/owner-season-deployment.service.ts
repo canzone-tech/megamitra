@@ -594,8 +594,9 @@ export class OwnerSeasonDeploymentService {
     if (!/^[a-f0-9]{64}$/.test(checksum)) {
       throw new BadRequestException('Season deployment package checksum is missing or invalid');
     }
-    const { checksum: _checksum, ...body } = record;
-    const actualChecksum = this.checksum(body as DeploymentBody);
+    const body = { ...record };
+    delete body.checksum;
+    const actualChecksum = this.checksum(body as unknown as DeploymentBody);
     if (actualChecksum !== checksum) {
       throw new BadRequestException(
         'Season deployment package checksum does not match its contents',
