@@ -4,7 +4,7 @@ Use this checklist against a release candidate after automated verification is g
 
 `docs/STATEFUL-UAT-COVERAGE.md` is the release-grade map from each stateful business journey to its automated evidence and remaining human/provider/open-rule gate. Do not mark a manual or provider-dependent row complete solely because CI is green.
 
-For cross-chat continuity, read [Business Rules Register](BUSINESS-RULES-REGISTER.md) before UAT. Never treat pending printed-reference formatting or database-level season-code hardening as already shipped.
+For cross-chat continuity, read [Business Rules Register](BUSINESS-RULES-REGISTER.md) before UAT. Owner printed-reference formatting is implemented and its first owner receipt / Print-Save-PDF UAT scenario is recorded below; database-level season-code immutable-after-ACTIVE hardening remains pending and must not be treated as shipped.
 
 ## Automated baseline
 
