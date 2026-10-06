@@ -339,13 +339,23 @@ export function SignupForm() {
 
       {epinPreview ? (
         <div style={{ margin: '-4px 0 18px', padding: '13px 14px', borderRadius: 13, border: '1px solid rgba(7,150,77,.25)', background: 'var(--mm-green-100)' }}>
-          <strong style={{ display: 'block', color: 'var(--mm-green-700)' }}>Session verified ✓</strong>
-          <span style={{ display: 'block', marginTop: 5, fontSize: 13 }}><b>{epinPreview.seasonName}</b> • {epinPreview.seasonCode}</span>
-          <span style={{ display: 'block', marginTop: 3, color: 'var(--mm-ink-500)', fontSize: 12 }}>
-            Start {epinPreview.seasonStartDate} • installments required through joining: {epinPreview.requiredInstallmentCount}
+          <strong style={{ display: 'block', color: 'var(--mm-green-700)' }}>Activation E-PIN Verified ✓</strong>
+          <span style={{ display: 'block', marginTop: 5, fontSize: 13 }}>
+            Season: <b>{epinPreview.seasonName}</b> • {epinPreview.seasonCode}
           </span>
           <span style={{ display: 'block', marginTop: 3, color: 'var(--mm-ink-500)', fontSize: 12 }}>
-            Additional installment E-PINs required now: <b>{epinPreview.additionalInstallmentEpinsRequired}</b>
+            Season Starts: {new Date(`${epinPreview.seasonStartDate}T00:00:00Z`).toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'UTC' })}
+          </span>
+          <span style={{ display: 'block', marginTop: 3, color: 'var(--mm-ink-500)', fontSize: 12 }}>
+            Registration Fee + First EMI: Covered by Activation E-PIN
+          </span>
+          <span style={{ display: 'block', marginTop: 3, color: 'var(--mm-ink-500)', fontSize: 12 }}>
+            Extra E-PINs Needed Now: <b>{epinPreview.additionalInstallmentEpinsRequired}</b>
+          </span>
+          <span style={{ display: 'block', marginTop: 6, color: 'var(--mm-green-700)', fontSize: 12 }}>
+            {epinPreview.additionalInstallmentEpinsRequired === 0
+              ? 'You can complete your registration.'
+              : 'Enter the additional installment E-PINs below to complete your registration.'}
           </span>
         </div>
       ) : null}
