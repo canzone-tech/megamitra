@@ -85,8 +85,6 @@ export function OwnerCoreV14Portal({ section, extension }: { section: OwnerCoreV
   const [notice, setNotice] = useState('');
   const [generatedPassword, setGeneratedPassword] = useState('');
   const [genealogy, setGenealogy] = useState<Row | null>(null);
-  const [operationsSummary, setOperationsSummary] = useState<Row | null>(null);
-  const [orchestrationQueue, setOrchestrationQueue] = useState<Row | null>(null);
 
   const handleError = useCallback((reason: unknown) => {
     if (reason instanceof ApiClientError && reason.status === 401) {
@@ -102,14 +100,7 @@ export function OwnerCoreV14Portal({ section, extension }: { section: OwnerCoreV
       const portalSettings = await apiJson<Settings>(`${API}/settings`);
       setSettings(portalSettings);
       if (section === 'dashboard') {
-        const [dashboard, operations, orchestration] = await Promise.all([
-          apiJson<Row>(`${API}/dashboard`),
-          apiJson<Row>('/api/backend/admin/operations/summary'),
-          apiJson<Row>('/api/backend/admin/operations/orchestration?page=1&limit=8'),
-        ]);
-        setData(dashboard);
-        setOperationsSummary(operations);
-        setOrchestrationQueue(orchestration);
+        setData(await apiJson<Row>(`${API}/dashboard`));
         setAux(null);
       } else if (section === 'income') {
         setData(await apiJson<Row[]>(`${API}/seasons`));
@@ -217,24 +208,6 @@ export function OwnerCoreV14Portal({ section, extension }: { section: OwnerCoreV
     return rows.find((row) => ['ACTIVE', 'PAUSED'].includes(text(row.status, ''))) ?? rows[0] ?? {};
   }
 
-  async function processPendingMemberUpdates() {
-    if (!window.confirm('Run all waiting automatic member updates now?')) return;
-    await run(
-      () => apiJson('/api/backend/admin/program-orchestration/process-pending?limit=25', { method: 'POST' }),
-      'Waiting member updates processed.',
-    );
-  }
-
-  async function processBusinessEvent(businessEventId: string) {
-    await run(
-      () => apiJson(`/api/backend/admin/program-orchestration/events/${businessEventId}/process`, {
-        method: 'POST',
-        body: '{}',
-      }),
-      'Member update completed.',
-    );
-  }
-
   function renderDashboard() {
     const row = (data ?? {}) as Row;
     const active = (row.activeSeason && typeof row.activeSeason === 'object' ? row.activeSeason : {}) as Row;
@@ -260,50 +233,10 @@ export function OwnerCoreV14Portal({ section, extension }: { section: OwnerCoreV
         </div>
       </div>
       <div className={styles.card}>
-        {(() => {
-          const queueItems = Array.isArray(orchestrationQueue?.items)
-            ? orchestrationQueue.items.filter((item): item is Row => Boolean(item) && typeof item === 'object')
-            : [];
-          const waitingCount =
-            number(operationsSummary?.unprocessedBusinessEvents) +
-            number(operationsSummary?.orchestrationAttention);
-          return <>
-            <SectionHead icon="⚙️" title="Automatic Member Updates" note={`${waitingCount} waiting`} />
-            <div className={styles.notice}>
-              Process payment and membership business events into the published program hooks, including Binary 1:4 qualifying units.
-            </div>
-            <div className={styles.buttonLine}>
-              <button
-                className={styles.button}
-                type="button"
-                disabled={busy || waitingCount === 0}
-                onClick={() => void processPendingMemberUpdates()}
-              >
-                RUN WAITING UPDATES
-              </button>
-            </div>
-            {queueItems.length ? <div className={styles.tableBox}>
-              <table className={styles.table}>
-                <thead><tr><th>EVENT</th><th>MEMBER</th><th>STATUS</th><th>ACTION</th></tr></thead>
-                <tbody>{queueItems.map((item) => {
-                  const status = text(item.processingStatus, 'UNPROCESSED');
-                  const actionable = ['UNPROCESSED', 'FAILED', 'RECONCILIATION_REQUIRED'].includes(status);
-                  return <tr key={text(item.businessEventId)}>
-                    <td>{text(item.type)}</td>
-                    <td><b>{text(item.memberUsername)}</b></td>
-                    <td className={status === 'PROCESSED' ? styles.status : styles.statusOff}>{status}</td>
-                    <td>{actionable ? <button
-                      className={styles.button}
-                      type="button"
-                      disabled={busy}
-                      onClick={() => void processBusinessEvent(text(item.businessEventId, ''))}
-                    >RUN NOW</button> : '—'}</td>
-                  </tr>;
-                })}</tbody>
-              </table>
-            </div> : <Empty>No automatic member updates are currently visible in the queue.</Empty>}
-          </>;
-        })()}
+        <SectionHead icon="⚙️" title="Automatic Earnings Processing" note="No operator action required" />
+        <div className={classNames(styles.notice, styles.success)}>
+          Confirmed business events automatically flow through qualification, referral handling, fixed A:C / B:D settlement, caps and wallet ledger posting. Lucky Draw execution remains an explicit owner action.
+        </div>
       </div>
     </>;
   }
