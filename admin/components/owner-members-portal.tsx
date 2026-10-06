@@ -87,7 +87,8 @@ export function OwnerMembersPortal({ extension }: { extension?: ReactNode }) {
 
   async function submitMember(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     setBusy(true);
     setError('');
     setNotice('');
@@ -111,7 +112,7 @@ export function OwnerMembersPortal({ extension }: { extension?: ReactNode }) {
         }),
       });
       if (result.initialPassword) setGeneratedPassword(text(result.initialPassword, ''));
-      event.currentTarget.reset();
+      formElement.reset();
       setNotice('MEMBER account created with Binary 1:4 placement');
       await load();
     } catch (reason) {
