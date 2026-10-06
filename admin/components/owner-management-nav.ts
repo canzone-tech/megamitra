@@ -32,7 +32,6 @@ export const OWNER_MANAGEMENT_NAV: OwnerManagementNavItem[] = [
   { section: 'income', label: '9 Income Types', symbol: '📈', group: 'Main' },
   { section: 'members', label: 'Members', symbol: '👥', group: 'Main' },
   { section: 'binary', label: 'Binary 1:4', symbol: '🌳', group: 'Main' },
-  { section: 'placement', label: 'Placement / Pairing', symbol: '🧭', group: 'Main' },
   { section: 'seasons', label: 'Season Management', symbol: '📅', group: 'Season & Draw' },
   { section: 'draw', label: 'Monthly Draw', symbol: '🎲', group: 'Season & Draw' },
   { section: 'winners', label: 'Winners', symbol: '🏆', group: 'Season & Draw' },
