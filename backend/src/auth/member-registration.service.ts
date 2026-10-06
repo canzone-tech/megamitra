@@ -322,12 +322,13 @@ export class MemberRegistrationService {
         }
 
         await tx.$executeRawUnsafe(
-          `INSERT INTO member_profiles (userId, dateOfBirth, state, city, memberType, lifecycleStatus)
-           VALUES (?, ?, ?, ?, 'MEMBER', 'ACTIVE')`,
+          `INSERT INTO member_profiles (userId, dateOfBirth, state, city, postalCode, memberType, lifecycleStatus)
+           VALUES (?, ?, ?, ?, ?, 'MEMBER', 'ACTIVE')`,
           created.id,
           dto.dateOfBirth ? new Date(`${dto.dateOfBirth}T00:00:00.000Z`) : null,
           dto.state?.trim() || null,
           dto.city?.trim() || null,
+          dto.postalCode?.trim() || null,
         );
         await tx.sponsorRelationship.create({
           data: {
