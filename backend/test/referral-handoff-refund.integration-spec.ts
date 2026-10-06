@@ -124,6 +124,13 @@ describe('MegaGoldenClub referral handoff and refund reconciliation integration'
       });
       await prisma.ledgerAccount.deleteMany({ where: { ownerUserId: { in: userIds } } });
 
+      if (businessEventIds.length) {
+        await prisma.$executeRawUnsafe(
+          `DELETE FROM program_event_processing_runs
+           WHERE businessEventId IN (${businessEventIds.map(() => '?').join(',')})`,
+          ...businessEventIds,
+        );
+      }
       await prisma.programBusinessEvent.deleteMany({ where: { id: { in: businessEventIds } } });
       await prisma.programRefundAllocation.deleteMany({
         where: { refundRecordId: { in: refundIds } },
