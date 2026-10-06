@@ -18,7 +18,6 @@ const expectedOwnerNav = new Map(Object.entries({
   income: '📈',
   members: '👥',
   binary: '🌳',
-  placement: '🧭',
   seasons: '📅',
   draw: '🎲',
   winners: '🏆',
