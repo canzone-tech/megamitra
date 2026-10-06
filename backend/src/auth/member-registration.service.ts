@@ -20,7 +20,7 @@ import {
   UserStatus,
   UsernameCreationMode,
 } from '../generated/prisma/enums';
-import { ReferralRewardService } from '../referral-reward/referral-reward.service';
+import { ProgramAutomationService } from '../program/program-automation.service';
 import { generateRandomUsername } from '../users/random-username';
 import type { RegisterDto } from './auth.dto';
 import { AuthRecoveryService } from './auth-recovery.service';
@@ -86,7 +86,7 @@ export class MemberRegistrationService {
     private readonly audit: AuditService,
     private readonly recovery: AuthRecoveryService,
     private readonly genealogy: GenealogyService,
-    private readonly referralRewards: ReferralRewardService,
+    private readonly automation: ProgramAutomationService,
     private readonly drawTokens: LuckyDrawTokenService,
   ) {}
 
@@ -398,26 +398,10 @@ export class MemberRegistrationService {
       installmentDrawTokens.sort(
         (left, right) => Number(left.installmentSequence ?? 0) - Number(right.installmentSequence ?? 0),
       );
-      let referralRewardId: string | null = null;
-      if (registered.activation.referralPolicyVersionId) {
-        const reward = await this.referralRewards.createEvent(
-          {
-            sourceKey: `epin-activation:${registered.activation.epinId}:direct-referral`,
-            referredUserId: registered.user.id,
-            policyVersionId: registered.activation.referralPolicyVersionId,
-            basisAmount: registered.activation.paidAmount,
-            currencyCode: registered.activation.currencyCode,
-            occurredAt: activationAt.toISOString(),
-            metadata: {
-              seasonId: registered.activation.seasonId,
-              enrollmentId: registered.activation.enrollmentId,
-              activationType: 'PAID_EPIN_REGISTRATION',
-            },
-          },
-          registered.user.id,
-        );
-        referralRewardId = reward.event.id;
-      }
+      await this.processRegistrationEventsBestEffort(
+        registered.activation.enrollmentId,
+        registered.user.id,
+      );
 
       await this.audit.log({
         actorUserId: registered.user.id,
@@ -435,7 +419,7 @@ export class MemberRegistrationService {
           paymentRecordIds: registered.activation.paymentRecordIds,
           paidInstallmentCount: registered.activation.requiredInstallmentCount,
           catchUpInstallmentCount: registered.activation.catchUpInstallmentCount,
-          referralRewardId,
+          automaticBusinessProcessing: true,
           epinRequired: true,
         },
       });
@@ -474,6 +458,34 @@ export class MemberRegistrationService {
         throw new ConflictException('Username, email, or mobile is already in use');
       }
       throw error;
+    }
+  }
+
+  private async processRegistrationEventsBestEffort(
+    enrollmentId: string,
+    actorUserId: string,
+  ) {
+    const events = await this.prisma.programBusinessEvent.findMany({
+      where: { enrollmentId },
+      orderBy: [{ occurredAt: 'asc' }, { createdAt: 'asc' }],
+      select: { id: true },
+    });
+    for (const event of events) {
+      try {
+        await this.automation.processEvent(event.id, actorUserId);
+      } catch (error) {
+        await this.audit.log({
+          actorUserId,
+          action: AuditAction.UPDATE,
+          entityType: 'ProgramEnrollment',
+          entityId: enrollmentId,
+          description: 'Automatic paid-registration processing requires reconciliation',
+          metadata: {
+            businessEventId: event.id,
+            reason: error instanceof Error ? error.message.slice(0, 500) : 'Unknown automation error',
+          },
+        });
+      }
     }
   }
 
