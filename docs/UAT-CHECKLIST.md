@@ -30,6 +30,10 @@ For cross-chat continuity, read [Business Rules Register](BUSINESS-RULES-REGISTE
 - [ ] Member tokens cannot access admin-only operations.
 - [ ] Admin permissions restrict KYC, payout, entitlement, business-plan and presentation actions as configured.
 
+## Recorded manual UAT evidence
+
+- **2026-10-06 — Owner activation-payment receipt:** first paid public signup under the bootstrap sponsor was visible in the owner payment register. Owner receipt showed the recorded ₹2,000 activation payment split into ₹1,000 Registration Fee + ₹1,000 Monthly EMI, stored Lucky Draw Token `41483` for EMI #1 as AVAILABLE, and printed reference `MGC_202610_3FC2-M01-41483`. Browser Print/Save PDF preview rendered the same receipt and token/reference on one page without printing the owner dashboard. **PASS for this owner-receipt scenario only.** This does not pre-check the separate public/member receipt, future installments, draw consumption, winner, refund or full business-UAT rows below.
+
 ## Program, payment, receipt, E-PIN and refund
 
 - [ ] Register a MEMBER with a valid sponsor and E-PIN; verify the pin is consumed once and the intended session/enrollment activation state is created.
