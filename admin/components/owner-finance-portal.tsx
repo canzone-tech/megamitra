@@ -142,8 +142,12 @@ function PaymentReceiptPreview({ receipt, settings, defaultCurrencyCode }: {
             <div className={styles.receiptTokenList}>
               {drawTokens.map((item, index) => (
                 <div className={styles.receiptTokenRow} key={`${text(item.installmentSequence)}-${text(item.token)}-${index}`}>
-                  <span>EMI #{text(item.installmentSequence)} • {text(item.status)}</span>
-                  <strong className={styles.receiptTokenNumber}>{text(item.token)}</strong>
+                  <div className={styles.receiptTokenDetails}>
+                    <span>EMI #{text(item.installmentSequence)} • {text(item.status)}</span>
+                    <strong className={styles.receiptTokenNumber}>{text(item.token)}</strong>
+                    <span>Printed Reference</span>
+                    <b className={styles.receiptPrintedReference}>{text(item.printedReference, 'Unavailable — check season mapping')}</b>
+                  </div>
                 </div>
               ))}
             </div>
