@@ -145,7 +145,7 @@ export class OwnerPortalCoreService {
     return this.rows<Record<string, unknown>>(
       `SELECT u.id, u.username, u.email, u.phone, u.firstName, u.lastName,
               u.status, u.createdAt,
-              mp.dateOfBirth, mp.state, mp.city,
+              mp.dateOfBirth, mp.state, mp.city, mp.postalCode,
               'MEMBER' AS accountRole,
               sponsor.username AS sponsorUsername,
               parent.username AS placementParentUsername,
