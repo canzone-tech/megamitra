@@ -266,15 +266,31 @@ export class OwnerPortalFinanceService {
       : refundedAmount.greaterThan(0)
         ? 'PARTIALLY_REFUNDED'
         : 'RECORDED';
+    const occurredAt = this.utcInstant(row.occurredAt);
     return {
       ...row,
-      receiptNumber: this.receiptNumber(row.id, row.occurredAt),
+      occurredAt,
+      receiptNumber: this.receiptNumber(row.id, occurredAt),
       amount: amount.toFixed(2),
       refundedAmount: refundedAmount.toFixed(2),
       netAmount: amount.minus(refundedAmount).toFixed(2),
       paymentType: row.paymentType || 'OTHER',
       status,
     };
+  }
+
+  private utcInstant(value: Date | string) {
+    if (value instanceof Date) {
+      return Number.isFinite(value.getTime()) ? value.toISOString() : String(value);
+    }
+
+    const raw = String(value).trim();
+    const naiveUtc = raw.match(
+      /^(\\d{4}-\\d{2}-\\d{2})[ T](\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?)$/,
+    );
+    const candidate = naiveUtc ? `${naiveUtc[1]}T${naiveUtc[2]}Z` : raw;
+    const parsed = new Date(candidate);
+    return Number.isFinite(parsed.getTime()) ? parsed.toISOString() : raw;
   }
 
   private receiptNumber(id: string, occurredAt: Date | string) {
