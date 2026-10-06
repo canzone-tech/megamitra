@@ -446,6 +446,18 @@ describe('MegaGoldenClub authenticated runtime UAT', () => {
       expect(epins).toHaveLength(7);
       generatedEpinIds.push(...epins.map((epin) => epin.id));
 
+      const defaultInventory = await request(
+        `/admin/owner-portal/epins?seasonId=${encodeURIComponent(paidRegistration.seasonId)}&pinType=ACTIVATION&page=1&pageSize=25`,
+        { headers: adminHeaders },
+      );
+      expect(defaultInventory.status).toBe(200);
+      expect(defaultInventory.body.total).toBe(7);
+      expect(
+        (defaultInventory.body.items as Array<Record<string, any>>).every(
+          (item) => item.status === 'ACTIVE',
+        ),
+      ).toBe(true);
+
       const inventoryPage1 = await request(
         `/admin/owner-portal/epins?status=UNUSED&seasonId=${encodeURIComponent(paidRegistration.seasonId)}&pinType=ACTIVATION&page=1&pageSize=5`,
         { headers: adminHeaders },
@@ -469,6 +481,31 @@ describe('MegaGoldenClub authenticated runtime UAT', () => {
       );
       expect(inventoryPage2.status).toBe(200);
       expect((inventoryPage2.body.items as Array<Record<string, any>>)).toHaveLength(2);
+
+      const revoked = await request(`/admin/owner-portal/epins/${encodeURIComponent(epins[6].id)}/revoke`, {
+        method: 'POST',
+        headers: adminHeaders,
+        body: JSON.stringify({ reason: 'Runtime UAT status filter coverage' }),
+      });
+      expect(revoked.status).toBe(201);
+      expect(revoked.body.ok).toBe(true);
+
+      const activeAfterRevoke = await request(
+        `/admin/owner-portal/epins?seasonId=${encodeURIComponent(paidRegistration.seasonId)}&pinType=ACTIVATION&page=1&pageSize=25`,
+        { headers: adminHeaders },
+      );
+      expect(activeAfterRevoke.status).toBe(200);
+      expect(activeAfterRevoke.body.total).toBe(6);
+
+      const revokedInventory = await request(
+        `/admin/owner-portal/epins?status=REVOKED&seasonId=${encodeURIComponent(paidRegistration.seasonId)}&pinType=ACTIVATION&page=1&pageSize=25`,
+        { headers: adminHeaders },
+      );
+      expect(revokedInventory.status).toBe(200);
+      expect(revokedInventory.body.total).toBe(1);
+      expect(revokedInventory.body.items).toEqual([
+        expect.objectContaining({ id: epins[6].id, status: 'REVOKED' }),
+      ]);
 
       const publicEpins = await Promise.all(
         Array.from({ length: 5 }, async (_, index) => {
