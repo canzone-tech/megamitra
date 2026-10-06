@@ -58,6 +58,11 @@ export class RegisterDto {
 
   @IsOptional()
   @IsString()
+  @Matches(/^[1-9][0-9]{5}$/)
+  postalCode?: string;
+
+  @IsOptional()
+  @IsString()
   @MaxLength(191)
   sponsorReference?: string;
 
