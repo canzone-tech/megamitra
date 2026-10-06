@@ -286,7 +286,7 @@ export class OwnerPortalFinanceService {
 
     const raw = String(value).trim();
     const naiveUtc = raw.match(
-      /^(\\d{4}-\\d{2}-\\d{2})[ T](\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?)$/,
+      /^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?)$/,
     );
     const candidate = naiveUtc ? `${naiveUtc[1]}T${naiveUtc[2]}Z` : raw;
     const parsed = new Date(candidate);
