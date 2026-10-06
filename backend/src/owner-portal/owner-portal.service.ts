@@ -204,7 +204,7 @@ export class OwnerPortalService {
     }
     return this.rows<Record<string, unknown>>(
       `SELECT u.id, u.username, u.email, u.phone, u.firstName, u.lastName, u.status, u.createdAt,
-              mp.dateOfBirth, mp.state, mp.city, mp.memberType,
+              mp.dateOfBirth, mp.state, mp.city, mp.postalCode, mp.memberType,
               sponsor.username AS sponsorUsername,
               parent.username AS placementParentUsername,
               bp.side AS placementSide
@@ -238,14 +238,15 @@ export class OwnerPortalService {
     );
 
     await this.db.execute(
-      `INSERT INTO member_profiles (userId, dateOfBirth, state, city, memberType)
-       VALUES (?, ?, ?, ?, ?)
-       ON DUPLICATE KEY UPDATE dateOfBirth=VALUES(dateOfBirth), state=VALUES(state), city=VALUES(city), memberType=VALUES(memberType)`,
+      `INSERT INTO member_profiles (userId, dateOfBirth, state, city, postalCode, memberType)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE dateOfBirth=VALUES(dateOfBirth), state=VALUES(state), city=VALUES(city), postalCode=VALUES(postalCode), memberType=VALUES(memberType)`,
       [
         user.id,
         dto.dateOfBirth ? new Date(`${dto.dateOfBirth}T00:00:00.000Z`) : null,
         dto.state?.trim() || null,
         dto.city?.trim() || null,
+        dto.postalCode?.trim() || null,
         dto.memberType,
       ],
     );
@@ -295,7 +296,7 @@ export class OwnerPortalService {
   async memberDetail(userId: string) {
     const member = await this.genealogy.getMember(userId);
     const profile = await this.rows<Record<string, unknown>>(
-      'SELECT dateOfBirth, state, city, memberType FROM member_profiles WHERE userId = ? LIMIT 1',
+      'SELECT dateOfBirth, state, city, postalCode, memberType FROM member_profiles WHERE userId = ? LIMIT 1',
       [userId],
     );
     return { ...member, profile: profile[0] ?? null };
