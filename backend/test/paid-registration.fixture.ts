@@ -136,6 +136,34 @@ export async function createPaidRegistrationFixture(
        WHERE enrollmentId IN (${enrollmentIds.map(() => '?').join(',')})`,
       ...enrollmentIds,
     );
+    const businessEvents = await prisma.programBusinessEvent.findMany({
+      where: { enrollmentId: { in: enrollmentIds } },
+      select: { id: true },
+    });
+    const businessEventIds = businessEvents.map((item) => item.id);
+    if (businessEventIds.length) {
+      const placeholders = businessEventIds.map(() => '?').join(',');
+      await prisma.$executeRawUnsafe(
+        `DELETE FROM program_entitlement_generation_links WHERE businessEventId IN (${placeholders})`,
+        ...businessEventIds,
+      );
+      await prisma.$executeRawUnsafe(
+        `DELETE FROM program_binary_qualification_links WHERE businessEventId IN (${placeholders})`,
+        ...businessEventIds,
+      );
+      await prisma.$executeRawUnsafe(
+        `DELETE FROM program_referral_reward_hooks WHERE businessEventId IN (${placeholders})`,
+        ...businessEventIds,
+      );
+      await prisma.$executeRawUnsafe(
+        `DELETE FROM program_draw_eligibility_hooks WHERE businessEventId IN (${placeholders})`,
+        ...businessEventIds,
+      );
+      await prisma.$executeRawUnsafe(
+        `DELETE FROM program_event_processing_runs WHERE businessEventId IN (${placeholders})`,
+        ...businessEventIds,
+      );
+    }
     await prisma.programBusinessEvent.deleteMany({ where: { enrollmentId: { in: enrollmentIds } } });
     await prisma.programPaymentAllocation.deleteMany({ where: { enrollmentId: { in: enrollmentIds } } });
     await prisma.programPaymentRecord.deleteMany({ where: { enrollmentId: { in: enrollmentIds } } });
