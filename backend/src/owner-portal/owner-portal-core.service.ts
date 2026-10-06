@@ -18,6 +18,29 @@ type RegistrationPolicyRow = {
   defaultRoleName: string;
 };
 type UserReferenceRow = { id: string; username: string };
+type BinaryGenealogyRootRow = {
+  id: string;
+  username: string;
+  firstName: string | null;
+  lastName: string | null;
+  status: string;
+  createdAt: Date | string;
+  directChildCount: string | number | bigint;
+};
+type BinaryGenealogyMemberRow = {
+  id: string;
+  username: string;
+  firstName: string | null;
+  lastName: string | null;
+  status: string;
+  parentUserId: string;
+  parentUsername: string;
+  slot: BinaryPlacementSlot;
+  side: 'LEFT' | 'RIGHT';
+  depth: number;
+  firstLegSlot: BinaryPlacementSlot;
+  firstLegSide: 'LEFT' | 'RIGHT';
+};
 
 @Injectable()
 export class OwnerPortalCoreService {
@@ -177,6 +200,75 @@ export class OwnerPortalCoreService {
        LIMIT 100`,
       values,
     );
+  }
+
+  async binaryGenealogy(reference?: string) {
+    const roots = await this.rows<BinaryGenealogyRootRow>(
+      `SELECT u.id, u.username, u.firstName, u.lastName, u.status, u.createdAt,
+              COUNT(child.id) AS directChildCount
+       FROM users u
+       INNER JOIN user_roles ur ON ur.userId=u.id
+       INNER JOIN roles role ON role.id=ur.roleId AND role.name='MEMBER' AND role.status='ACTIVE'
+       LEFT JOIN binary_placements own_placement ON own_placement.memberUserId=u.id
+       LEFT JOIN binary_placements child ON child.parentUserId=u.id
+       WHERE own_placement.id IS NULL
+       GROUP BY u.id, u.username, u.firstName, u.lastName, u.status, u.createdAt
+       ORDER BY directChildCount DESC, u.createdAt ASC, u.username ASC
+       LIMIT 100`,
+    );
+
+    let root: Omit<BinaryGenealogyRootRow, 'directChildCount'> & { directChildCount: number } | null = null;
+    const normalizedReference = reference?.trim();
+    if (normalizedReference) {
+      const selected = await this.resolveUser(normalizedReference);
+      const selectedRows = await this.rows<BinaryGenealogyRootRow>(
+        `SELECT u.id, u.username, u.firstName, u.lastName, u.status, u.createdAt,
+                (SELECT COUNT(*) FROM binary_placements child WHERE child.parentUserId=u.id) AS directChildCount
+         FROM users u
+         WHERE u.id=? LIMIT 1`,
+        [selected.id],
+      );
+      const selectedRoot = selectedRows[0];
+      if (!selectedRoot) throw new NotFoundException('Binary root member was not found');
+      root = { ...selectedRoot, directChildCount: Number(selectedRoot.directChildCount ?? 0) };
+    } else if (roots[0]) {
+      root = { ...roots[0], directChildCount: Number(roots[0].directChildCount ?? 0) };
+    }
+
+    if (!root) {
+      return {
+        root: null,
+        roots: [],
+        members: [],
+        visibleMemberCount: 0,
+      };
+    }
+
+    const members = await this.rows<BinaryGenealogyMemberRow>(
+      `SELECT u.id, u.username, u.firstName, u.lastName, u.status,
+              bp.parentUserId, parent.username AS parentUsername,
+              bp.slot, bp.side, ba.depth, ba.firstLegSlot, ba.firstLegSide
+       FROM binary_ancestry ba
+       INNER JOIN users u ON u.id=ba.descendantUserId
+       INNER JOIN binary_placements bp ON bp.memberUserId=ba.descendantUserId
+       INNER JOIN users parent ON parent.id=bp.parentUserId
+       WHERE ba.ancestorUserId=?
+       ORDER BY ba.depth ASC,
+                FIELD(ba.firstLegSlot, 'A','B','C','D'),
+                FIELD(bp.slot, 'A','B','C','D'),
+                bp.createdAt ASC, u.username ASC`,
+      [root.id],
+    );
+
+    return {
+      root,
+      roots: roots.map((item) => ({
+        ...item,
+        directChildCount: Number(item.directChildCount ?? 0),
+      })),
+      members,
+      visibleMemberCount: members.length,
+    };
   }
 
   async listPairLedger(limit = 100) {
