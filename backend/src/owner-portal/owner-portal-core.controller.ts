@@ -42,6 +42,12 @@ export class OwnerPortalCoreController {
     );
   }
 
+  @Permissions('genealogy.read')
+  @Get('genealogy')
+  genealogy(@Query('reference') reference?: string) {
+    return this.core.binaryGenealogy(reference);
+  }
+
   @Permissions('binary.settlement.read')
   @Get('pair-ledger')
   pairLedger(@Query('limit') limit?: string) {
