@@ -92,4 +92,6 @@
 .receiptTokenList{display:grid;gap:11px}
 .receiptTokenRow{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap}
 .receiptTokenRow span{font-size:11px;color:#386c4b}
-.receiptTokenNumber{font-size:25px;font-weight:900;color:#15803d;letter-spacing:2px;line-height:1.2}
+.receiptTokenNumber{display:block;font-size:28px;font-weight:900;color:#15803d;letter-spacing:2px;line-height:1.2}
+.receiptTokenDetails{display:flex;flex-direction:column;align-items:flex-start;gap:7px;min-width:0}
+.receiptPrintedReference{font-size:14px;font-weight:800;color:#166534;overflow-wrap:anywhere;letter-spacing:.2px}
