@@ -3,6 +3,13 @@
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { ApiClientError, apiJson } from '@/lib/client-api';
+import {
+  DEFAULT_INDIAN_CITY,
+  DEFAULT_INDIAN_STATE,
+  INDIA_STATE_CITIES,
+  INDIA_STATES,
+  OTHER_CITY_VALUE,
+} from '../../shared/india-locations';
 
 type RegistrationConfig = {
   publicRegistrationEnabled: boolean;
@@ -81,6 +88,8 @@ export function SignupForm() {
   const [epinPreview, setEpinPreview] = useState<EpinPreview | null>(null);
   const [epinPreviewState, setEpinPreviewState] = useState<'idle' | 'checking' | 'found' | 'invalid'>('idle');
   const [installmentEpins, setInstallmentEpins] = useState<string[]>([]);
+  const [selectedState, setSelectedState] = useState(DEFAULT_INDIAN_STATE);
+  const [selectedCity, setSelectedCity] = useState(DEFAULT_INDIAN_CITY);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<RegistrationResult | null>(null);
@@ -201,7 +210,13 @@ export function SignupForm() {
       return;
     }
 
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    const city = selectedCity === OTHER_CITY_VALUE ? formString(form, 'otherCity') : selectedCity;
+    if (!city) {
+      setError('Please enter your city.');
+      return;
+    }
     setBusy(true);
     setError('');
     setResult(null);
@@ -215,8 +230,9 @@ export function SignupForm() {
           password: formString(form, 'password') || undefined,
           fullName: formString(form, 'fullName'),
           dateOfBirth: formString(form, 'dateOfBirth') || undefined,
-          state: formString(form, 'state') || undefined,
-          city: formString(form, 'city') || undefined,
+          state: selectedState,
+          city,
+          postalCode: formString(form, 'postalCode'),
           sponsorReference: reference || undefined,
           epin: activationEpin.trim(),
           installmentEpins: installmentEpins.map((pin) => pin.trim()),
@@ -229,7 +245,9 @@ export function SignupForm() {
         }),
       });
       setResult(registered);
-      event.currentTarget.reset();
+      formElement.reset();
+      setSelectedState(DEFAULT_INDIAN_STATE);
+      setSelectedCity(DEFAULT_INDIAN_CITY);
       setSponsorReference('');
       setSponsor(null);
       setSponsorState('idle');
@@ -381,12 +399,58 @@ export function SignupForm() {
         <input className="mm-input" id="dateOfBirth" name="dateOfBirth" type="date" />
       </div>
       <div className="mm-field">
-        <label htmlFor="state">State</label>
-        <input className="mm-input" id="state" name="state" autoComplete="address-level1" />
+        <label htmlFor="state">State *</label>
+        <select
+          className="mm-input"
+          id="state"
+          name="state"
+          value={selectedState}
+          required
+          autoComplete="address-level1"
+          onChange={(event) => {
+            const state = event.target.value;
+            const cities = INDIA_STATE_CITIES[state] ?? [];
+            setSelectedState(state);
+            setSelectedCity(cities[0] ?? OTHER_CITY_VALUE);
+          }}
+        >
+          {INDIA_STATES.map((state) => <option key={state} value={state}>{state}</option>)}
+        </select>
       </div>
       <div className="mm-field">
-        <label htmlFor="city">City</label>
-        <input className="mm-input" id="city" name="city" autoComplete="address-level2" />
+        <label htmlFor="city">City *</label>
+        <select
+          className="mm-input"
+          id="city"
+          name="city"
+          value={selectedCity}
+          required
+          autoComplete="address-level2"
+          onChange={(event) => setSelectedCity(event.target.value)}
+        >
+          {(INDIA_STATE_CITIES[selectedState] ?? []).map((city) => <option key={city} value={city}>{city}</option>)}
+          <option value={OTHER_CITY_VALUE}>Other</option>
+        </select>
+      </div>
+      {selectedCity === OTHER_CITY_VALUE ? (
+        <div className="mm-field">
+          <label htmlFor="otherCity">Other city *</label>
+          <input className="mm-input" id="otherCity" name="otherCity" required autoComplete="address-level2" />
+        </div>
+      ) : null}
+      <div className="mm-field">
+        <label htmlFor="postalCode">PIN Code *</label>
+        <input
+          className="mm-input"
+          id="postalCode"
+          name="postalCode"
+          inputMode="numeric"
+          autoComplete="postal-code"
+          pattern="[1-9][0-9]{5}"
+          maxLength={6}
+          required
+          placeholder="6-digit PIN Code"
+        />
       </div>
       <div className="mm-field">
         <label htmlFor="signupPassword">Password{passwordMode === 'MANUAL' ? ' *' : ''}</label>
