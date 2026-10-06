@@ -1,6 +1,6 @@
 # MegaGoldenClub — Business Rules Register (Canonical)
 
-**Status:** authoritative human-readable register for the MegaMitra project, maintained in GitHub on `dev/local-foundation`.  
+**Status:** authoritative human-readable register for the MegaGoldenClub project, maintained in GitHub on `dev/local-foundation`.  
 **Reviewed:** 2026-10-06.  
 **Read first in every new development/UAT chat.** This register complements `docs/BUSINESS-ARCHITECTURE.md`, `docs/UAT-CHECKLIST.md` and `docs/STATEFUL-UAT-COVERAGE.md`. If a chat summary conflicts with repository code, migration history or a newer approved rule, stop and reconcile explicitly before changing business behavior.
 
