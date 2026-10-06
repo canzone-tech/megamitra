@@ -437,6 +437,61 @@ describe('MegaGoldenClub auth integration', () => {
     expect(correctButLocked.status).toBe(401);
   });
 
+  it('generates a random six-digit prefixed username when registration is AUTO', async () => {
+    const suffix = randomUUID().replaceAll('-', '').slice(0, 12);
+    const epin = `AUTO-${suffix}`;
+    const email = `auto_${suffix}@example.test`;
+    await createEpin(epin);
+
+    const sequenceBefore = await prisma.systemSequence.findUniqueOrThrow({
+      where: { key: 'username' },
+      select: { nextValue: true },
+    });
+
+    await prisma.systemRegistrationConfig.update({
+      where: { id: 1 },
+      data: {
+        usernameMode: UsernameCreationMode.AUTO,
+        usernamePrefixEnabled: true,
+        usernamePrefix: 'MGC',
+      },
+    });
+
+    try {
+      const registered = await request('/auth/register', {
+        method: 'POST',
+        body: JSON.stringify({
+          email,
+          password: 'Integration-Pass-123!',
+          fullName: 'Auto Username Member',
+          state: 'Karnataka',
+          city: 'Bengaluru',
+          postalCode: '560001',
+          sponsorReference: paidRegistration.sponsorUsername,
+          epin,
+        }),
+      });
+      expect(registered.status).toBe(201);
+      expect(String(registered.body.user.username)).toMatch(/^MGC\d{6}$/);
+      createdUserIds.push(String(registered.body.user.id));
+
+      const sequenceAfter = await prisma.systemSequence.findUniqueOrThrow({
+        where: { key: 'username' },
+        select: { nextValue: true },
+      });
+      expect(sequenceAfter.nextValue).toBe(sequenceBefore.nextValue);
+    } finally {
+      await prisma.systemRegistrationConfig.update({
+        where: { id: 1 },
+        data: {
+          usernameMode: UsernameCreationMode.MANUAL,
+          usernamePrefixEnabled: false,
+          usernamePrefix: null,
+        },
+      });
+    }
+  });
+
   it('requires atomic sequential catch-up E-PINs for a late session join', async () => {
     const late = await createPaidRegistrationFixture(
       prisma,
