@@ -152,6 +152,31 @@ export class ProgramReferralRewardConsumerService {
       return { hook, event: null, idempotent: false };
     }
 
+    const legacyReward = await this.legacyRegistrationReward(hook);
+    if (legacyReward) {
+      await this.prisma.$executeRawUnsafe(
+        `UPDATE program_referral_reward_hooks
+         SET status = 'CONSUMED', consumedRewardEventId = ?, updatedAt = CURRENT_TIMESTAMP(3)
+         WHERE id = ? AND status = 'READY'`,
+        legacyReward.id,
+        hook.id,
+      );
+      hook = await this.getHookRow(hook.id);
+      await this.audit.log({
+        actorUserId,
+        action: AuditAction.UPDATE,
+        entityType: 'ProgramReferralRewardHook',
+        entityId: hook.id,
+        description: 'Program referral hook linked to legacy paid-registration reward',
+        metadata: { rewardEventId: legacyReward.id },
+      });
+      return {
+        hook,
+        event: await this.rewards.getEvent(legacyReward.id),
+        idempotent: true,
+      };
+    }
+
     const result = await this.rewards.createEvent(
       {
         sourceKey: `PROGRAM_REFERRAL_HOOK:${hook.id}`,
@@ -194,6 +219,43 @@ export class ProgramReferralRewardConsumerService {
       metadata: { rewardEventId: result.event.id },
     });
     return { hook, event: result.event, idempotent: result.idempotent };
+  }
+
+  private async legacyRegistrationReward(hook: ReferralHookRow) {
+    const event = await this.prisma.programBusinessEvent.findUnique({
+      where: { id: hook.businessEventId },
+      include: { paymentRecord: { select: { metadata: true } } },
+    });
+    const metadata = event?.paymentRecord?.metadata;
+    const epinId =
+      metadata &&
+      typeof metadata === 'object' &&
+      !Array.isArray(metadata) &&
+      typeof (metadata as Record<string, unknown>).epinId === 'string'
+        ? String((metadata as Record<string, unknown>).epinId)
+        : null;
+    if (!epinId) return null;
+
+    const reward = await this.prisma.referralRewardEvent.findUnique({
+      where: { sourceKey: `epin-activation:${epinId}:direct-referral` },
+      select: {
+        id: true,
+        referredUserId: true,
+        sponsorUserId: true,
+        policyVersionId: true,
+      },
+    });
+    if (!reward) return null;
+    if (
+      reward.referredUserId !== hook.referredUserId ||
+      reward.sponsorUserId !== hook.sponsorUserId ||
+      reward.policyVersionId !== hook.referralPolicyVersionId
+    ) {
+      throw new ConflictException(
+        'Legacy registration referral reward does not match the orchestration hook',
+      );
+    }
+    return reward;
   }
 
   async processReady(actorUserId: string, limit = 25) {
