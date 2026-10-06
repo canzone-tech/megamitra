@@ -119,10 +119,17 @@ describe('MegaGoldenClub program event orchestration integration', () => {
       });
       const qualifyingEventIds = qualifyingEvents.map((row) => row.id);
       if (qualifyingEventIds.length > 0) {
+        await prisma.$executeRawUnsafe(
+          `DELETE FROM program_binary_qualification_links
+           WHERE qualifyingUnitEventId IN (${qualifyingEventIds.map(() => '?').join(',')})`,
+          ...qualifyingEventIds,
+        );
         await prisma.binaryUplineQualifyingUnit.deleteMany({
           where: { unitEventId: { in: qualifyingEventIds } },
         });
-        await prisma.binaryQualifyingUnitEvent.deleteMany({ where: { id: { in: qualifyingEventIds } } });
+        await prisma.binaryQualifyingUnitEvent.deleteMany({
+          where: { id: { in: qualifyingEventIds } },
+        });
       }
 
       await prisma.auditLog.deleteMany({
