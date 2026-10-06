@@ -313,6 +313,18 @@ describe('MegaGoldenClub auth integration', () => {
        WHERE enrollmentId=? AND installmentSequence=1`,
       enrollmentId,
     );
+
+    const paymentClockRows = await prisma.$queryRawUnsafe<
+      Array<{ ageSeconds: number | bigint | string }>
+    >(
+      `SELECT TIMESTAMPDIFF(SECOND, occurredAt, UTC_TIMESTAMP(3)) AS ageSeconds
+       FROM program_payment_records
+       WHERE enrollmentId=?
+       ORDER BY occurredAt ASC
+       LIMIT 1`,
+      enrollmentId,
+    );
+    expect(Math.abs(Number(paymentClockRows[0]?.ageSeconds ?? Number.POSITIVE_INFINITY))).toBeLessThanOrEqual(120);
     expect(drawTokenRows).toHaveLength(1);
     expect(drawTokenRows[0]).toMatchObject({
       installmentSequence: 1,
