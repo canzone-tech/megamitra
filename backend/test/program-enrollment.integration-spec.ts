@@ -95,6 +95,14 @@ describe('MegaGoldenClub program enrollment and payment integration', () => {
           ],
         },
       });
+      if (enrollmentIds.length) {
+        await prisma.$executeRawUnsafe(
+          `DELETE r FROM program_event_processing_runs r
+           INNER JOIN program_business_events e ON e.id=r.businessEventId
+           WHERE e.enrollmentId IN (${enrollmentIds.map(() => '?').join(',')})`,
+          ...enrollmentIds,
+        );
+      }
       await prisma.programBusinessEvent.deleteMany({ where: { enrollmentId: { in: enrollmentIds } } });
       await prisma.programRefundAllocation.deleteMany({ where: { refundRecordId: { in: refundIds } } });
       await prisma.programRefundRecord.deleteMany({ where: { id: { in: refundIds } } });
