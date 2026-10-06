@@ -2,6 +2,10 @@
 
 MegaGoldenClub is a configurable consumer rewards and binary-network platform with a shared template-based design system across the public website, member portal, and administration console.
 
+## Canonical business rules (read first)
+
+**[Business Rules Register](docs/BUSINESS-RULES-REGISTER.md)** is the cross-chat source of truth for approved decisions, current implementation, pending gaps and manual business UAT progress. Read it **before changing** identity, binary, E-PIN, season code, draw-token or payment-receipt logic. Rules must be documented alongside code and test changes; prior-chat memory is not the authority.
+
 ## Architecture status
 
 The repository is being bootstrapped from a clean initial state. The following project-level decisions are locked for the foundation:
