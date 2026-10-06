@@ -259,6 +259,9 @@ describe('MegaGoldenClub auth integration', () => {
         email,
         password,
         fullName: 'Integration Member',
+        state: 'Karnataka',
+        city: 'Bengaluru',
+        postalCode: '560001',
         sponsorReference: paidRegistration.sponsorUsername,
         epin,
       }),
@@ -266,6 +269,18 @@ describe('MegaGoldenClub auth integration', () => {
     expect(registered.status).toBe(201);
     const userId = String(registered.body.user.id);
     createdUserIds.push(userId);
+
+    const profileRows = await prisma.$queryRawUnsafe<
+      Array<{ state: string | null; city: string | null; postalCode: string | null }>
+    >(
+      'SELECT state, city, postalCode FROM member_profiles WHERE userId=? LIMIT 1',
+      userId,
+    );
+    expect(profileRows[0]).toEqual({
+      state: 'Karnataka',
+      city: 'Bengaluru',
+      postalCode: '560001',
+    });
 
     expect(registered.body.enrollment).toMatchObject({
       seasonId: paidRegistration.seasonId,
