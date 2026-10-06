@@ -1,5 +1,7 @@
 # MegaGoldenClub — Configurable Binary Business Architecture
 
+> **Change-control source:** [Business Rules Register](BUSINESS-RULES-REGISTER.md) tracks confirmed contracts, implemented behavior, pending gaps and manual UAT. Read both documents before modifying season identity, lucky-draw tokens, E-PINs or binary rules.
+
 ## Product model
 
 MegaGoldenClub combines:
