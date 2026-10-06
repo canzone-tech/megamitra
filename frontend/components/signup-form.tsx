@@ -9,7 +9,7 @@ import {
   INDIA_STATE_CITIES,
   INDIA_STATES,
   OTHER_CITY_VALUE,
-} from '../../shared/india-locations';
+} from '@/lib/india-locations';
 
 type RegistrationConfig = {
   publicRegistrationEnabled: boolean;
