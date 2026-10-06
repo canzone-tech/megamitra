@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { FinancialDbService } from '../database/financial-db.service';
 import { Prisma } from '../generated/prisma/client';
 import { MemberPaymentService } from '../member-payments/member-payment.service';
+import { printedLuckyDrawTokenReference } from '../lucky-draw/lucky-draw-token.util';
 import { ProgramPaymentService } from '../program/program-payment.service';
 import type { RecordOwnerPaymentDto } from './owner-portal.dto';
 import { OwnerPortalService } from './owner-portal.service';
@@ -121,7 +122,14 @@ export class OwnerPortalFinanceService {
     return {
       ...this.formatPaymentRow(row),
       companyName: settings[0]?.companyName ?? 'MegaGoldenClub',
-      drawTokens,
+      drawTokens: drawTokens.map((item) => ({
+        ...item,
+        printedReference: printedLuckyDrawTokenReference(
+          row.seasonCode,
+          Number(item.installmentSequence),
+          item.token,
+        ),
+      })),
       member: {
         id: row.userId,
         username: row.username,
