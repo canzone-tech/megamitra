@@ -537,6 +537,7 @@ export class MemberRegistrationService {
       throw new ConflictException('Catch-up E-PIN count no longer matches the session calendar');
     }
 
+    const occurredAtSql = this.sqlUtcDateTime(occurredAt);
     const enrollmentDate = occurredAt.toISOString().slice(0, 10);
     const seasonStartDate = this.dateOnly(epin.seasonStartDate!);
     const seasonStartAt = new Date(`${seasonStartDate}T00:00:00.000Z`);
@@ -562,7 +563,7 @@ export class MemberRegistrationService {
       enrollmentFingerprint,
       userId,
       epin.programVersionId,
-      occurredAt,
+      occurredAtSql,
       enrollmentDate,
       JSON.stringify({
         source: 'SESSION_BOUND_EPIN',
@@ -644,8 +645,8 @@ export class MemberRegistrationService {
         this.money(amount),
         epin.currencyCodeSnapshot,
         providerReference,
-        occurredAt,
-        occurredAt,
+        occurredAtSql,
+        occurredAtSql,
         JSON.stringify({
           seasonId: epin.seasonId,
           epinId: paymentEpin.id,
@@ -669,7 +670,7 @@ export class MemberRegistrationService {
         this.money(amount),
         epin.currencyCodeSnapshot,
         providerReference,
-        occurredAt,
+        occurredAtSql,
         JSON.stringify({
           seasonId: epin.seasonId,
           epinId: paymentEpin.id,
@@ -709,7 +710,7 @@ export class MemberRegistrationService {
         `PROGRAM_PAYMENT:${paymentRecordId}:CONFIRMED`,
         enrollmentId,
         paymentRecordId,
-        occurredAt,
+        occurredAtSql,
         JSON.stringify({
           paymentAttemptId,
           amount: this.money(amount),
@@ -746,7 +747,7 @@ export class MemberRegistrationService {
       randomUUID(),
       `PROGRAM_ENROLLMENT:${enrollmentId}:CREATED`,
       enrollmentId,
-      occurredAt,
+      occurredAtSql,
       JSON.stringify({
         source: 'SESSION_BOUND_EPIN',
         seasonId: epin.seasonId,
@@ -772,6 +773,13 @@ export class MemberRegistrationService {
       requiredInstallmentCount,
       catchUpInstallmentCount: catchUpEpins.length,
     };
+  }
+
+  private sqlUtcDateTime(value: Date) {
+    if (!Number.isFinite(value.getTime())) {
+      throw new ConflictException('Payment timestamp is invalid');
+    }
+    return value.toISOString().replace('T', ' ').replace('Z', '');
   }
 
   private installmentDueDate(
