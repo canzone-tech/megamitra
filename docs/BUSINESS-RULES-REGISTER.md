@@ -46,6 +46,13 @@
 | TOK-03 | A draw uses the token corresponding to the intended installment/season; when consumed, it is `USED` and must not be recycled. Idempotent token-ensuring reuses a previous token rather than minting a second one for a paid installment. | `backend/src/lucky-draw/lucky-draw-token.service.ts`. **IMPLEMENTED**. |
 | TOK-04 | **Printed human reference = `<seasonCode>-M<2-digit installmentSequence>-<fiveDigitToken>`**. Example for a hypothetical new season: `MGC-JAN27-M01-58321`. For the EXISTING ACTIVE season, use its **actual stored code**, e.g. `MGC_202610_3FC2-M01-58321` (illustrative token only). Show the **actual 5-digit token bold green** and the complete printed reference in the receipt preview and Print/Save PDF. Never infer the token from transaction reference, never mint a new token just to render a receipt. | **LOCKED / IMPLEMENTED** for owner receipt preview + Print/Save PDF. Server formats stored token using `backend/src/lucky-draw/lucky-draw-token.util.ts`, owner receipt API returns `printedReference`, and admin shows both raw token and reference. `backend/test/lucky-draw-token-contract.integration-spec.ts` and `backend/src/owner-portal/owner-portal-finance.service.spec.ts` guard formatting/read-only linkage. **Human owner-receipt screenshot + browser Print/Save PDF preview UAT PASSED on 2026-10-06** for the first paid UAT member; broader member/public receipt and end-to-end draw UAT remain separate. |
 
+## Time and timezone contract
+
+| ID | Rule | Implementation/evidence |
+| --- | --- | --- |
+| TIME-01 | Business instants are persisted as **UTC** in MySQL `DATETIME` fields. Owner-facing finance timestamps render in the configured portal/business timezone (currently `Asia/Kolkata`). Do not derive business time from the browser locale. | E-PIN registration writes UTC DATETIME strings in `backend/src/auth/member-registration.service.ts`; finance UI formats using owner settings in `admin/components/owner-finance-portal.tsx`. **IMPLEMENTED** for new records after the timestamp fix. |
+| TIME-02 | Historical/UAT timestamps already stored before a clock-fix are not silently rewritten by UI code or migrations. If transactional UAT data is later reset, re-run the scenario under the corrected clock path. | **LOCKED data-integrity rule**. |
+
 ## Receipt and payment visibility
 
 - **View Receipt first**, then an explicit **Print / Save PDF** action below it. Print output should contain only the receipt, not the owner dashboard.
