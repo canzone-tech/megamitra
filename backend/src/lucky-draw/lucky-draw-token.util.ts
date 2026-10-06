@@ -22,7 +22,7 @@ export function printedLuckyDrawTokenReference(
   token: string,
 ): string | null {
   if (!seasonCode || !/^[A-Z0-9][A-Z0-9_-]{1,49}$/.test(seasonCode)) return null;
-  if (!Number.isSafeInteger(installmentSequence) || (installmentSequence ?? 0) < 1) return null;
+  if (typeof installmentSequence !== 'number' || !Number.isSafeInteger(installmentSequence) || installmentSequence < 1) return null;
   if (!isLuckyDrawToken(token)) return null;
   return `${seasonCode}-M${String(installmentSequence).padStart(2, '0')}-${token}`;
 }
