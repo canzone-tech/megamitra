@@ -204,6 +204,7 @@ SystemConfiguration
 13. Lucky-draw tokens match `^[1-9][0-9]{4}$` and are unique within their Season for their entire lifetime; authoritative uniqueness is `(seasonId, token)`, and the same five-digit token may exist in a different Season.
 14. A lucky-draw token is consumed at most once and is never deleted/recycled by application workflows.
 15. Bulk installment confirmation creates distinct tokens for distinct installment allocations; one token is never reused for multiple scheduled draws.
+16. After a successful authoritative payment/enrollment commit, deterministic earning processing is automatic and idempotent: business-event orchestration, referral handoff consumption, slot-aware binary qualification, fixed-lane settlement and ledger posting do not depend on an owner clicking a processing button. Manual endpoints are recovery controls; Lucky Draw execution and human-risk exception approvals remain explicit operator actions.
 
 ## Admin configuration principle
 
