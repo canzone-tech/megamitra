@@ -72,13 +72,25 @@ export class BinarySettlementService {
     private readonly audit: AuditService,
   ) {}
 
-  async run(dto: RunBinaryPairSettlementDto, actorUserId: string) {
+  run(dto: RunBinaryPairSettlementDto, actorUserId: string) {
+    return this.execute(dto, actorUserId, false);
+  }
+
+  runIfPairReady(dto: RunBinaryPairSettlementDto, actorUserId: string) {
+    return this.execute(dto, actorUserId, true);
+  }
+
+  private async execute(
+    dto: RunBinaryPairSettlementDto,
+    actorUserId: string,
+    skipWhenNoPair: boolean,
+  ) {
     const settledAt = new Date(dto.settledAt);
     const fingerprint = this.requestFingerprint(dto, settledAt);
     const existing = await this.findSettlement(dto.sourceKey);
     if (existing) {
       this.assertIdempotentMatch(existing, dto, fingerprint);
-      return { settlement: existing, idempotent: true };
+      return { settlement: existing, idempotent: true, skipped: false };
     }
 
     const mutexKey = `binary-settlement:${dto.memberUserId}:${dto.planVersionId}`;
@@ -89,20 +101,32 @@ export class BinarySettlementService {
       [mutexKey],
     );
 
-    let outcome: { id: string; idempotent: boolean };
+    let outcome: { id: string | null; idempotent: boolean; skipped: boolean };
     try {
       outcome = await this.financialDb.transaction((connection) =>
-        this.runNativeTransaction(connection, dto, actorUserId, settledAt, fingerprint, mutexKey),
+        this.runNativeTransaction(
+          connection,
+          dto,
+          actorUserId,
+          settledAt,
+          fingerprint,
+          mutexKey,
+          skipWhenNoPair,
+        ),
       );
     } catch (error) {
       if ((error as { code?: string }).code === 'ER_DUP_ENTRY') {
         const duplicate = await this.findSettlement(dto.sourceKey);
         if (duplicate) {
           this.assertIdempotentMatch(duplicate, dto, fingerprint);
-          return { settlement: duplicate, idempotent: true };
+          return { settlement: duplicate, idempotent: true, skipped: false };
         }
       }
       throw error;
+    }
+
+    if (outcome.skipped || !outcome.id) {
+      return { settlement: null, idempotent: outcome.idempotent, skipped: true };
     }
 
     const settlement = await this.findSettlement(outcome.id);
@@ -125,7 +149,7 @@ export class BinarySettlementService {
         },
       });
     }
-    return { settlement, idempotent: outcome.idempotent };
+    return { settlement, idempotent: outcome.idempotent, skipped: false };
   }
 
   async getSettlement(id: string) {
@@ -171,7 +195,8 @@ export class BinarySettlementService {
     settledAt: Date,
     fingerprint: string,
     mutexKey: string,
-  ): Promise<{ id: string; idempotent: boolean }> {
+    skipWhenNoPair: boolean,
+  ): Promise<{ id: string | null; idempotent: boolean; skipped: boolean }> {
     await connection.query(
       `UPDATE system_sequences SET nextValue = nextValue + 1, updatedAt = CURRENT_TIMESTAMP(3)
        WHERE \`key\` = ?`,
@@ -186,7 +211,7 @@ export class BinarySettlementService {
     const raced = racedRows[0];
     if (raced) {
       this.assertIdempotentMatch(raced, dto, fingerprint);
-      return { id: raced.id, idempotent: true };
+      return { id: raced.id, idempotent: true, skipped: false };
     }
 
     const memberRows = await connection.query<MemberRow[]>(
@@ -252,6 +277,10 @@ export class BinarySettlementService {
       if (left.lane !== right.lane) return left.lane === 'A:C' ? -1 : 1;
       return Number(left.leftUnit.sequence) - Number(right.leftUnit.sequence);
     });
+
+    if (skipWhenNoPair && candidates.length === 0) {
+      return { id: null, idempotent: true, skipped: true };
+    }
 
     const dailyRows = await connection.query<CountRow[]>(
       `SELECT COALESCE(SUM(pairCountPayable), 0) AS total
@@ -417,7 +446,7 @@ export class BinarySettlementService {
       'carry-disabled',
     );
 
-    return { id: settlementId, idempotent: false };
+    return { id: settlementId, idempotent: false, skipped: false };
   }
 
   private buildLaneCandidates(
