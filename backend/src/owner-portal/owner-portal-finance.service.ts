@@ -158,13 +158,13 @@ export class OwnerPortalFinanceService {
   }
 
   async listEpins() {
-    return (await this.listEpinsPage({ page: 1, pageSize: 500 })).items;
+    return (await this.listEpinsPage({ status: 'ACTIVE', page: 1, pageSize: 500 })).items;
   }
 
   async listEpinsPage(query: EpinInventoryQuery = {}) {
-    const status = String(query.status ?? 'ALL').trim().toUpperCase();
+    const status = String(query.status ?? 'ACTIVE').trim().toUpperCase();
     const pinType = String(query.pinType ?? 'ALL').trim().toUpperCase();
-    if (!['ALL', 'UNUSED', 'USED'].includes(status)) throw new BadRequestException('E-PIN status filter is invalid');
+    if (!['ACTIVE', 'UNUSED', 'USED', 'REVOKED', 'ALL'].includes(status)) throw new BadRequestException('E-PIN status filter is invalid');
     if (!['ALL', 'ACTIVATION', 'INSTALLMENT'].includes(pinType)) throw new BadRequestException('E-PIN type filter is invalid');
 
     const parsedPage = Number.parseInt(String(query.page ?? '1'), 10);
@@ -173,8 +173,10 @@ export class OwnerPortalFinanceService {
     const pageSize = Number.isFinite(parsedPageSize) ? Math.max(1, Math.min(100, parsedPageSize)) : 25;
     const conditions: string[] = [];
     const values: SqlValue[] = [];
+    if (status === 'ACTIVE') conditions.push("e.status='ACTIVE' AND e.expiresAt>CURRENT_TIMESTAMP(3)");
     if (status === 'UNUSED') conditions.push("e.status='ACTIVE' AND e.usedByUserId IS NULL AND e.expiresAt>CURRENT_TIMESTAMP(3)");
     if (status === 'USED') conditions.push("e.status='USED'");
+    if (status === 'REVOKED') conditions.push("e.status='REVOKED'");
     if (query.memberUserId?.trim()) {
       conditions.push('(e.assignedUserId=? OR e.usedByUserId=?)');
       values.push(query.memberUserId.trim(), query.memberUserId.trim());
