@@ -81,6 +81,11 @@ function PaymentReceiptPreview({ receipt, settings, defaultCurrencyCode }: {
   const allocations = Array.isArray(receipt.allocations)
     ? receipt.allocations.filter((item): item is Row => item !== null && typeof item === 'object')
     : [];
+  const drawTokens = Array.isArray(receipt.drawTokens)
+    ? receipt.drawTokens.filter((item): item is Row =>
+        item !== null && typeof item === 'object' && /^[0-9]{5}$/.test(String((item as Row).token ?? '')),
+      )
+    : [];
   const receiptCurrency = text(receipt.currencyCode, defaultCurrencyCode);
   const refundAmount = number(receipt.refundedAmount);
   return (
@@ -131,6 +136,21 @@ function PaymentReceiptPreview({ receipt, settings, defaultCurrencyCode }: {
           <div><span>Refunded</span><strong>{money(receipt.refundedAmount, receiptCurrency)}</strong></div>
           <div className={styles.receiptNet}><span>Net Received</span><strong>{money(receipt.netAmount ?? number(receipt.amount) - refundAmount, receiptCurrency)}</strong></div>
         </div>
+        <section className={styles.receiptTokenSection} aria-label="Lucky draw tokens">
+          <h4>Lucky Draw Token{drawTokens.length === 1 ? '' : 's'}</h4>
+          {drawTokens.length ? (
+            <div className={styles.receiptTokenList}>
+              {drawTokens.map((item, index) => (
+                <div className={styles.receiptTokenRow} key={`${text(item.installmentSequence)}-${text(item.token)}-${index}`}>
+                  <span>EMI #{text(item.installmentSequence)} • {text(item.status)}</span>
+                  <strong className={styles.receiptTokenNumber}>{text(item.token)}</strong>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p>No lucky draw token is linked to this payment yet.</p>
+          )}
+        </section>
         <p className={styles.receiptFootnote}>
           Generated from the recorded payment and its allocation details. Keep this receipt for your records.
         </p>
