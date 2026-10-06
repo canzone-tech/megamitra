@@ -19,6 +19,7 @@ export class CreateOwnerCoreMemberDto {
   @IsOptional() @IsString() @Matches(/^\d{4}-\d{2}-\d{2}$/) dateOfBirth?: string;
   @IsOptional() @IsString() @MaxLength(100) state?: string;
   @IsOptional() @IsString() @MaxLength(100) city?: string;
+  @IsOptional() @IsString() @Matches(/^[1-9][0-9]{5}$/) postalCode?: string;
   @IsOptional() @IsString() @MaxLength(191) sponsorReference?: string;
   @IsIn(OWNER_PLACEMENTS) placement!: (typeof OWNER_PLACEMENTS)[number];
   @IsOptional() @IsString() @MaxLength(191) placementReference?: string;
