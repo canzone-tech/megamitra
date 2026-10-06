@@ -95,3 +95,31 @@
 .receiptTokenNumber{display:block;font-size:28px;font-weight:900;color:#15803d;letter-spacing:2px;line-height:1.2}
 .receiptTokenDetails{display:flex;flex-direction:column;align-items:flex-start;gap:7px;min-width:0}
 .receiptPrintedReference{font-size:14px;font-weight:800;color:#166534;overflow-wrap:anywhere;letter-spacing:.2px}
+
+
+/* Persisted Binary 1:4 genealogy workspace. */
+.genealogyToolbar{display:flex;align-items:end;justify-content:space-between;gap:14px;margin-bottom:16px;flex-wrap:wrap}
+.genealogyToolbar label{min-width:min(100%,420px);flex:1}
+.genealogyToolbar label>span{display:block;margin-bottom:6px;font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase}
+.genealogyCount{min-width:155px;padding:10px 13px;border:1px solid var(--line);border-radius:11px;background:#faf9ff;text-align:right}
+.genealogyCount b{display:block;font-size:20px;color:#5b21b6}
+.genealogyCount span{display:block;margin-top:2px;font-size:9px;color:var(--muted)}
+.genealogyRootCard{max-width:250px;margin:0 auto 18px;padding:14px 18px;border-radius:14px;background:var(--grad);color:#fff;text-align:center;box-shadow:0 10px 24px #6d28d933}
+.genealogyRootCard small,.genealogyRootCard b,.genealogyRootCard span{display:block}
+.genealogyRootCard small{font-size:8px;font-weight:900;letter-spacing:1px;opacity:.82}
+.genealogyRootCard b{margin-top:4px;font-size:15px}
+.genealogyRootCard span{margin-top:4px;font-size:10px;opacity:.9}
+.genealogySlotGrid{display:grid;grid-template-columns:repeat(4,minmax(150px,1fr));gap:10px;margin:0 0 16px;overflow:auto;padding-bottom:2px}
+.genealogySlotCard,.genealogyEmptySlot{min-width:150px;min-height:105px;border-radius:13px;padding:12px;border:1px solid var(--line);box-sizing:border-box}
+.genealogySlotCard{background:#fff;box-shadow:0 5px 13px #32155b12}
+.genealogyEmptySlot{background:#fafbfe;border-style:dashed;color:#9497a8}
+.genealogySlotHead{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:9px}
+.genealogySlotHead b{display:grid;place-items:center;width:26px;height:26px;border-radius:8px;background:#f0e9ff;color:#5b21b6;font-size:11px}
+.genealogySlotHead span{font-size:9px;font-weight:800;color:#737789}
+.genealogySlotCard>strong{display:block;font-size:12px;color:#17152b}
+.genealogySlotCard>span,.genealogySlotCard>small,.genealogyEmptySlot>span{display:block;margin-top:4px;font-size:9px;color:#737789;line-height:1.35}
+@media(max-width:680px){
+  .genealogyToolbar{align-items:stretch}
+  .genealogyCount{text-align:left}
+  .genealogySlotGrid{grid-template-columns:repeat(4,minmax(145px,1fr))}
+}
