@@ -2,6 +2,43 @@ import { Prisma } from '../generated/prisma/client';
 import { OwnerPortalFinanceService } from './owner-portal-finance.service';
 
 describe('OwnerPortalFinanceService', () => {
+  it('serializes zone-less database payment timestamps as explicit UTC instants', async () => {
+    const query = jest.fn().mockResolvedValue([{
+      id: 'payment-1',
+      occurredAt: '2026-10-06 11:43:43',
+      amount: '2000.00',
+      currencyCode: 'INR',
+      paymentMode: 'EPIN_PREPAID',
+      transactionReference: 'ref-1',
+      paymentType: 'OTHER',
+      refundedAmount: '0.00',
+      userId: 'member-1',
+      username: 'MGC855889',
+      firstName: 'Demo',
+      lastName: 'User C',
+      seasonId: 'season-1',
+      seasonCode: 'MGC_202610_3FC2',
+      seasonName: 'MegaGoldenClub 2027',
+      recordedByUsername: 'MGC855889',
+    }]);
+    const db = {
+      transaction: jest.fn(async (work: (connection: { query: typeof query }) => unknown) =>
+        work({ query }),
+      ),
+    };
+    const service = new OwnerPortalFinanceService(
+      db as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+
+    const [payment] = await service.listPayments(10);
+
+    expect(payment?.occurredAt).toBe('2026-10-06T11:43:43.000Z');
+    expect(payment?.receiptNumber).toBe('MGC-20261006-PAYMENT1');
+  });
+
   it('adds exact running balances to recent wallet entries', async () => {
     const portal = {
       wallet: jest.fn().mockResolvedValue({
