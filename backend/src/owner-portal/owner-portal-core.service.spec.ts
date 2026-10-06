@@ -86,4 +86,76 @@ describe('OwnerPortalCoreService', () => {
     expect(portal.createMember).not.toHaveBeenCalled();
     expect(db.execute).not.toHaveBeenCalled();
   });
+
+  it('loads the persisted Binary 1:4 descendants for the preferred top-level root', async () => {
+    const query = jest
+      .fn()
+      .mockResolvedValueOnce([
+        {
+          id: 'root-1',
+          username: 'uatroot',
+          firstName: 'UAT',
+          lastName: 'Root Sponsor',
+          status: 'ACTIVE',
+          createdAt: new Date('2026-10-01T00:00:00.000Z'),
+          directChildCount: 2,
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: 'member-a',
+          username: 'MGC585499',
+          firstName: 'Demo',
+          lastName: 'User for A',
+          status: 'ACTIVE',
+          parentUserId: 'root-1',
+          parentUsername: 'uatroot',
+          slot: 'A',
+          side: 'LEFT',
+          depth: 1,
+          firstLegSlot: 'A',
+          firstLegSide: 'LEFT',
+        },
+        {
+          id: 'member-b',
+          username: 'MGC709887',
+          firstName: 'Demo',
+          lastName: 'user B',
+          status: 'ACTIVE',
+          parentUserId: 'root-1',
+          parentUsername: 'uatroot',
+          slot: 'B',
+          side: 'LEFT',
+          depth: 1,
+          firstLegSlot: 'B',
+          firstLegSide: 'LEFT',
+        },
+      ]);
+    const db = {
+      transaction: jest.fn(async (work: (connection: { query: jest.Mock }) => unknown) =>
+        work({ query }),
+      ),
+      execute: jest.fn().mockResolvedValue(undefined),
+    };
+    const service = new OwnerPortalCoreService(
+      db as never,
+      {} as never,
+      {} as never,
+    );
+
+    const result = await service.binaryGenealogy();
+
+    expect(result.root).toMatchObject({
+      id: 'root-1',
+      username: 'uatroot',
+      directChildCount: 2,
+    });
+    expect(result.visibleMemberCount).toBe(2);
+    expect(result.members).toEqual([
+      expect.objectContaining({ username: 'MGC585499', slot: 'A', side: 'LEFT', depth: 1 }),
+      expect.objectContaining({ username: 'MGC709887', slot: 'B', side: 'LEFT', depth: 1 }),
+    ]);
+    expect(query.mock.calls[1]?.[1]).toEqual(['root-1']);
+  });
+
 });
