@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { BinarySettlementModule } from '../binary-settlement/binary-settlement.module';
 import { BinaryUnitModule } from '../binary-unit/binary-unit.module';
 import { EntitlementModule } from '../entitlement/entitlement.module';
 import { ReferralRewardModule } from '../referral-reward/referral-reward.module';
@@ -7,6 +8,10 @@ import {
   ProgramPaymentController,
   ProgramPolicyController,
 } from './program.controller';
+import {
+  ProgramAutomationService,
+  ProgramAutomationWorkerService,
+} from './program-automation.service';
 import { ProgramEligibilityService } from './program-eligibility.service';
 import { ProgramEnrollmentService } from './program-enrollment.service';
 import { ProgramEntitlementOrchestrationController } from './program-entitlement-orchestration.controller';
@@ -18,7 +23,7 @@ import { ProgramPolicyService } from './program-policy.service';
 import { ProgramReferralRewardConsumerService } from './program-referral-reward-consumer.service';
 
 @Module({
-  imports: [BinaryUnitModule, ReferralRewardModule, EntitlementModule],
+  imports: [BinaryUnitModule, BinarySettlementModule, ReferralRewardModule, EntitlementModule],
   controllers: [
     ProgramPolicyController,
     ProgramEnrollmentController,
@@ -37,6 +42,8 @@ import { ProgramReferralRewardConsumerService } from './program-referral-reward-
       useExisting: ProgramEntitlementOrchestrationService,
     },
     ProgramReferralRewardConsumerService,
+    ProgramAutomationService,
+    ProgramAutomationWorkerService,
   ],
   exports: [
     ProgramEligibilityService,
@@ -46,6 +53,7 @@ import { ProgramReferralRewardConsumerService } from './program-referral-reward-
     ProgramOrchestrationService,
     ProgramEntitlementOrchestrationService,
     ProgramReferralRewardConsumerService,
+    ProgramAutomationService,
   ],
 })
 export class ProgramModule {}
