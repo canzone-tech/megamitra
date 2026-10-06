@@ -426,7 +426,6 @@ async function runScenario(debugPort, scenario) {
         '9 Income Types': '📈',
         Members: '👥',
         'Binary 1:4': '🌳',
-        'Placement / Pairing': '🧭',
         'Season Management': '📅',
         'Monthly Draw': '🎲',
         Winners: '🏆',
