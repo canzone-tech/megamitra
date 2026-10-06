@@ -27,6 +27,12 @@ type PaymentListRow = {
   recordedByUsername: string | null;
 };
 
+type PaymentDrawTokenRow = {
+  token: string;
+  installmentSequence: number;
+  status: string;
+};
+
 type PortalSettingsRow = {
   companyName: string;
   currencyCode: string;
@@ -105,9 +111,17 @@ export class OwnerPortalFinanceService {
     const settings = await this.rows<PortalSettingsRow>(
       'SELECT companyName, currencyCode FROM owner_portal_settings WHERE id=1 LIMIT 1',
     );
+    const drawTokens = await this.rows<PaymentDrawTokenRow>(
+      `SELECT token, installmentSequence, status
+       FROM lucky_draw_tokens
+       WHERE paymentRecordId=? AND sourceType='INSTALLMENT'
+       ORDER BY installmentSequence ASC, createdAt ASC, token ASC`,
+      [id],
+    );
     return {
       ...this.formatPaymentRow(row),
       companyName: settings[0]?.companyName ?? 'MegaGoldenClub',
+      drawTokens,
       member: {
         id: row.userId,
         username: row.username,
