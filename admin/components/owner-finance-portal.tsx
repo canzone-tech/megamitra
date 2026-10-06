@@ -71,6 +71,84 @@ function Kpi({ label, value, note }: { label: string; value: ReactNode; note: st
   return <div className={styles.kpi}><small>{label}</small><strong>{value}</strong><span>{note}</span></div>;
 }
 
+function PaymentReceiptPreview({ receipt, settings, defaultCurrencyCode }: {
+  receipt: Row;
+  settings: Settings;
+  defaultCurrencyCode: string;
+}) {
+  const member = receipt.member && typeof receipt.member === 'object' ? receipt.member as Row : {};
+  const season = receipt.season && typeof receipt.season === 'object' ? receipt.season as Row : {};
+  const allocations = Array.isArray(receipt.allocations)
+    ? receipt.allocations.filter((item): item is Row => item !== null && typeof item === 'object')
+    : [];
+  const receiptCurrency = text(receipt.currencyCode, defaultCurrencyCode);
+  const refundAmount = number(receipt.refundedAmount);
+  return (
+    <>
+      <article className={styles.receiptDocument} aria-label="Payment receipt">
+        <header className={styles.receiptHeader}>
+          <div>
+            <span className={styles.receiptEyebrow}>OFFICIAL PAYMENT RECEIPT</span>
+            <h3>{text(receipt.companyName, text(settings.companyName, 'MegaGoldenClub'))}</h3>
+            <p>Receipt No. {text(receipt.receiptNumber)}</p>
+          </div>
+          <strong className={styles.receiptStatus}>{text(receipt.status)}</strong>
+        </header>
+        <div className={styles.receiptAmount}>
+          <span>Amount Received</span>
+          <strong>{money(receipt.amount, receiptCurrency)}</strong>
+        </div>
+        <div className={styles.receiptDetails}>
+          <div><span>Payment Date</span><strong>{dateTime(receipt.occurredAt)}</strong></div>
+          <div><span>Member Name</span><strong>{text(member.fullName)}</strong></div>
+          <div><span>Member / Sponsor ID</span><strong>{text(member.username)}</strong></div>
+          <div><span>Season</span><strong>{text(season.name, 'Unmapped')}</strong></div>
+          <div><span>Payment Mode</span><strong>{text(receipt.paymentMode)}</strong></div>
+          <div><span>Payment Type</span><strong>{text(receipt.paymentType)}</strong></div>
+          <div><span>Transaction Reference</span><strong>{text(receipt.transactionReference)}</strong></div>
+          <div><span>Recorded By</span><strong>{text(receipt.recordedByUsername)}</strong></div>
+        </div>
+        <section className={styles.receiptSection} aria-label="Payment allocation">
+          <h4>Payment Breakdown</h4>
+          {allocations.length ? (
+            <table className={styles.receiptAllocationTable}>
+              <thead><tr><th>Applied Towards</th><th>Amount</th></tr></thead>
+              <tbody>{allocations.map((allocation, index) => (
+                <tr key={text(allocation.id, String(index))}>
+                  <td>{text(allocation.allocationType) === 'REGISTRATION_FEE'
+                    ? 'Registration Fee'
+                    : text(allocation.allocationType) === 'INSTALLMENT'
+                      ? 'Monthly EMI'
+                      : text(allocation.allocationType)}</td>
+                  <td>{money(allocation.amount, receiptCurrency)}</td>
+                </tr>
+              ))}</tbody>
+            </table>
+          ) : <p>No separate allocation breakdown is available for this payment.</p>}
+        </section>
+        <div className={styles.receiptTotals}>
+          <div><span>Total Paid</span><strong>{money(receipt.amount, receiptCurrency)}</strong></div>
+          <div><span>Refunded</span><strong>{money(receipt.refundedAmount, receiptCurrency)}</strong></div>
+          <div className={styles.receiptNet}><span>Net Received</span><strong>{money(receipt.netAmount ?? number(receipt.amount) - refundAmount, receiptCurrency)}</strong></div>
+        </div>
+        <p className={styles.receiptFootnote}>
+          Generated from the recorded payment and its allocation details. Keep this receipt for your records.
+        </p>
+      </article>
+      <div className={styles.receiptActions}>
+        <span>Review your receipt above before printing or saving it.</span>
+        <button
+          className={classNames(styles.button, styles.dark)}
+          type="button"
+          onClick={() => window.print()}
+        >
+          PRINT / SAVE PDF
+        </button>
+      </div>
+    </>
+  );
+}
+
 export function OwnerFinancePortal({ section }: { section: OwnerFinanceSection }) {
   const router = useRouter();
   const [settings, setSettings] = useState<Settings>({});
@@ -320,7 +398,7 @@ export function OwnerFinancePortal({ section }: { section: OwnerFinanceSection }
         {(activeTab) => <>
           {activeTab === 'payment-record' ? <div className={styles.card}><SectionHead icon="💳" title="Record Payment" note="Purpose-bound authorization required" /><form method="post" onSubmit={submitPayment}><div className={styles.fields}><Field label="Member"><MemberSearchSelect name="memberReference" required /></Field><Field label={`Payment Amount (${currencyCode})`}><input name="amount" className={styles.input} inputMode="decimal" required defaultValue="1000" /></Field><Field label="Payment Type"><select name="paymentType" className={styles.select}><option value="MONTHLY_EMI">Monthly EMI</option><option value="REGISTRATION">Registration</option><option value="OTHER">Other</option></select></Field><Field label="Payment Mode"><select name="paymentMode" className={styles.select}><option value="CASH">Cash</option><option value="UPI_ONLINE">UPI / Online</option><option value="BANK_TRANSFER">Bank Transfer</option></select></Field><Field label="Transaction / Receipt Reference"><input name="transactionReference" className={styles.input} placeholder="Optional provider/reference number" /></Field><Field label="Admin / Agent Auth Code"><input name="authorizationCode" className={styles.input} required placeholder="Generate under Auth Codes" /></Field></div><div className={styles.buttonLine}><button className={styles.button} disabled={busy}>SUBMIT PAYMENT</button></div></form></div> : null}
           {activeTab === 'payment-register' ? <div className={styles.card}><SectionHead icon="🧾" title="Payment Register" note="Recorded payments with refund/reconciliation state" />{rows.length ? <div className={styles.tableBox}><table className={styles.table}><thead><tr><th>DATE</th><th>RECEIPT</th><th>MEMBER</th><th>TYPE</th><th>MODE</th><th>AMOUNT</th><th>REFUNDED</th><th>STATUS</th><th>ACTION</th></tr></thead><tbody>{rows.map((row) => <tr key={text(row.id)}><td>{dateTime(row.occurredAt)}</td><td>{text(row.receiptNumber)}</td><td><b>{text(row.username)}</b><br />{[text(row.firstName, ''), text(row.lastName, '')].filter(Boolean).join(' ') || '—'}</td><td>{text(row.paymentType)}</td><td>{text(row.paymentMode)}</td><td>{money(row.amount, text(row.currencyCode, currencyCode))}</td><td>{money(row.refundedAmount, text(row.currencyCode, currencyCode))}</td><td className={text(row.status) === 'RECORDED' ? styles.status : styles.statusOff}>{text(row.status)}</td><td><button type="button" className={classNames(styles.button, styles.outline)} onClick={() => void openReceipt(text(row.id))}>VIEW RECEIPT</button></td></tr>)}</tbody></table></div> : <Empty>No payments recorded yet.</Empty>}</div> : null}
-          {activeTab === 'payment-receipt' ? <div className={styles.card}><SectionHead icon="🧾" title="Receipt Preview" note="Authoritative payment record" />{receipt ? <><div className={styles.notice}><b>{text(receipt.companyName, text(settings.companyName, 'MegaGoldenClub'))}</b> • Receipt {text(receipt.receiptNumber)} • Member {text((receipt.member as Row | undefined)?.fullName)} • User ID {text((receipt.member as Row | undefined)?.username)} • {text(receipt.paymentType)} {money(receipt.amount, text(receipt.currencyCode, currencyCode))} • Season {text((receipt.season as Row | undefined)?.name, 'Unmapped')} • Mode {text(receipt.paymentMode)} • Reference {text(receipt.transactionReference)} • Status {text(receipt.status)} • Refunds {money(receipt.refundedAmount, text(receipt.currencyCode, currencyCode))}.</div><div className={styles.buttonLine}><button className={classNames(styles.button, styles.dark)} type="button" onClick={() => window.print()}>PRINT RECEIPT</button></div></> : <Empty>Submit a payment or open a payment record to preview its receipt.</Empty>}</div> : null}
+          {activeTab === 'payment-receipt' ? <div className={styles.card}><SectionHead icon="🧾" title="Receipt Preview" note="Authoritative payment record" />{receipt ? <PaymentReceiptPreview receipt={receipt} settings={settings} defaultCurrencyCode={currencyCode} /> : <Empty>Submit a payment or open a payment record to preview its receipt.</Empty>}</div> : null}
         </>}
       </WorkspaceTabs>
     </>;
