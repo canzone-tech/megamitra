@@ -70,6 +70,9 @@ function Empty({ children = 'No records yet.' }: { children?: ReactNode }) {
 function Kpi({ label, value, note }: { label: string; value: ReactNode; note: string }) {
   return <div className={styles.kpi}><small>{label}</small><strong>{value}</strong><span>{note}</span></div>;
 }
+function memberDisplayName(row: Row) {
+  return [text(row.firstName, ''), text(row.lastName, '')].filter(Boolean).join(' ') || text(row.username);
+}
 
 export function OwnerCoreV14Portal({ section, extension }: { section: OwnerCoreV14Section; extension?: ReactNode }) {
   const router = useRouter();
@@ -81,6 +84,7 @@ export function OwnerCoreV14Portal({ section, extension }: { section: OwnerCoreV
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [generatedPassword, setGeneratedPassword] = useState('');
+  const [genealogy, setGenealogy] = useState<Row | null>(null);
 
   const handleError = useCallback((reason: unknown) => {
     if (reason instanceof ApiClientError && reason.status === 401) {
@@ -110,12 +114,14 @@ export function OwnerCoreV14Portal({ section, extension }: { section: OwnerCoreV
         setRegistrationPolicy(policy);
         setAux(null);
       } else if (section === 'binary') {
-        const [pairs, seasons] = await Promise.all([
+        const [pairs, seasons, tree] = await Promise.all([
           apiJson<Row[]>(`${CORE_API}/pair-ledger`),
           apiJson<Row[]>(`${API}/seasons`),
+          apiJson<Row>(`${CORE_API}/genealogy`),
         ]);
         setData(pairs);
         setAux(seasons);
+        setGenealogy(tree);
       } else {
         setData(await apiJson<Row[]>(`${API}/seasons`));
         setAux(null);
@@ -181,6 +187,21 @@ export function OwnerCoreV14Portal({ section, extension }: { section: OwnerCoreV
         slot: formString(form, 'slot'),
       }),
     }), 'Binary 1:4 placement saved');
+  }
+
+  async function selectGenealogyRoot(reference: string) {
+    setBusy(true);
+    setError('');
+    try {
+      const tree = await apiJson<Row>(
+        `${CORE_API}/genealogy?reference=${encodeURIComponent(reference)}`,
+      );
+      setGenealogy(tree);
+    } catch (reason) {
+      handleError(reason);
+    } finally {
+      setBusy(false);
+    }
   }
 
   function activeSeason(rows: Row[]) {
@@ -279,26 +300,91 @@ export function OwnerCoreV14Portal({ section, extension }: { section: OwnerCoreV
     const seasons = (Array.isArray(aux) ? aux : []) as Row[];
     const active = activeSeason(seasons);
     const currency = text(active.currencyCode, settings.currencyCode ?? 'INR');
+    const tree = (genealogy ?? {}) as Row;
+    const root = tree.root && typeof tree.root === 'object' ? tree.root as Row : null;
+    const roots = Array.isArray(tree.roots) ? tree.roots.filter((item): item is Row => Boolean(item) && typeof item === 'object') : [];
+    const members = Array.isArray(tree.members) ? tree.members.filter((item): item is Row => Boolean(item) && typeof item === 'object') : [];
+    const directChildren = root
+      ? members.filter((member) => text(member.parentUserId, '') === text(root.id, ''))
+      : [];
+    const bySlot = new Map(directChildren.map((member) => [text(member.slot), member]));
+    const tabs = [
+      { id: 'binary-genealogy', label: 'Placement Genealogy', count: number(tree.visibleMemberCount) },
+      { id: 'binary-pairs', label: 'Pair Ledger', count: rows.length },
+    ];
+
     return <>
       <Hero title="Binary 1:4" subtitle="Four direct slots: A/B on Left and C/D on Right. Pair lanes are fixed." pill="A:C + B:D ONLY" />
-      <div className={styles.card}>
-        <SectionHead icon="🌳" title="Binary 1:4 Structure" />
-        <div className={styles.binaryBox}>
-          <div className={styles.binaryRow}><div className={classNames(styles.node, styles.root)}><b>YOU</b><span>Reference member</span></div></div>
-          <div className={styles.binaryRow}>
-            <div className={styles.node}><b>A • LEFT</b><span>Pairs only with C</span></div>
-            <div className={styles.node}><b>B • LEFT</b><span>Pairs only with D</span></div>
-            <div className={styles.node}><b>C • RIGHT</b><span>Pairs only with A</span></div>
-            <div className={styles.node}><b>D • RIGHT</b><span>Pairs only with B</span></div>
-          </div>
-          <div className={styles.pairBox}>A:C = PAIR 1 • B:D = PAIR 2 • VALUE = {money(active.pairValue, currency)}</div>
-        </div>
-        <div className={classNames(styles.notice, styles.warn)}>A:D and B:C are intentionally invalid and cannot be matched by the settlement engine.</div>
-      </div>
-      <div className={styles.card}>
-        <SectionHead icon="🔗" title="Pair Ledger" note="Fixed-lane qualified pair records" />
-        {rows.length ? <div className={styles.tableBox}><table className={styles.table}><thead><tr><th>PAIR</th><th>MEMBER</th><th>LANE</th><th>LEFT SLOT</th><th>RIGHT SLOT</th><th>VALUE</th><th>STATUS</th></tr></thead><tbody>{rows.map((row) => <tr key={text(row.id)}><td>{text(row.pairSequence)}</td><td>{text(row.username)}</td><td><b>{text(row.pairLane, text(row.crossMatch))}</b></td><td>{text(row.leftSlot)}</td><td>{text(row.rightSlot)}</td><td>{money(row.payoutAmount, text(row.currencyCode, currency))}</td><td className={row.payable ? styles.status : styles.statusOff}>{row.payable ? 'QUALIFIED' : 'CAP LIMITED'}</td></tr>)}</tbody></table></div> : <Empty>No pair records yet.</Empty>}
-      </div>
+      <WorkspaceTabs ariaLabel="Binary 1:4 workspace" tabs={tabs}>
+        {(activeTab) => <>
+          {activeTab === 'binary-genealogy' ? <div className={styles.card}>
+            <SectionHead
+              icon="🌳"
+              title="Placement Genealogy"
+              note={root ? `${number(tree.visibleMemberCount)} placed member${number(tree.visibleMemberCount) === 1 ? '' : 's'} below selected root` : 'No placement root found'}
+            />
+            {roots.length ? <div className={styles.genealogyToolbar}>
+              <label>
+                <span>Root member</span>
+                <select
+                  className={styles.select}
+                  value={text(root?.id, '')}
+                  disabled={busy}
+                  onChange={(event) => void selectGenealogyRoot(event.target.value)}
+                >
+                  {roots.map((item) => <option value={text(item.id)} key={text(item.id)}>
+                    {text(item.username)} • {memberDisplayName(item)} • {number(item.directChildCount)} direct
+                  </option>)}
+                </select>
+              </label>
+              <div className={styles.genealogyCount}><b>{number(tree.visibleMemberCount)}</b><span>Visible placed members</span></div>
+            </div> : null}
+
+            {root ? <>
+              <div className={styles.genealogyRootCard}>
+                <small>ROOT</small>
+                <b>{text(root.username)}</b>
+                <span>{memberDisplayName(root)}</span>
+              </div>
+              <div className={styles.genealogySlotGrid}>
+                {(['A', 'B', 'C', 'D'] as const).map((slot) => {
+                  const member = bySlot.get(slot);
+                  const side = slot === 'A' || slot === 'B' ? 'LEFT' : 'RIGHT';
+                  return <div className={member ? styles.genealogySlotCard : styles.genealogyEmptySlot} key={slot}>
+                    <div className={styles.genealogySlotHead}><b>{slot}</b><span>{side}</span></div>
+                    {member ? <>
+                      <strong>{text(member.username)}</strong>
+                      <span>{memberDisplayName(member)}</span>
+                      <small>{number(member.depth)} level • parent {text(member.parentUsername)}</small>
+                    </> : <span>Available slot</span>}
+                  </div>;
+                })}
+              </div>
+              {members.length ? <div className={styles.tableBox}>
+                <table className={styles.table}>
+                  <thead><tr><th>LEVEL</th><th>MEMBER</th><th>NAME</th><th>PARENT</th><th>SLOT</th><th>SIDE</th><th>FIRST LEG</th><th>STATUS</th></tr></thead>
+                  <tbody>{members.map((member) => <tr key={text(member.id)}>
+                    <td>{number(member.depth)}</td>
+                    <td><b>{text(member.username)}</b></td>
+                    <td>{memberDisplayName(member)}</td>
+                    <td>{text(member.parentUsername)}</td>
+                    <td><b>{text(member.slot)}</b></td>
+                    <td>{text(member.side)}</td>
+                    <td>{text(member.firstLegSlot)} / {text(member.firstLegSide)}</td>
+                    <td className={text(member.status) === 'ACTIVE' ? styles.status : styles.statusOff}>{text(member.status)}</td>
+                  </tr>)}</tbody>
+                </table>
+              </div> : <Empty>No members are placed below this root yet.</Empty>}
+            </> : <Empty>No top-level Binary 1:4 root member is available.</Empty>}
+          </div> : null}
+
+          {activeTab === 'binary-pairs' ? <div className={styles.card}>
+            <SectionHead icon="🔗" title="Pair Ledger" note="Fixed-lane qualified pair records" />
+            <div className={styles.notice}><b>Valid pair lanes:</b> A:C and B:D only. A:D and B:C are invalid.</div>
+            {rows.length ? <div className={styles.tableBox}><table className={styles.table}><thead><tr><th>PAIR</th><th>MEMBER</th><th>LANE</th><th>LEFT SLOT</th><th>RIGHT SLOT</th><th>VALUE</th><th>STATUS</th></tr></thead><tbody>{rows.map((row) => <tr key={text(row.id)}><td>{text(row.pairSequence)}</td><td>{text(row.username)}</td><td><b>{text(row.pairLane, text(row.crossMatch))}</b></td><td>{text(row.leftSlot)}</td><td>{text(row.rightSlot)}</td><td>{money(row.payoutAmount, text(row.currencyCode, currency))}</td><td className={row.payable ? styles.status : styles.statusOff}>{row.payable ? 'QUALIFIED' : 'CAP LIMITED'}</td></tr>)}</tbody></table></div> : <Empty>No pair records yet.</Empty>}
+          </div> : null}
+        </>}
+      </WorkspaceTabs>
     </>;
   }
 
