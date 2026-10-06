@@ -5,6 +5,7 @@ import {
   isLuckyDrawToken,
   LUCKY_DRAW_TOKEN_MAX_EXCLUSIVE,
   LUCKY_DRAW_TOKEN_MIN,
+  printedLuckyDrawTokenReference,
 } from '../src/lucky-draw/lucky-draw-token.util';
 
 const TOKEN_MIGRATION_PATH = resolve(
@@ -37,6 +38,20 @@ describe('MegaGoldenClub lucky draw token registry contract', () => {
     expect(seasonScopeMigrationSql).toContain(
       'ADD UNIQUE INDEX `lucky_draw_entries_draw_token_key` (`drawId`, `drawToken`)',
     );
+  });
+
+  it('formats the stored token with immutable season code and two-digit installment number', () => {
+    expect(printedLuckyDrawTokenReference('MGC_202610_3FC2', 1, '58321'))
+      .toBe('MGC_202610_3FC2-M01-58321');
+    expect(printedLuckyDrawTokenReference('MGC-JAN27', 7, '58321'))
+      .toBe('MGC-JAN27-M07-58321');
+    expect(printedLuckyDrawTokenReference('MGC-JUL27', 1, '58321'))
+      .toBe('MGC-JUL27-M01-58321');
+    expect(printedLuckyDrawTokenReference('MGC-JAN27', 18, '58321'))
+      .toBe('MGC-JAN27-M18-58321');
+    expect(printedLuckyDrawTokenReference('MGC-JAN27', 1, '01234')).toBeNull();
+    expect(printedLuckyDrawTokenReference('MGC-JAN27', 0, '58321')).toBeNull();
+    expect(printedLuckyDrawTokenReference(null, 1, '58321')).toBeNull();
   });
 
   it('generates only valid five-digit tokens in the 10000-99999 namespace', () => {
