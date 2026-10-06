@@ -14,6 +14,7 @@ import {
   UserStatus,
   UsernameCreationMode,
 } from '../generated/prisma/enums';
+import { generateRandomUsername } from './random-username';
 import type { CreateManagedStaffDto, CreateManagedUserDto } from './users.dto';
 
 @Injectable()
@@ -109,12 +110,17 @@ export class UsersService {
           registration.usernameMode === UsernameCreationMode.AUTO ||
           (registration.usernameMode === UsernameCreationMode.AUTO_OR_MANUAL && !username);
         if (mustAutoUsername) {
-          const sequence = await tx.systemSequence.update({
-            where: { key: 'username' },
-            data: { nextValue: { increment: 1 } },
-            select: { nextValue: true },
-          });
-          username = `${registration.usernamePrefixEnabled ? (registration.usernamePrefix ?? '') : ''}${sequence.nextValue.toString()}`;
+          const prefix = registration.usernamePrefixEnabled
+            ? (registration.usernamePrefix ?? '').trim()
+            : '';
+          username = await generateRandomUsername(prefix, async (candidate) =>
+            Boolean(
+              await tx.user.findUnique({
+                where: { username: candidate },
+                select: { id: true },
+              }),
+            ),
+          );
         }
         if (!username) throw new BadRequestException('Username is required');
 
