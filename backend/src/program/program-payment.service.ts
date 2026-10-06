@@ -17,6 +17,7 @@ import {
   ProgramPaymentAllocationType,
   ProgramPaymentAttemptStatus,
 } from '../generated/prisma/enums';
+import { ProgramAutomationService } from './program-automation.service';
 import type {
   ConfirmProgramPaymentAttemptDto,
   CreateProgramPaymentAttemptDto,
@@ -90,6 +91,7 @@ export class ProgramPaymentService {
     private readonly prisma: PrismaService,
     private readonly financialDb: FinancialDbService,
     private readonly audit: AuditService,
+    private readonly automation: ProgramAutomationService,
   ) {}
 
   async createAttempt(dto: CreateProgramPaymentAttemptDto, actorUserId: string) {
@@ -178,6 +180,7 @@ export class ProgramPaymentService {
     });
     if (existing) {
       this.assertPaymentIdempotent(existing, attemptId, fingerprint);
+      await this.processPaymentEventsBestEffort(existing.id, actorUserId);
       return { payment: await this.getPayment(existing.id), idempotent: true };
     }
 
@@ -204,6 +207,7 @@ export class ProgramPaymentService {
         });
         if (duplicate) {
           this.assertPaymentIdempotent(duplicate, attemptId, fingerprint);
+          await this.processPaymentEventsBestEffort(duplicate.id, actorUserId);
           return { payment: await this.getPayment(duplicate.id), idempotent: true };
         }
       }
@@ -218,6 +222,7 @@ export class ProgramPaymentService {
       description: 'Program payment confirmed',
       metadata: { attemptId, sourceKey: dto.sourceKey },
     });
+    await this.processPaymentEventsBestEffort(paymentId, actorUserId);
     return { payment: await this.getPayment(paymentId), idempotent: false };
   }
 
@@ -278,6 +283,7 @@ export class ProgramPaymentService {
     });
     if (existing) {
       this.assertRefundIdempotent(existing, dto.paymentRecordId, fingerprint);
+      await this.processRefundEventsBestEffort(existing.id, actorUserId);
       return { refund: await this.getRefund(existing.id), idempotent: true };
     }
 
@@ -305,6 +311,7 @@ export class ProgramPaymentService {
         });
         if (duplicate) {
           this.assertRefundIdempotent(duplicate, dto.paymentRecordId, fingerprint);
+          await this.processRefundEventsBestEffort(duplicate.id, actorUserId);
           return { refund: await this.getRefund(duplicate.id), idempotent: true };
         }
       }
@@ -319,7 +326,58 @@ export class ProgramPaymentService {
       description: 'Program payment refund recorded',
       metadata: { paymentRecordId: dto.paymentRecordId, amount: amount.toFixed(2) },
     });
+    await this.processRefundEventsBestEffort(refundId, actorUserId);
     return { refund: await this.getRefund(refundId), idempotent: false };
+  }
+
+  private async processPaymentEventsBestEffort(paymentRecordId: string, actorUserId: string) {
+    const events = await this.prisma.programBusinessEvent.findMany({
+      where: { paymentRecordId },
+      orderBy: [{ occurredAt: 'asc' }, { createdAt: 'asc' }],
+      select: { id: true },
+    });
+    for (const event of events) {
+      try {
+        await this.automation.processEvent(event.id, actorUserId);
+      } catch (error) {
+        await this.audit.log({
+          actorUserId,
+          action: AuditAction.UPDATE,
+          entityType: 'ProgramPaymentRecord',
+          entityId: paymentRecordId,
+          description: 'Automatic post-payment processing requires reconciliation',
+          metadata: {
+            businessEventId: event.id,
+            reason: error instanceof Error ? error.message.slice(0, 500) : 'Unknown automation error',
+          },
+        });
+      }
+    }
+  }
+
+  private async processRefundEventsBestEffort(refundRecordId: string, actorUserId: string) {
+    const events = await this.prisma.programBusinessEvent.findMany({
+      where: { refundRecordId },
+      orderBy: [{ occurredAt: 'asc' }, { createdAt: 'asc' }],
+      select: { id: true },
+    });
+    for (const event of events) {
+      try {
+        await this.automation.processEvent(event.id, actorUserId);
+      } catch (error) {
+        await this.audit.log({
+          actorUserId,
+          action: AuditAction.UPDATE,
+          entityType: 'ProgramRefundRecord',
+          entityId: refundRecordId,
+          description: 'Automatic post-refund processing requires reconciliation',
+          metadata: {
+            businessEventId: event.id,
+            reason: error instanceof Error ? error.message.slice(0, 500) : 'Unknown automation error',
+          },
+        });
+      }
+    }
   }
 
   async getAttempt(id: string) {
