@@ -15,6 +15,7 @@ import {
   ProgramEnrollmentStatus,
   ProgramIntervalUnit,
 } from '../generated/prisma/enums';
+import { ProgramAutomationService } from './program-automation.service';
 import type { CreateProgramEnrollmentDto } from './program.dto';
 import { ProgramEligibilityService } from './program-eligibility.service';
 
@@ -24,6 +25,7 @@ export class ProgramEnrollmentService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly eligibility: ProgramEligibilityService,
+    private readonly automation: ProgramAutomationService,
   ) {}
 
   async createEnrollment(dto: CreateProgramEnrollmentDto, actorUserId: string) {
@@ -194,7 +196,41 @@ export class ProgramEnrollmentService {
         installmentCount: version.installmentCount,
       },
     });
+    await this.processEnrollmentEventsBestEffort(enrollmentId, actorUserId);
     return { enrollment: await this.getEnrollment(enrollmentId), idempotent: false };
+  }
+
+  private async processEnrollmentEventsBestEffort(enrollmentId: string, actorUserId: string) {
+    const events = await this.prisma.programBusinessEvent.findMany({
+      where: {
+        enrollmentId,
+        type: {
+          in: [
+            ProgramBusinessEventType.ENROLLMENT_CREATED,
+            ProgramBusinessEventType.ENROLLMENT_COMPLETED,
+          ],
+        },
+      },
+      orderBy: [{ occurredAt: 'asc' }, { createdAt: 'asc' }],
+      select: { id: true },
+    });
+    for (const event of events) {
+      try {
+        await this.automation.processEvent(event.id, actorUserId);
+      } catch (error) {
+        await this.audit.log({
+          actorUserId,
+          action: AuditAction.UPDATE,
+          entityType: 'ProgramEnrollment',
+          entityId: enrollmentId,
+          description: 'Automatic enrollment event processing requires reconciliation',
+          metadata: {
+            businessEventId: event.id,
+            reason: error instanceof Error ? error.message.slice(0, 500) : 'Unknown automation error',
+          },
+        });
+      }
+    }
   }
 
   async getEnrollment(id: string) {
