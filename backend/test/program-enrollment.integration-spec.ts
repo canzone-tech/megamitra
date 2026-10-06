@@ -103,6 +103,13 @@ describe('MegaGoldenClub program enrollment and payment integration', () => {
           ...enrollmentIds,
         );
       }
+      if (refundIds.length) {
+        await prisma.$executeRawUnsafe(
+          `DELETE FROM program_referral_refund_evaluations
+           WHERE refundRecordId IN (${refundIds.map(() => '?').join(',')})`,
+          ...refundIds,
+        );
+      }
       await prisma.programBusinessEvent.deleteMany({ where: { enrollmentId: { in: enrollmentIds } } });
       await prisma.programRefundAllocation.deleteMany({ where: { refundRecordId: { in: refundIds } } });
       await prisma.programRefundRecord.deleteMany({ where: { id: { in: refundIds } } });
