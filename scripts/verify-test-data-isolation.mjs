@@ -9,6 +9,7 @@ const content = readFileSync(resolve(rootDir, relativePath), 'utf8');
 const forbidden = [
   /sourceKey\s*:\s*\{\s*startsWith\s*:\s*['"]PROGRAM_EVENT:['"]\s*\}/,
   /sourceKey\s+LIKE\s+['"]PROGRAM_EVENT:%['"]/i,
+  /key\s*:\s*\{\s*startsWith\s*:\s*['"]BU:['"]\s*\}/,
 ];
 
 for (const pattern of forbidden) {
@@ -24,6 +25,7 @@ for (const required of [
   'FROM program_binary_qualification_links',
   'WHERE businessEventId IN',
   'PROGRAM_EVENT:UAT-SENTINEL:',
+  'binarySequenceKeys',
 ]) {
   if (!content.includes(required)) {
     throw new Error(
