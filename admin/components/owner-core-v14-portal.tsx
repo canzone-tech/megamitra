@@ -86,6 +86,7 @@ export function OwnerCoreV14Portal({ section, extension }: { section: OwnerCoreV
   const [notice, setNotice] = useState('');
   const [generatedPassword, setGeneratedPassword] = useState('');
   const [genealogy, setGenealogy] = useState<Row | null>(null);
+  const [genealogyMemberFilter, setGenealogyMemberFilter] = useState('');
 
   const handleError = useCallback((reason: unknown) => {
     if (reason instanceof ApiClientError && reason.status === 401) {
@@ -316,6 +317,14 @@ export function OwnerCoreV14Portal({ section, extension }: { section: OwnerCoreV
       ? members.filter((member) => text(member.parentUserId, '') === text(root.id, ''))
       : [];
     const bySlot = new Map(directChildren.map((member) => [text(member.slot), member]));
+    const normalizedMemberFilter = genealogyMemberFilter.trim().toLowerCase();
+    const filteredRoots = roots.filter((member) =>
+      !normalizedMemberFilter ||
+      text(member.id, '').toLowerCase().includes(normalizedMemberFilter) ||
+      text(member.username, '').toLowerCase().includes(normalizedMemberFilter) ||
+      memberDisplayName(member).toLowerCase().includes(normalizedMemberFilter) ||
+      text(member.id, '') === text(root?.id, ''),
+    );
     const tabs = [
       { id: 'binary-genealogy', label: 'Placement Genealogy', count: number(tree.visibleMemberCount) },
       { id: 'binary-pairs', label: 'Pair Ledger', count: rows.length },
@@ -333,48 +342,82 @@ export function OwnerCoreV14Portal({ section, extension }: { section: OwnerCoreV
             />
             {roots.length ? <div className={styles.genealogyToolbar}>
               <label>
-                <span>Root member</span>
+                <span>Find any member (ID or name)</span>
+                <input
+                  className={styles.input}
+                  type="search"
+                  value={genealogyMemberFilter}
+                  onChange={(event) => setGenealogyMemberFilter(event.target.value)}
+                  placeholder="Search any member, e.g. MGC695322"
+                  aria-label="Search binary members"
+                />
+              </label>
+              <label>
+                <span>View member's A/B/C/D slots ({roots.length} total members)</span>
                 <select
+                  aria-label="Select binary member"
                   className={styles.select}
                   value={text(root?.id, '')}
                   disabled={busy}
                   onChange={(event) => void selectGenealogyRoot(event.target.value)}
                 >
-                  {roots.map((item) => <option value={text(item.id)} key={text(item.id)}>
-                    {text(item.username)} • {memberDisplayName(item)} • {number(item.directChildCount)} direct
+                  {filteredRoots.map((item) => <option value={text(item.id)} key={text(item.id)}>
+                    {text(item.username)} • {memberDisplayName(item)} • {number(item.directChildCount)} filled
                   </option>)}
                 </select>
               </label>
-              <div className={styles.genealogyCount}><b>{number(tree.visibleMemberCount)}</b><span>Visible placed members</span></div>
+              <div className={styles.genealogyCount}><b>{number(tree.visibleMemberCount)}</b><span>Members below selection</span></div>
             </div> : null}
-
             {root ? <>
+              <div className={styles.genealogyNavigation}>
+                {root.placementParentUserId ? <button
+                  className={classNames(styles.button, styles.dark)}
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void selectGenealogyRoot(text(root.placementParentUserId))}
+                >← BACK TO PLACEMENT PARENT: {text(root.placementParentUsername)}</button> : null}
+                <span>Selected member's four direct placement slots • OPEN = empty • FILLED = occupied</span>
+              </div>
               <div className={styles.genealogyRootCard}>
-                <small>ROOT</small>
+                <small>SELECTED MEMBER</small>
                 <b>{text(root.username)}</b>
                 <span>{memberDisplayName(root)}</span>
+                <span>Sponsor: {text(root.sponsorUsername, 'Not assigned')}</span>
+                <span>Placement parent: {text(root.placementParentUsername, 'Top level')}</span>
               </div>
               <div className={styles.genealogySlotGrid}>
                 {(['A', 'B', 'C', 'D'] as const).map((slot) => {
                   const member = bySlot.get(slot);
                   const side = slot === 'A' || slot === 'B' ? 'LEFT' : 'RIGHT';
-                  return <div className={member ? styles.genealogySlotCard : styles.genealogyEmptySlot} key={slot}>
-                    <div className={styles.genealogySlotHead}><b>{slot}</b><span>{side}</span></div>
-                    {member ? <>
-                      <strong>{text(member.username)}</strong>
-                      <span>{memberDisplayName(member)}</span>
-                      <small>{number(member.depth)} level • parent {text(member.parentUsername)}</small>
-                    </> : <span>Available slot</span>}
+                  return member ? <button
+                    className={classNames(styles.genealogySlotCard, styles.genealogySlotButton)}
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void selectGenealogyRoot(text(member.id))}
+                    aria-label={`View ${text(member.username)} A B C D slots from filled slot ${slot}`}
+                    key={slot}
+                  >
+                    <div className={styles.genealogySlotHead}><b>{slot}</b><span>{side} • FILLED</span></div>
+                    <strong>{text(member.username)}</strong>
+                    <span>{memberDisplayName(member)}</span>
+                    <small>Sponsor: {text(member.sponsorUsername, 'Not assigned')}</small>
+                    <small>Parent: {text(member.parentUsername)} • {text(member.status)}</small>
+                    <small className={styles.genealogyDrillHint}>View A/B/C/D slots →</small>
+                  </button> : <div className={styles.genealogyEmptySlot} key={slot}>
+                    <div className={styles.genealogySlotHead}><b>{slot}</b><span>{side} • OPEN</span></div>
+                    <strong>Available</strong>
+                    <span>No member placed in this slot</span>
                   </div>;
                 })}
               </div>
               {members.length ? <div className={styles.tableBox}>
                 <table className={styles.table}>
-                  <thead><tr><th>LEVEL</th><th>MEMBER</th><th>NAME</th><th>PARENT</th><th>SLOT</th><th>SIDE</th><th>FIRST LEG</th><th>STATUS</th></tr></thead>
+                  <thead><tr><th>LEVEL</th><th>MEMBER</th><th>NAME</th><th>SPONSOR</th><th>PLACEMENT PARENT</th><th>SLOT</th><th>SIDE</th><th>FIRST LEG</th><th>STATUS</th></tr></thead>
                   <tbody>{members.map((member) => <tr key={text(member.id)}>
                     <td>{number(member.depth)}</td>
-                    <td><b>{text(member.username)}</b></td>
+                    <td><button className={styles.genealogyMemberLink} type="button" disabled={busy} onClick={() => void selectGenealogyRoot(text(member.id))}>{text(member.username)} →</button></td>
                     <td>{memberDisplayName(member)}</td>
+                    <td>{text(member.sponsorUsername, 'Not assigned')}</td>
                     <td>{text(member.parentUsername)}</td>
                     <td><b>{text(member.slot)}</b></td>
                     <td>{text(member.side)}</td>
@@ -383,7 +426,7 @@ export function OwnerCoreV14Portal({ section, extension }: { section: OwnerCoreV
                   </tr>)}</tbody>
                 </table>
               </div> : <Empty>No members are placed below this root yet.</Empty>}
-            </> : <Empty>No top-level Binary 1:4 root member is available.</Empty>}
+            </> : <Empty>No Binary 1:4 member is available.</Empty>}
           </div> : null}
 
           {activeTab === 'binary-pairs' ? <div className={styles.card}>
