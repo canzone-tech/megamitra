@@ -19,11 +19,6 @@ type ReadyPairRow = {
   settlementTimezone: string | null;
 };
 
-type MissingBinaryQualificationRow = {
-  businessEventId: string;
-};
-
-
 @Injectable()
 export class ProgramAutomationService {
   private readonly logger = new Logger(ProgramAutomationService.name);
@@ -188,46 +183,6 @@ export class ProgramAutomationService {
     return { processed, failed: failures.length, failures };
   }
 
-  async repairMissingBinaryQualifications(limit = 100) {
-    const safeLimit = Math.max(1, Math.min(Math.trunc(limit), 100));
-    const rows = await this.prisma.$queryRawUnsafe<MissingBinaryQualificationRow[]>(
-      `SELECT r.businessEventId
-       FROM program_event_processing_runs r
-       INNER JOIN program_event_policy_versions p ON p.id = r.policyVersionId
-       INNER JOIN program_business_events be ON be.id = r.businessEventId
-       WHERE r.status = 'PROCESSED' AND r.eligible = 1
-         AND p.binaryPlanVersionId IS NOT NULL
-         AND p.binaryUnitsPerEvent > 0
-         AND (
-           SELECT COUNT(*)
-           FROM program_binary_qualification_links l
-           WHERE l.runId = r.id
-         ) < p.binaryUnitsPerEvent
-       ORDER BY be.occurredAt ASC, be.createdAt ASC, r.createdAt ASC
-       LIMIT ${safeLimit}`,
-    );
-
-    const results: Array<{ eventId: string; result?: unknown; error?: string }> = [];
-    for (const row of rows) {
-      try {
-        results.push({
-          eventId: row.businessEventId,
-          result: await this.processEvent(row.businessEventId),
-        });
-      } catch (error) {
-        results.push({
-          eventId: row.businessEventId,
-          error: this.errorMessage(error),
-        });
-      }
-    }
-    return {
-      processed: results.filter((item) => !item.error).length,
-      failed: results.filter((item) => item.error).length,
-      results,
-    };
-  }
-
   async settleReadyPairs(limit = 100) {
     const safeLimit = Math.max(1, Math.min(Math.trunc(limit), 100));
     const rows = await this.prisma.$queryRawUnsafe<ReadyPairRow[]>(
@@ -289,21 +244,12 @@ export class ProgramAutomationService {
 
   async runCycle() {
     const pending = await this.processPending();
-    // Processed runs are durable business truth. If a derived binary qualification/link
-    // is missing, rebuild it idempotently before the settlement sweep.
-    const repairedBinaryQualifications = await this.repairMissingBinaryQualifications();
     // Settlement runs immediately after qualification so a stale referral/reconciliation
     // item can never starve ready A:C / B:D earnings.
     const settlements = await this.settleReadyPairs();
     const referralHooks = await this.consumeReadyReferralHooks();
     const referralRefunds = await this.reconcilePendingReferralRefunds();
-    return {
-      pending,
-      repairedBinaryQualifications,
-      settlements,
-      referralHooks,
-      referralRefunds,
-    };
+    return { pending, settlements, referralHooks, referralRefunds };
   }
 
   private errorMessage(error: unknown) {
