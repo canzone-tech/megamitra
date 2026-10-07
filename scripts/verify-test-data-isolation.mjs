@@ -98,8 +98,24 @@ const localVerify = readFileSync(
 );
 if (!localVerify.includes('cleanup-stale-integration-staff.ts')) {
   throw new Error(
-    'backend/scripts/verify-local.sh: stale integration staff cleanup must run before local integration verification',
+    'backend/scripts/verify-local.sh: stale integration/UAT principal cleanup must run before local integration verification',
   );
+}
+
+const stalePrincipalCleanup = readFileSync(
+  resolve(rootDir, 'backend/scripts/cleanup-stale-integration-staff.ts'),
+  'utf8',
+);
+for (const required of [
+  '__uat_verify_admin_',
+  '__uat_verify_member_',
+  "'SUPER_ADMIN', 'ADMIN', 'AGENT', 'MEMBER'",
+]) {
+  if (!stalePrincipalCleanup.includes(required)) {
+    throw new Error(
+      `backend/scripts/cleanup-stale-integration-staff.ts: missing stale principal cleanup contract ${JSON.stringify(required)}`,
+    );
+  }
 }
 
 for (const workerPath of [
