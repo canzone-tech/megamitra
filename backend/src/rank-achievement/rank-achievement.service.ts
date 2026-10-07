@@ -528,7 +528,7 @@ export class RankAchievementWorker implements OnModuleInit, OnModuleDestroy {
   constructor(private readonly ranks: RankAchievementService) {}
 
   onModuleInit() {
-    if (process.env.NODE_ENV === 'test') return;
+    if (process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID) return;
     const first = setTimeout(() => void this.run(), 4_000);
     first.unref();
     this.timer = setInterval(() => void this.run(), 60_000);
