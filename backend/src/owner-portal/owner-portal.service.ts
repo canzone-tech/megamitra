@@ -1099,9 +1099,10 @@ export class OwnerPortalService {
   }
 
   async generateAuthCode(dto: GenerateOwnerAuthCodeDto, actorUserId: string) {
+    const generatedAt = new Date();
     const raw = this.readableSecret('MGC-AUTH');
     const id = randomUUID();
-    const expiresAt = new Date(Date.now() + dto.validityMinutes * 60_000);
+    const expiresAt = new Date(generatedAt.getTime() + dto.validityMinutes * 60_000);
 
     const operator = await this.db.transaction(async (connection) => {
       // Serialize generation per operator so double-clicks/concurrent requests
@@ -1136,10 +1137,10 @@ export class OwnerPortalService {
         `SELECT id, expiresAt
          FROM owner_auth_codes
          WHERE operatorUserId=? AND purpose=? AND status='ACTIVE'
-           AND expiresAt>CURRENT_TIMESTAMP(3)
+           AND expiresAt>?
          ORDER BY createdAt DESC
          LIMIT 1`,
-        [selected.id, dto.purpose],
+        [selected.id, dto.purpose, generatedAt],
       )) as { id: string; expiresAt: Date }[];
       if (existing[0]) {
         throw new ConflictException(
@@ -1149,8 +1150,8 @@ export class OwnerPortalService {
 
       await connection.query(
         `INSERT INTO owner_auth_codes
-         (id, codeHash, displaySuffix, codeCiphertext, roleScope, purpose, operatorUserId, status, expiresAt)
-         VALUES (?, ?, ?, ?, ?, ?, ?, 'ACTIVE', ?)`,
+         (id, codeHash, displaySuffix, codeCiphertext, roleScope, purpose, operatorUserId, status, expiresAt, createdAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'ACTIVE', ?, ?)`,
         [
           id,
           this.secretHash('auth', raw),
@@ -1160,6 +1161,7 @@ export class OwnerPortalService {
           dto.purpose,
           selected.id,
           expiresAt,
+          generatedAt,
         ],
       );
 
@@ -1199,6 +1201,7 @@ export class OwnerPortalService {
   }
 
   async consumeAuthCode(dto: ConsumeOwnerAuthCodeDto, actorUserId: string) {
+    const authorizedAt = new Date();
     const hash = this.secretHash('auth', dto.code);
     return this.db.transaction(async (connection) => {
       const rows = (await connection.query(
@@ -1217,7 +1220,7 @@ export class OwnerPortalService {
       if (
         !row ||
         row.operatorUserId !== actorUserId ||
-        new Date(row.expiresAt) <= new Date()
+        new Date(row.expiresAt) <= authorizedAt
       ) {
         throw new BadRequestException(
           'Authorization code is invalid, expired, or not assigned to this operator',
@@ -1240,17 +1243,18 @@ export class OwnerPortalService {
       }
 
       await connection.query(
-        "UPDATE owner_auth_codes SET status='USED', usedAt=CURRENT_TIMESTAMP(3) WHERE id=?",
-        [row.id],
+        'UPDATE owner_auth_codes SET usedAt=? WHERE id=?',
+        [authorizedAt, row.id],
       );
       await this.audit.log({
         actorUserId,
         action: AuditAction.UPDATE,
         entityType: 'OwnerAuthCode',
         entityId: row.id,
-        description: `Authorization code consumed for ${dto.purpose}`,
+        description: `Authorization code validated for ${dto.purpose}`,
+        metadata: { authorizedAt },
       });
-      return { ok: true, id: row.id };
+      return { ok: true, id: row.id, authorizedAt };
     });
   }
 
