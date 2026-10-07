@@ -543,8 +543,10 @@ describe('MegaGoldenClub program event orchestration integration', () => {
     const cleanupRightEvent = await prisma.binaryQualifyingUnitEvent.create({
       data: {
         sourceKey: `PROGRAM_EVENT:CLEANUP:${suffix}`,
+        requestFingerprint: 'c'.repeat(64),
         sourceMemberUserId: cleanupSibling.id,
         planVersionId: binaryVersion.id,
+        eventType: 'QUALIFY',
         occurredAt: new Date(),
       },
     });
