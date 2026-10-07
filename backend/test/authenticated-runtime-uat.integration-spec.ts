@@ -670,6 +670,46 @@ describe('MegaGoldenClub authenticated runtime UAT', () => {
         slot: 'A',
         side: 'LEFT',
       });
+
+      const nestedGenealogy = await request(
+        `/admin/owner-portal/core/genealogy?reference=${encodeURIComponent(adminMemberUsername)}`,
+        { headers: adminHeaders },
+      );
+      expect(nestedGenealogy.status).toBe(200);
+      expect(nestedGenealogy.body.root).toMatchObject({
+        id: adminAddedMemberId,
+        username: adminMemberUsername,
+        sponsorUserId,
+        sponsorUsername,
+        placementParentUserId: firstChildId,
+        placementParentUsername: childUsernames[0],
+        directChildCount: 0,
+      });
+      expect(nestedGenealogy.body.visibleMemberCount).toBe(0);
+      expect(nestedGenealogy.body.members).toEqual([]);
+      expect(
+        (nestedGenealogy.body.roots as Array<Record<string, unknown>>).some(
+          (member) => member.id === adminAddedMemberId && member.username === adminMemberUsername,
+        ),
+      ).toBe(true);
+
+      const sponsorGenealogy = await request(
+        `/admin/owner-portal/core/genealogy?reference=${encodeURIComponent(sponsorUsername)}`,
+        { headers: adminHeaders },
+      );
+      expect(sponsorGenealogy.status).toBe(200);
+      const nestedAdminMember = (sponsorGenealogy.body.members as Array<Record<string, unknown>>)
+        .find((member) => member.id === adminAddedMemberId);
+      expect(nestedAdminMember).toMatchObject({
+        username: adminMemberUsername,
+        sponsorUserId,
+        sponsorUsername,
+        parentUserId: firstChildId,
+        parentUsername: childUsernames[0],
+        depth: 2,
+        slot: 'A',
+        side: 'LEFT',
+      });
       const adminAddedEpin = await prisma.$queryRawUnsafe<
         Array<{ status: string; usedByUserId: string | null }>
       >('SELECT status, usedByUserId FROM owner_epins WHERE id=? LIMIT 1', epins[5].id);
