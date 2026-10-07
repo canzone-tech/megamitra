@@ -427,7 +427,7 @@ describe('MegaGoldenClub authenticated runtime UAT', () => {
       const elevateAdmin = await request('/admin/rbac/roles/ADMIN/permissions', {
         method: 'PUT',
         headers: ownerHeaders,
-        body: JSON.stringify({ permissions: ['users.read', 'users.manage'] }),
+        body: JSON.stringify({ permissions: ['users.read', 'users.manage', 'genealogy.read'] }),
       });
       expect(elevateAdmin.status).toBe(200);
 
