@@ -174,7 +174,7 @@ describe('MegaGoldenClub authenticated runtime UAT', () => {
       method: 'POST',
       body: JSON.stringify(args),
     });
-    expect(registered.status).toBe(201);
+    expect(registered).toMatchObject({ status: 201 });
     const userId = String(registered.body.user.id);
     createdUserIds.push(userId);
     return registered;
