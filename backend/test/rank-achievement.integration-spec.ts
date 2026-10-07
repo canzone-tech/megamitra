@@ -64,7 +64,7 @@ describe('MegaGoldenClub Lightning/level cash rank ledger integration', () => {
     if (app) await app.close();
   });
 
-  it('credits Lightning once and never overlaps Gold/Diamond recurring rank income', async () => {
+  it('credits Lightning once, requires a fresh Bronze cohort, and never overlaps Gold/Diamond income', async () => {
     const suffix = randomUUID().replaceAll('-', '').slice(0, 10);
     const joiningAt = new Date(Date.now() - 2 * 60 * 60 * 1000);
     const referralAt = new Date(joiningAt.getTime() + 60 * 60 * 1000);
@@ -153,6 +153,152 @@ describe('MegaGoldenClub Lightning/level cash rank ledger integration', () => {
     const replayWallet = await ledger.getUserWallet(sponsor.id, 'INR');
     expect(Number(replayWallet.balance)).toBe(1000);
 
+    // Controlled Bronze fixture: Lightning's four members MUST NOT be reused.
+    // First create only 6 fresh direct + 30 fresh descendants = 36 fresh team.
+    // If the four Lightning members were incorrectly recycled, this would look
+    // like 10 direct / 40 team and would incorrectly award Bronze.
+    const createPaidBatch = async (
+      count: number,
+      paidAt: Date,
+      label: string,
+      sponsorForIndex: (index: number, ids: string[]) => string,
+    ) => {
+      const ids = Array.from({ length: count }, () => randomUUID());
+      const enrollments = ids.map(() => randomUUID());
+      const attempts = ids.map(() => randomUUID());
+      const records = ids.map(() => randomUUID());
+
+      await prisma.user.createMany({
+        data: ids.map((id, index) => ({
+          id,
+          username: `rank_${label}_${index}_${suffix}`,
+          passwordHash: 'rank-uat-not-for-login',
+          status: UserStatus.ACTIVE,
+        })),
+      });
+      userIds.push(...ids);
+
+      await prisma.programEnrollment.createMany({
+        data: ids.map((userId, index) => ({
+          id: enrollments[index]!,
+          sourceKey: `rank:${label}:enroll:${userId}`,
+          requestFingerprint: 'd'.repeat(64),
+          userId,
+          programVersionId,
+          enrolledAt: paidAt,
+          enrollmentDate: paidAt.toISOString().slice(0, 10),
+          status: 'ACTIVE',
+          eligibilitySnapshot: { eligible: true },
+          currencyCode: 'INR',
+          registrationFeeSnapshot: '1000.00',
+          installmentAmountSnapshot: '1000.00',
+          installmentCountSnapshot: 18,
+          gracePeriodDaysSnapshot: 0,
+        })),
+      });
+      enrollmentIds.push(...enrollments);
+
+      await prisma.programPaymentAttempt.createMany({
+        data: ids.map((_, index) => ({
+          id: attempts[index]!,
+          sourceKey: `rank:${label}:attempt:${ids[index]}`,
+          requestFingerprint: 'e'.repeat(64),
+          enrollmentId: enrollments[index]!,
+          amount: '2000.00',
+          currencyCode: 'INR',
+          status: ProgramPaymentAttemptStatus.CONFIRMED,
+          initiatedAt: paidAt,
+          finalizedAt: paidAt,
+        })),
+      });
+      attemptIds.push(...attempts);
+
+      await prisma.programPaymentRecord.createMany({
+        data: ids.map((_, index) => ({
+          id: records[index]!,
+          sourceKey: `rank:${label}:payment:${ids[index]}`,
+          requestFingerprint: 'f'.repeat(64),
+          enrollmentId: enrollments[index]!,
+          paymentAttemptId: attempts[index]!,
+          amount: '2000.00',
+          currencyCode: 'INR',
+          occurredAt: paidAt,
+        })),
+      });
+      recordIds.push(...records);
+
+      await prisma.sponsorRelationship.createMany({
+        data: ids.map((memberUserId, index) => ({
+          memberUserId,
+          sponsorUserId: sponsorForIndex(index, ids),
+        })),
+      });
+      return ids;
+    };
+
+    const bronzeSeedAt = new Date(joiningAt.getTime() + 90 * 60 * 1000);
+    const bronzeSeed = await createPaidBatch(
+      36,
+      bronzeSeedAt,
+      'bronze_seed',
+      (index, ids) => index < 6 ? sponsor.id : ids[Math.floor((index - 6) / 5)]!,
+    );
+    expect(bronzeSeed).toHaveLength(36);
+
+    const incompleteBronze = await ranks.runCycle();
+    expect(incompleteBronze.failed).toBe(0);
+    expect(incompleteBronze.awarded).toBe(0);
+    expect(
+      await prisma.rankAchievement.count({
+        where: { userId: sponsor.id, tierCode: 'BRONZE' },
+      }),
+    ).toBe(0);
+    const walletBeforeBronze = await ledger.getUserWallet(sponsor.id, 'INR');
+    expect(Number(walletBeforeBronze.balance)).toBe(1000);
+
+    // Four more NEW direct referrals complete the Bronze cohort:
+    // 10 new direct + 40 new sponsor-tree members after Lightning.
+    const bronzeFinalAt = new Date(joiningAt.getTime() + 105 * 60 * 1000);
+    await createPaidBatch(4, bronzeFinalAt, 'bronze_finish', () => sponsor.id);
+
+    const bronzeRun = await ranks.runCycle();
+    expect(bronzeRun.failed).toBe(0);
+    expect(bronzeRun.awarded).toBe(1);
+
+    const bronze = await prisma.rankAchievement.findFirstOrThrow({
+      where: { userId: sponsor.id, tierCode: 'BRONZE' },
+    });
+    expect(bronze.directCount).toBe(10);
+    expect(bronze.teamCount).toBe(40);
+    expect(bronze.achievedAt).toEqual(bronzeFinalAt);
+    expect(Number(bronze.cashAmount)).toBe(5000);
+    expect(bronze.ledgerTransactionId).toBeTruthy();
+
+    const bronzeTransaction = await ledger.getTransaction(String(bronze.ledgerTransactionId));
+    expect(bronzeTransaction.balanced).toBe(true);
+    expect(Number(bronzeTransaction.creditTotal)).toBe(5000);
+    expect(Number(bronzeTransaction.debitTotal)).toBe(5000);
+
+    const bronzeWallet = await ledger.getUserWallet(sponsor.id, 'INR');
+    expect(Number(bronzeWallet.balance)).toBe(6000);
+
+    const portalOverview = await ranks.overview();
+    expect(portalOverview.achievements.some((award) =>
+      award.userId === sponsor.id &&
+      award.tierCode === 'BRONZE' &&
+      Number(award.cashAmount) === 5000
+    )).toBe(true);
+
+    const bronzeReplay = await ranks.runCycle();
+    expect(bronzeReplay.awarded).toBe(0);
+    const bronzeStableWallet = await ledger.getUserWallet(sponsor.id, 'INR');
+    expect(Number(bronzeStableWallet.balance)).toBe(6000);
+    expect(
+      await prisma.rankAchievement.count({
+        where: { userId: sponsor.id, tierCode: 'BRONZE' },
+      }),
+    ).toBe(1);
+
     // Fixture prior ranks solely to exercise the income scheduler, not achievement
     // qualification. Diamond begins at the exact instant Gold month #4 is due:
     // Gold #1–#3 remain payable, Gold #4–#18 MUST never be credited.
@@ -192,11 +338,11 @@ describe('MegaGoldenClub Lightning/level cash rank ledger integration', () => {
     expect(gold?.monthlyPayouts.every((p) => p.dueAt < diamondAt)).toBe(true);
     expect(diamond?.monthlyPayouts.every((p) => p.dueAt > diamondAt)).toBe(true);
     const promotedWallet = await ledger.getUserWallet(sponsor.id, 'INR');
-    expect(Number(promotedWallet.balance)).toBe(22000); // 1k fast-start + 6k Gold + 15k Diamond
+    expect(Number(promotedWallet.balance)).toBe(27000); // 1k Lightning + 5k Bronze + 6k Gold + 15k Diamond
 
     const rerun = await ranks.runCycle(asOf);
     expect(rerun.monthlyPaid).toBe(0);
     const stableWallet = await ledger.getUserWallet(sponsor.id, 'INR');
-    expect(Number(stableWallet.balance)).toBe(22000);
+    expect(Number(stableWallet.balance)).toBe(27000);
   });
 });
