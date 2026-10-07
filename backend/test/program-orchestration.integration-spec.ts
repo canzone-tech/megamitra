@@ -208,6 +208,32 @@ describe('MegaGoldenClub program event orchestration integration', () => {
         externalSentinelQualifyingEventId = null;
       }
 
+      const referralRewardEvents =
+        referralVersionIds.length > 0
+          ? await prisma.referralRewardEvent.findMany({
+              where: { policyVersionId: { in: referralVersionIds } },
+              select: { id: true, ledgerTransactionId: true },
+            })
+          : [];
+      const referralLedgerTransactionIds = referralRewardEvents
+        .map((row) => row.ledgerTransactionId)
+        .filter((id): id is string => Boolean(id));
+      if (referralLedgerTransactionIds.length > 0) {
+        await prisma.ledgerEntry.deleteMany({
+          where: { transactionId: { in: referralLedgerTransactionIds } },
+        });
+      }
+      if (referralRewardEvents.length > 0) {
+        await prisma.referralRewardEvent.deleteMany({
+          where: { id: { in: referralRewardEvents.map((row) => row.id) } },
+        });
+      }
+      if (referralLedgerTransactionIds.length > 0) {
+        await prisma.ledgerTransaction.deleteMany({
+          where: { id: { in: referralLedgerTransactionIds } },
+        });
+      }
+
       await prisma.$executeRawUnsafe(
         `DELETE FROM program_draw_eligibility_hooks WHERE businessEventId IN (${eventIds.map(() => '?').join(',') || "''"})`,
         ...eventIds,
