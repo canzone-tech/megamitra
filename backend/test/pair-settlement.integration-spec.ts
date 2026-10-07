@@ -4,6 +4,7 @@ import { AppModule } from '../src/app.module';
 import { PasswordService } from '../src/auth/password.service';
 import { configureApp } from '../src/bootstrap/configure-app';
 import { PrismaService } from '../src/database/prisma.service';
+import { ProgramAutomationService } from '../src/program/program-automation.service';
 import {
   BinaryCapOverflowMode,
   BinaryPlacementSide,
@@ -14,6 +15,7 @@ describe('MegaGoldenClub explicit binary pair matching and ledger integration', 
   let app: Awaited<ReturnType<typeof NestFactory.create>>;
   let prisma: PrismaService;
   let passwords: PasswordService;
+  let automation: ProgramAutomationService;
   let baseUrl: string;
   let accessToken: string;
   const userIds: string[] = [];
@@ -54,6 +56,7 @@ describe('MegaGoldenClub explicit binary pair matching and ledger integration', 
     baseUrl = await app.getUrl();
     prisma = app.get(PrismaService);
     passwords = app.get(PasswordService);
+    automation = app.get(ProgramAutomationService);
 
     const suffix = randomUUID().replaceAll('-', '').slice(0, 12);
     const username = `settlement_admin_${suffix}`;
@@ -442,5 +445,129 @@ describe('MegaGoldenClub explicit binary pair matching and ledger integration', 
     );
     expect(walletAfter.status).toBe(200);
     expect(Number(walletAfter.body.balance)).toBe(50);
+
+  it('automatically sweeps direct A:C and B:D slots without an operator settlement action', async () => {
+    const suffix = randomUUID().replaceAll('-', '').slice(0, 10);
+    const users = await Promise.all(
+      ['root', 'A', 'B', 'C', 'D'].map((label) =>
+        prisma.user.create({
+          data: {
+            username: `auto_settle_${label}_${suffix}`,
+            passwordHash: 'integration-not-used',
+            status: UserStatus.ACTIVE,
+          },
+        }),
+      ),
+    );
+    const [root, a, b, c, d] = users;
+    userIds.push(...users.map((user) => user.id));
+
+    for (const placement of [
+      { memberUserId: a.id, parentUserId: root.id, slot: 'A' },
+      { memberUserId: b.id, parentUserId: root.id, slot: 'B' },
+      { memberUserId: c.id, parentUserId: root.id, slot: 'C' },
+      { memberUserId: d.id, parentUserId: root.id, slot: 'D' },
+    ]) {
+      const response = await request(
+        '/admin/genealogy/placements',
+        authenticated({ method: 'POST', body: JSON.stringify(placement) }),
+      );
+      expect(response.status).toBe(201);
+    }
+
+    const plan = await request(
+      '/admin/binary-plans',
+      authenticated({
+        method: 'POST',
+        body: JSON.stringify({ code: `AUT${suffix}`, name: `Automatic settlement ${suffix}` }),
+      }),
+    );
+    expect(plan.status).toBe(201);
+    const planId = String(plan.body.id);
+    planIds.push(planId);
+
+    const draft = await request(
+      `/admin/binary-plans/${planId}/versions`,
+      authenticated({
+        method: 'POST',
+        body: JSON.stringify({
+          effectiveFrom: new Date(Date.now() - 60_000).toISOString(),
+          qualifyingUnit: '1.0000',
+          leftVolumePerPair: '1.0000',
+          rightVolumePerPair: '1.0000',
+          pairPayoutAmount: '25.00',
+          currencyCode: 'INR',
+          settlementTimezone: 'Asia/Kolkata',
+          capOverflowMode: BinaryCapOverflowMode.CARRY,
+          carryForwardEnabled: true,
+        }),
+      }),
+    );
+    expect(draft.status).toBe(201);
+    const versionId = String(draft.body.id);
+    versionIds.push(versionId);
+
+    const publish = await request(
+      `/admin/binary-plans/versions/${versionId}/publish`,
+      authenticated({ method: 'POST' }),
+    );
+    expect(publish.status).toBe(201);
+
+    const occurredBase = Date.now();
+    for (const [index, input] of [a, c, b, d].entries()) {
+      const response = await request(
+        '/admin/binary-units/events',
+        authenticated({
+          method: 'POST',
+          body: JSON.stringify({
+            sourceKey: `auto-unit-${index + 1}-${suffix}`,
+            sourceMemberUserId: input.id,
+            planVersionId: versionId,
+            occurredAt: new Date(occurredBase + index * 1_000).toISOString(),
+          }),
+        }),
+      );
+      expect(response.status).toBe(201);
+      unitEventIds.push(String((response.body.event as { id: string }).id));
+    }
+
+    const sweep = await automation.settleReadyPairs(100);
+    expect(sweep.failed).toBe(0);
+
+    const autoSettlements = await prisma.binaryPairSettlement.findMany({
+      where: { memberUserId: root.id, planVersionId: versionId },
+      select: { id: true, ledgerTransactionId: true, pairCountPayable: true, payoutAmount: true },
+    });
+    expect(autoSettlements).toHaveLength(1);
+    settlementIds.push(...autoSettlements.map((item) => item.id));
+    ledgerTransactionIds.push(
+      ...autoSettlements
+        .map((item) => item.ledgerTransactionId)
+        .filter((id): id is string => Boolean(id)),
+    );
+    expect(autoSettlements[0]?.pairCountPayable).toBe(2);
+    expect(Number(autoSettlements[0]?.payoutAmount)).toBe(50);
+
+    const matches = await prisma.binaryPairMatch.findMany({
+      where: { memberUserId: root.id, planVersionId: versionId },
+      orderBy: { pairSequence: 'asc' },
+      include: {
+        leftUnit: { select: { slot: true } },
+        rightUnit: { select: { slot: true } },
+      },
+    });
+    expect(matches.map((match) => `${match.leftUnit.slot}:${match.rightUnit.slot}`)).toEqual([
+      'A:C',
+      'B:D',
+    ]);
+
+    const wallet = await request(
+      `/admin/ledger/wallets/users/${root.id}/INR`,
+      authenticated(),
+    );
+    expect(wallet.status).toBe(200);
+    expect(Number(wallet.body.balance)).toBe(50);
+  });
+
   });
 });
