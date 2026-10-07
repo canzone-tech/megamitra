@@ -197,6 +197,7 @@ describe('MegaGoldenClub program event orchestration integration', () => {
         memberUserId: member.id,
         parentUserId: ancestor.id,
         side: BinaryPlacementSide.LEFT,
+        slot: 'A',
       },
     });
     await prisma.binaryAncestry.create({
@@ -205,6 +206,7 @@ describe('MegaGoldenClub program event orchestration integration', () => {
         descendantUserId: member.id,
         depth: 1,
         firstLegSide: BinaryPlacementSide.LEFT,
+        firstLegSlot: 'A',
       },
     });
 
