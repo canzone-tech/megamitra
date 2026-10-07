@@ -243,6 +243,25 @@ export class OwnerPortalFinanceService {
     return { items, total, page, pageSize, totalPages };
   }
 
+  async listAuthCodesForOperator(operatorUserId: string) {
+    const rows = await this.rows<Record<string, unknown> & { codeCiphertext: string | null }>(
+      `SELECT c.id, c.codeCiphertext, c.displaySuffix, c.roleScope, c.purpose,
+              'ACTIVE' AS status,
+              c.expiresAt, c.usedAt, c.revokedAt, c.createdAt,
+              operator.username AS operatorUsername
+       FROM owner_auth_codes c
+       INNER JOIN users operator ON operator.id=c.operatorUserId
+       WHERE c.operatorUserId=? AND c.status='ACTIVE'
+         AND c.expiresAt>CURRENT_TIMESTAMP(3)
+       ORDER BY c.expiresAt ASC, c.createdAt DESC`,
+      [operatorUserId],
+    );
+    return rows.map(({ codeCiphertext, ...row }) => ({
+      ...row,
+      code: codeCiphertext ? this.portal.decryptAuthCode(codeCiphertext) : null,
+    }));
+  }
+
   async listAuthCodes() {
     const rows = await this.rows<Record<string, unknown> & { codeCiphertext: string | null }>(
       `SELECT c.id, c.codeCiphertext, c.displaySuffix, c.roleScope, c.purpose,
