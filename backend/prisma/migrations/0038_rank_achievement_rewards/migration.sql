@@ -74,7 +74,7 @@ CREATE TABLE rank_monthly_payouts (
   UNIQUE KEY rank_monthly_ledger_key (ledgerTransactionId)
 ) ENGINE=InnoDB DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
--- Initial flyer is published for already-published program versions only.
+-- Seed flyer only for existing ACTIVE owner seasons backed by a published program.
 -- Future versions require an explicitly published rank policy; values remain configurable.
 INSERT INTO rank_reward_policy_versions
   (id, programVersionId, version, lifecycle, effectiveFrom, tiers, publishedAt, createdAt, updatedAt)
@@ -87,4 +87,9 @@ SELECT UUID(), pv.id, 1, 'PUBLISHED', COALESCE(pv.publishedAt, CURRENT_TIMESTAMP
          JSON_OBJECT('code','DIAMOND','name','Diamond Director','newDirect',100,'newTeam',500,'hours',2160,'cash','50000.00','monthly','5000.00','months',18,'trip','Shimla family trip')
        ),
        CURRENT_TIMESTAMP(3), CURRENT_TIMESTAMP(3), CURRENT_TIMESTAMP(3)
-FROM program_versions pv WHERE pv.lifecycle = 'PUBLISHED';
+FROM program_versions pv
+WHERE pv.lifecycle = 'PUBLISHED'
+  AND EXISTS (
+    SELECT 1 FROM owner_seasons season
+    WHERE season.programVersionId = pv.id AND season.status = 'ACTIVE'
+  );
