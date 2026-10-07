@@ -78,6 +78,9 @@ jobs:
       - name: Generate Prisma client
         run: npm run prisma:generate
 
+      - name: Verify guarded rank migration recovery (healthy database)
+        run: node scripts/recover-failed-rank-migration.mjs
+
       - name: Apply migrations
         run: npx prisma migrate deploy
 
