@@ -353,7 +353,7 @@ export function OwnerCoreV14Portal({ section, extension }: { section: OwnerCoreV
                 />
               </label>
               <label>
-                <span>View member's A/B/C/D slots ({roots.length} total members)</span>
+                <span>View A/B/C/D slots for member ({roots.length} total members)</span>
                 <select
                   aria-label="Select binary member"
                   className={styles.select}
@@ -376,7 +376,7 @@ export function OwnerCoreV14Portal({ section, extension }: { section: OwnerCoreV
                   disabled={busy}
                   onClick={() => void selectGenealogyRoot(text(root.placementParentUserId))}
                 >← BACK TO PLACEMENT PARENT: {text(root.placementParentUsername)}</button> : null}
-                <span>Selected member's four direct placement slots • OPEN = empty • FILLED = occupied</span>
+                <span>Four direct placement slots for selected member • OPEN = empty • FILLED = occupied</span>
               </div>
               <div className={styles.genealogyRootCard}>
                 <small>SELECTED MEMBER</small>
