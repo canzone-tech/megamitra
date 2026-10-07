@@ -244,6 +244,7 @@ export class OwnerPortalFinanceService {
   }
 
   async listAuthCodesForOperator(operatorUserId: string) {
+    const now = new Date();
     const rows = await this.rows<Record<string, unknown> & { codeCiphertext: string | null }>(
       `SELECT c.id, c.codeCiphertext, c.displaySuffix, c.roleScope, c.purpose,
               'ACTIVE' AS status,
@@ -252,9 +253,9 @@ export class OwnerPortalFinanceService {
        FROM owner_auth_codes c
        INNER JOIN users operator ON operator.id=c.operatorUserId
        WHERE c.operatorUserId=? AND c.status='ACTIVE'
-         AND c.expiresAt>CURRENT_TIMESTAMP(3)
+         AND c.expiresAt>?
        ORDER BY c.expiresAt ASC, c.createdAt DESC`,
-      [operatorUserId],
+      [operatorUserId, now],
     );
     return rows.map(({ codeCiphertext, ...row }) => ({
       ...row,
@@ -263,10 +264,11 @@ export class OwnerPortalFinanceService {
   }
 
   async listAuthCodes() {
+    const now = new Date();
     const rows = await this.rows<Record<string, unknown> & { codeCiphertext: string | null }>(
       `SELECT c.id, c.codeCiphertext, c.displaySuffix, c.roleScope, c.purpose,
               CASE
-                WHEN c.status='ACTIVE' AND c.expiresAt<=CURRENT_TIMESTAMP(3) THEN 'EXPIRED'
+                WHEN c.status='ACTIVE' AND c.expiresAt<=? THEN 'EXPIRED'
                 ELSE c.status
               END AS status,
               c.expiresAt, c.usedAt, c.revokedAt, c.createdAt,
@@ -274,6 +276,7 @@ export class OwnerPortalFinanceService {
        FROM owner_auth_codes c
        LEFT JOIN users operator ON operator.id=c.operatorUserId
        ORDER BY c.createdAt DESC LIMIT 200`,
+      [now],
     );
     return rows.map(({ codeCiphertext, ...row }) => ({
       ...row,
