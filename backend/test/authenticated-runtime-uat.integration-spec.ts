@@ -274,6 +274,10 @@ describe('MegaGoldenClub authenticated runtime UAT', () => {
       if (createdUserIds.length) {
         const placeholders = createdUserIds.map(() => '?').join(',');
         await prisma.$executeRawUnsafe(
+          `DELETE FROM owner_auth_codes WHERE operatorUserId IN (${placeholders})`,
+          ...createdUserIds,
+        );
+        await prisma.$executeRawUnsafe(
           `DELETE FROM binary_ancestry
            WHERE ancestorUserId IN (${placeholders}) OR descendantUserId IN (${placeholders})`,
           ...createdUserIds,
@@ -391,6 +395,125 @@ describe('MegaGoldenClub authenticated runtime UAT', () => {
       );
       const adminHeaders = bearer(adminLogin.body.accessToken);
       const agentHeaders = bearer(agentLogin.body.accessToken);
+
+      const setAdminAuthCodePermissions = await request(
+        '/admin/rbac/roles/ADMIN/permissions',
+        {
+          method: 'PUT',
+          headers: ownerHeaders,
+          body: JSON.stringify({
+            permissions: ['platform.config.read', 'platform.config.manage'],
+          }),
+        },
+      );
+      expect(setAdminAuthCodePermissions.status).toBe(200);
+      const setAgentAuthCodePermissions = await request(
+        '/admin/rbac/roles/AGENT/permissions',
+        {
+          method: 'PUT',
+          headers: ownerHeaders,
+          body: JSON.stringify({
+            permissions: ['platform.config.read', 'platform.config.manage'],
+          }),
+        },
+      );
+      expect(setAgentAuthCodePermissions.status).toBe(200);
+
+      const authCodeOperators = await request(
+        '/admin/owner-portal/auth-code-operators',
+        { headers: ownerHeaders },
+      );
+      expect(authCodeOperators.status).toBe(200);
+      const operatorRows = authCodeOperators.body as unknown as Array<{
+        id: string;
+        username: string;
+        roleScope: string;
+      }>;
+      expect(operatorRows).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            id: adminUserId,
+            username: adminUsername,
+            roleScope: 'ADMIN',
+          }),
+          expect.objectContaining({
+            id: agentUserId,
+            username: agentUsername,
+            roleScope: 'AGENT',
+          }),
+        ]),
+      );
+      expect(
+        operatorRows.some((item) => item.id === superAdmin.user.id),
+      ).toBe(false);
+
+      const wrongRoleOperator = await request('/admin/owner-portal/auth-codes', {
+        method: 'POST',
+        headers: ownerHeaders,
+        body: JSON.stringify({
+          roleScope: 'AGENT',
+          operatorUserId: adminUserId,
+          purpose: 'PAYMENT_AUTHORIZATION',
+          validityMinutes: 30,
+        }),
+      });
+      expect(wrongRoleOperator.status).toBe(400);
+
+      const generatedAuthCode = await request('/admin/owner-portal/auth-codes', {
+        method: 'POST',
+        headers: ownerHeaders,
+        body: JSON.stringify({
+          roleScope: 'ADMIN',
+          operatorUserId: adminUserId,
+          purpose: 'PAYMENT_AUTHORIZATION',
+          validityMinutes: 30,
+        }),
+      });
+      expect(generatedAuthCode.status).toBe(201);
+      expect(String(generatedAuthCode.body.code)).toMatch(/^MGC-AUTH-/);
+      expect(generatedAuthCode.body.operatorUserId).toBe(adminUserId);
+      expect(generatedAuthCode.body.operatorUsername).toBe(adminUsername);
+
+      const code = String(generatedAuthCode.body.code);
+      const wrongOperatorConsume = await request(
+        '/admin/owner-portal/auth-codes/consume',
+        {
+          method: 'POST',
+          headers: agentHeaders,
+          body: JSON.stringify({
+            code,
+            purpose: 'PAYMENT_AUTHORIZATION',
+          }),
+        },
+      );
+      expect(wrongOperatorConsume.status).toBe(400);
+
+      const assignedOperatorConsume = await request(
+        '/admin/owner-portal/auth-codes/consume',
+        {
+          method: 'POST',
+          headers: adminHeaders,
+          body: JSON.stringify({
+            code,
+            purpose: 'PAYMENT_AUTHORIZATION',
+          }),
+        },
+      );
+      expect(assignedOperatorConsume.status).toBe(201);
+      expect(assignedOperatorConsume.body.ok).toBe(true);
+
+      const reusedCode = await request(
+        '/admin/owner-portal/auth-codes/consume',
+        {
+          method: 'POST',
+          headers: adminHeaders,
+          body: JSON.stringify({
+            code,
+            purpose: 'PAYMENT_AUTHORIZATION',
+          }),
+        },
+      );
+      expect(reusedCode.status).toBe(400);
 
       const setAdminReadOnly = await request('/admin/rbac/roles/ADMIN/permissions', {
         method: 'PUT',
