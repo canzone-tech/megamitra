@@ -20,6 +20,9 @@ bash -n scripts/*.sh
 echo "==> Verifying canonical UAT documentation"
 node "${ROOT_DIR}/scripts/verify-uat-docs.mjs"
 
+echo "==> Verifying integration test data isolation"
+node "${ROOT_DIR}/scripts/verify-test-data-isolation.mjs"
+
 echo "==> Starting MegaGoldenClub data services"
 docker compose --env-file "${ROOT_DIR}/.env" -f "${ROOT_DIR}/docker-compose.yml" up -d
 
