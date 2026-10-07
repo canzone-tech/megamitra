@@ -475,6 +475,37 @@ describe('MegaGoldenClub authenticated runtime UAT', () => {
       expect(generatedAuthCode.body.operatorUsername).toBe(adminUsername);
 
       const code = String(generatedAuthCode.body.code);
+
+      const authCodeRegister = await request('/admin/owner-portal/auth-codes', {
+        headers: ownerHeaders,
+      });
+      expect(authCodeRegister.status).toBe(200);
+      const authCodeRows = authCodeRegister.body as unknown as Array<{
+        id: string;
+        code: string | null;
+        displaySuffix: string;
+        operatorUsername: string;
+        status: string;
+      }>;
+      const generatedRegisterRow = authCodeRows.find(
+        (item) => item.id === String(generatedAuthCode.body.id),
+      );
+      expect(generatedRegisterRow).toMatchObject({
+        code,
+        displaySuffix: code.slice(-6),
+        operatorUsername: adminUsername,
+        status: 'ACTIVE',
+      });
+
+      const storedCiphertext = await prisma.$queryRawUnsafe<
+        Array<{ codeCiphertext: string | null }>
+      >(
+        'SELECT codeCiphertext FROM owner_auth_codes WHERE id=? LIMIT 1',
+        String(generatedAuthCode.body.id),
+      );
+      expect(storedCiphertext[0]?.codeCiphertext).toBeTruthy();
+      expect(storedCiphertext[0]?.codeCiphertext).not.toContain(code);
+
       const wrongOperatorConsume = await request(
         '/admin/owner-portal/auth-codes/consume',
         {
@@ -501,6 +532,21 @@ describe('MegaGoldenClub authenticated runtime UAT', () => {
       );
       expect(assignedOperatorConsume.status).toBe(201);
       expect(assignedOperatorConsume.body.ok).toBe(true);
+
+      const usedAuthCodeRegister = await request('/admin/owner-portal/auth-codes', {
+        headers: ownerHeaders,
+      });
+      expect(usedAuthCodeRegister.status).toBe(200);
+      const usedAuthCodeRows = usedAuthCodeRegister.body as unknown as Array<{
+        id: string;
+        code: string | null;
+        status: string;
+      }>;
+      expect(
+        usedAuthCodeRows.find(
+          (item) => item.id === String(generatedAuthCode.body.id),
+        ),
+      ).toMatchObject({ code, status: 'USED' });
 
       const reusedCode = await request(
         '/admin/owner-portal/auth-codes/consume',
