@@ -5,7 +5,14 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { createHash, createHmac, randomBytes, randomUUID } from 'node:crypto';
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHash,
+  createHmac,
+  randomBytes,
+  randomUUID,
+} from 'node:crypto';
 import { AuditService } from '../audit/audit.service';
 import { BinaryPolicyService } from '../binary-policy/binary-policy.service';
 import { FinancialDbService } from '../database/financial-db.service';
@@ -1113,12 +1120,13 @@ export class OwnerPortalService {
     const expiresAt = new Date(Date.now() + dto.validityMinutes * 60_000);
     await this.db.execute(
       `INSERT INTO owner_auth_codes
-       (id, codeHash, displaySuffix, roleScope, purpose, operatorUserId, status, expiresAt)
-       VALUES (?, ?, ?, ?, ?, ?, 'ACTIVE', ?)`,
+       (id, codeHash, displaySuffix, codeCiphertext, roleScope, purpose, operatorUserId, status, expiresAt)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'ACTIVE', ?)`,
       [
         id,
         this.secretHash('auth', raw),
         raw.slice(-6),
+        this.encryptAuthCode(raw),
         dto.roleScope,
         dto.purpose,
         operator.id,
@@ -1686,6 +1694,45 @@ export class OwnerPortalService {
 
   private dayEnd(value: string) {
     return `${value.slice(0, 10)}T23:59:59.999Z`;
+  }
+
+  private authCodeEncryptionKey() {
+    return createHash('sha256')
+      .update(
+        `owner-portal:auth-code:cipher:${this.config.getOrThrow<string>(
+          'CAPTCHA_HMAC_SECRET',
+        )}`,
+      )
+      .digest();
+  }
+
+  private encryptAuthCode(raw: string) {
+    const iv = randomBytes(12);
+    const cipher = createCipheriv('aes-256-gcm', this.authCodeEncryptionKey(), iv);
+    const encrypted = Buffer.concat([cipher.update(raw, 'utf8'), cipher.final()]);
+    const tag = cipher.getAuthTag();
+    return [iv, tag, encrypted].map((part) => part.toString('base64url')).join('.');
+  }
+
+  decryptAuthCode(payload: string) {
+    try {
+      const [ivRaw, tagRaw, encryptedRaw] = payload.split('.');
+      if (!ivRaw || !tagRaw || !encryptedRaw) throw new Error('invalid payload');
+      const decipher = createDecipheriv(
+        'aes-256-gcm',
+        this.authCodeEncryptionKey(),
+        Buffer.from(ivRaw, 'base64url'),
+      );
+      decipher.setAuthTag(Buffer.from(tagRaw, 'base64url'));
+      return Buffer.concat([
+        decipher.update(Buffer.from(encryptedRaw, 'base64url')),
+        decipher.final(),
+      ]).toString('utf8');
+    } catch {
+      throw new ConflictException(
+        'Authorization code secret cannot be decrypted with the current server key',
+      );
+    }
   }
 
   private readableSecret(prefix: string) {
