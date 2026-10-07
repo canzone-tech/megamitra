@@ -445,6 +445,7 @@ describe('MegaGoldenClub explicit binary pair matching and ledger integration', 
     );
     expect(walletAfter.status).toBe(200);
     expect(Number(walletAfter.body.balance)).toBe(50);
+  });
 
   it('automatically sweeps direct A:C and B:D slots without an operator settlement action', async () => {
     const suffix = randomUUID().replaceAll('-', '').slice(0, 10);
@@ -567,7 +568,5 @@ describe('MegaGoldenClub explicit binary pair matching and ledger integration', 
     );
     expect(wallet.status).toBe(200);
     expect(Number(wallet.body.balance)).toBe(50);
-  });
-
   });
 });
