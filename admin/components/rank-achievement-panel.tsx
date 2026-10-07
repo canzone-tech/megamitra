@@ -149,7 +149,7 @@ export function RankAchievementPanel() {
       {error ? <div className={styles.notice}>{error}</div> : null}
       {notice ? <div className={styles.notice}>{notice}</div> : null}
       <div className={styles.notice}>
-        Each level starts a fresh direct-referral and sponsor-team member count. All deadlines remain anchored to the original paid joining date. Verified cash bonuses and 18-month monthly incomes are automatically posted to the member wallet; family-trip fulfilment is recorded manually.
+        Each level starts a fresh direct-referral and sponsor-team member count. All deadlines remain anchored to the original paid joining date. Verified cash bonuses and eligible monthly income are credited automatically. Gold and Diamond incomes never run together: Diamond achievement immediately closes future Gold installments, while previously due Gold installments remain valid. Each tier's 18 months is a maximum, not a second concurrent salary. Family-trip fulfilment is recorded manually.
       </div>
       {displayTiers.length ? <div className={styles.tableBox}>
         <table className={styles.table}>
@@ -161,7 +161,7 @@ export function RankAchievementPanel() {
             <td>{deadlineText(tier.hours)}</td>
             <td>{money(tier.cash)}</td>
             <td>{tier.trip ?? '—'}</td>
-            <td>{Number(tier.monthly) > 0 ? money(tier.monthly) + ' × ' + tier.months + ' months' : '—'}</td>
+            <td>{Number(tier.monthly) > 0 ? money(tier.monthly) + ' × up to ' + tier.months + ' months' : '—'}</td>
           </tr>)}</tbody>
         </table>
       </div> : <div className={styles.notice}>No published rank-bonus policy for a program version. Publish a policy before rewards become payable.</div>}
