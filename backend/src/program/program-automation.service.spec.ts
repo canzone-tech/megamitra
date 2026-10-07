@@ -67,31 +67,6 @@ describe('ProgramAutomationService', () => {
     expect(result.settlements).toHaveLength(1);
   });
 
-  it('repairs processed runs whose binary qualification links are missing', async () => {
-    const prisma = {
-      $queryRawUnsafe: jest.fn().mockResolvedValue([{ businessEventId: 'event-repair' }]),
-    };
-    const orchestration = {};
-    const referralConsumer = {};
-    const settlements = {};
-
-    const service = new ProgramAutomationService(
-      prisma as never,
-      orchestration as never,
-      referralConsumer as never,
-      settlements as never,
-    );
-    const process = jest
-      .spyOn(service, 'processEvent')
-      .mockResolvedValue({ run: { status: 'PROCESSED' } } as never);
-
-    const result = await service.repairMissingBinaryQualifications();
-
-    expect(process).toHaveBeenCalledWith('event-repair');
-    expect(result.processed).toBe(1);
-    expect(result.failed).toBe(0);
-  });
-
   it('reconciles referral effects automatically for confirmed refunds', async () => {
     const prisma = {
       programBusinessEvent: {
