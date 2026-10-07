@@ -55,8 +55,49 @@ for (const file of candidates) {
 const packageJson = JSON.parse(
   readFileSync(resolve(rootDir, 'backend/package.json'), 'utf8'),
 );
-if (!String(packageJson.scripts?.['test:integration'] ?? '').includes('NODE_ENV=test')) {
-  throw new Error('backend/package.json: test:integration must force NODE_ENV=test');
+if (
+  packageJson.scripts?.['test:integration'] !==
+  'bash scripts/run-integration-tests-isolated.sh'
+) {
+  throw new Error(
+    'backend/package.json: test:integration must use the isolated integration runner',
+  );
+}
+if (
+  !String(packageJson.scripts?.['test:integration:raw'] ?? '').includes(
+    'NODE_ENV=test',
+  )
+) {
+  throw new Error(
+    'backend/package.json: test:integration:raw must force NODE_ENV=test',
+  );
+}
+
+const isolatedRunner = readFileSync(
+  resolve(rootDir, 'backend/scripts/run-integration-tests-isolated.sh'),
+  'utf8',
+);
+for (const required of [
+  'TEST_DB=',
+  'trap drop_test_db EXIT INT TERM',
+  'npx prisma migrate deploy',
+  'npm run test:integration:raw',
+]) {
+  if (!isolatedRunner.includes(required)) {
+    throw new Error(
+      `backend/scripts/run-integration-tests-isolated.sh: missing isolation contract ${JSON.stringify(required)}`,
+    );
+  }
+}
+
+const localVerify = readFileSync(
+  resolve(rootDir, 'backend/scripts/verify-local.sh'),
+  'utf8',
+);
+if (!localVerify.includes('cleanup-stale-integration-staff.ts')) {
+  throw new Error(
+    'backend/scripts/verify-local.sh: stale integration staff cleanup must run before local integration verification',
+  );
 }
 
 for (const workerPath of [
