@@ -26,6 +26,10 @@ type BinaryGenealogyRootRow = {
   status: string;
   createdAt: Date | string;
   directChildCount: string | number | bigint;
+  sponsorUsername: string | null;
+  sponsorUserId: string | null;
+  placementParentUsername: string | null;
+  placementParentUserId: string | null;
 };
 type BinaryGenealogyMemberRow = {
   id: string;
@@ -35,6 +39,8 @@ type BinaryGenealogyMemberRow = {
   status: string;
   parentUserId: string;
   parentUsername: string;
+  sponsorUsername: string | null;
+  sponsorUserId: string | null;
   slot: BinaryPlacementSlot;
   side: 'LEFT' | 'RIGHT';
   depth: number;
@@ -203,18 +209,27 @@ export class OwnerPortalCoreService {
   }
 
   async binaryGenealogy(reference?: string) {
+    // Any member can be inspected, even when their placement is below a different
+    // binary parent than their sponsor. Do not restrict the selector to top-level
+    // roots or to the 100 most recently joined members.
     const roots = await this.rows<BinaryGenealogyRootRow>(
       `SELECT u.id, u.username, u.firstName, u.lastName, u.status, u.createdAt,
-              COUNT(child.id) AS directChildCount
+              COUNT(child.id) AS directChildCount,
+              sr.sponsorUserId, sponsor.username AS sponsorUsername,
+              bp.parentUserId AS placementParentUserId,
+              placement_parent.username AS placementParentUsername
        FROM users u
        INNER JOIN user_roles ur ON ur.userId=u.id
        INNER JOIN roles role ON role.id=ur.roleId AND role.name='MEMBER' AND role.status='ACTIVE'
-       LEFT JOIN binary_placements own_placement ON own_placement.memberUserId=u.id
+       LEFT JOIN binary_placements bp ON bp.memberUserId=u.id
+       LEFT JOIN users placement_parent ON placement_parent.id=bp.parentUserId
+       LEFT JOIN sponsor_relationships sr ON sr.memberUserId=u.id
+       LEFT JOIN users sponsor ON sponsor.id=sr.sponsorUserId
        LEFT JOIN binary_placements child ON child.parentUserId=u.id
-       WHERE own_placement.id IS NULL
-       GROUP BY u.id, u.username, u.firstName, u.lastName, u.status, u.createdAt
-       ORDER BY directChildCount DESC, u.createdAt ASC, u.username ASC
-       LIMIT 100`,
+       GROUP BY u.id, u.username, u.firstName, u.lastName, u.status, u.createdAt,
+                sr.sponsorUserId, sponsor.username, bp.parentUserId, placement_parent.username
+       ORDER BY CASE WHEN bp.parentUserId IS NULL THEN 0 ELSE 1 END,
+                directChildCount DESC, u.createdAt ASC, u.username ASC`,
     );
 
     let root: Omit<BinaryGenealogyRootRow, 'directChildCount'> & { directChildCount: number } | null = null;
@@ -223,13 +238,20 @@ export class OwnerPortalCoreService {
       const selected = await this.resolveUser(normalizedReference);
       const selectedRows = await this.rows<BinaryGenealogyRootRow>(
         `SELECT u.id, u.username, u.firstName, u.lastName, u.status, u.createdAt,
-                (SELECT COUNT(*) FROM binary_placements child WHERE child.parentUserId=u.id) AS directChildCount
+                (SELECT COUNT(*) FROM binary_placements child WHERE child.parentUserId=u.id) AS directChildCount,
+                sr.sponsorUserId, sponsor.username AS sponsorUsername,
+                bp.parentUserId AS placementParentUserId,
+                placement_parent.username AS placementParentUsername
          FROM users u
+         LEFT JOIN binary_placements bp ON bp.memberUserId=u.id
+         LEFT JOIN users placement_parent ON placement_parent.id=bp.parentUserId
+         LEFT JOIN sponsor_relationships sr ON sr.memberUserId=u.id
+         LEFT JOIN users sponsor ON sponsor.id=sr.sponsorUserId
          WHERE u.id=? LIMIT 1`,
         [selected.id],
       );
       const selectedRoot = selectedRows[0];
-      if (!selectedRoot) throw new NotFoundException('Binary root member was not found');
+      if (!selectedRoot) throw new NotFoundException('Binary member was not found');
       root = { ...selectedRoot, directChildCount: Number(selectedRoot.directChildCount ?? 0) };
     } else if (roots[0]) {
       root = { ...roots[0], directChildCount: Number(roots[0].directChildCount ?? 0) };
@@ -247,11 +269,14 @@ export class OwnerPortalCoreService {
     const members = await this.rows<BinaryGenealogyMemberRow>(
       `SELECT u.id, u.username, u.firstName, u.lastName, u.status,
               bp.parentUserId, parent.username AS parentUsername,
+              sr.sponsorUserId, sponsor.username AS sponsorUsername,
               bp.slot, bp.side, ba.depth, ba.firstLegSlot, ba.firstLegSide
        FROM binary_ancestry ba
        INNER JOIN users u ON u.id=ba.descendantUserId
        INNER JOIN binary_placements bp ON bp.memberUserId=ba.descendantUserId
        INNER JOIN users parent ON parent.id=bp.parentUserId
+       LEFT JOIN sponsor_relationships sr ON sr.memberUserId=u.id
+       LEFT JOIN users sponsor ON sponsor.id=sr.sponsorUserId
        WHERE ba.ancestorUserId=?
        ORDER BY ba.depth ASC,
                 FIELD(ba.firstLegSlot, 'A','B','C','D'),
