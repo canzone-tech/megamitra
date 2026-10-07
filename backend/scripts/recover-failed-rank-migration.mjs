@@ -83,6 +83,7 @@ function databaseOptions() {
     password: decodeURIComponent(url.password),
     database,
     timezone: '+00:00',
+    allowPublicKeyRetrieval: true,
     connectTimeout: 5000,
   };
 }
