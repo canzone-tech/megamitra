@@ -194,6 +194,7 @@ export class ProgramAutomationService {
       `SELECT r.businessEventId
        FROM program_event_processing_runs r
        INNER JOIN program_event_policy_versions p ON p.id = r.policyVersionId
+       INNER JOIN program_business_events be ON be.id = r.businessEventId
        WHERE r.status = 'PROCESSED' AND r.eligible = 1
          AND p.binaryPlanVersionId IS NOT NULL
          AND p.binaryUnitsPerEvent > 0
@@ -202,7 +203,7 @@ export class ProgramAutomationService {
            FROM program_binary_qualification_links l
            WHERE l.runId = r.id
          ) < p.binaryUnitsPerEvent
-       ORDER BY r.completedAt ASC, r.createdAt ASC
+       ORDER BY be.occurredAt ASC, be.createdAt ASC, r.createdAt ASC
        LIMIT ${safeLimit}`,
     );
 
