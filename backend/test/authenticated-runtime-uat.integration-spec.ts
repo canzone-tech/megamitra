@@ -476,6 +476,34 @@ describe('MegaGoldenClub authenticated runtime UAT', () => {
 
       const code = String(generatedAuthCode.body.code);
 
+      const adminMyAuthCodes = await request(
+        '/admin/owner-portal/auth-codes/mine',
+        { headers: adminHeaders },
+      );
+      expect(adminMyAuthCodes.status).toBe(200);
+      expect(
+        (adminMyAuthCodes.body as unknown as Array<{ id: string; code: string }>).find(
+          (item) => item.id === String(generatedAuthCode.body.id),
+        ),
+      ).toMatchObject({ code });
+
+      const agentMyAuthCodes = await request(
+        '/admin/owner-portal/auth-codes/mine',
+        { headers: agentHeaders },
+      );
+      expect(agentMyAuthCodes.status).toBe(200);
+      expect(
+        (agentMyAuthCodes.body as unknown as Array<{ id: string }>).some(
+          (item) => item.id === String(generatedAuthCode.body.id),
+        ),
+      ).toBe(false);
+
+      const superAdminMineDenied = await request(
+        '/admin/owner-portal/auth-codes/mine',
+        { headers: ownerHeaders },
+      );
+      expect(superAdminMineDenied.status).toBe(403);
+
       const duplicateActiveAuthCode = await request(
         '/admin/owner-portal/auth-codes',
         {
@@ -550,6 +578,17 @@ describe('MegaGoldenClub authenticated runtime UAT', () => {
       );
       expect(assignedOperatorConsume.status).toBe(201);
       expect(assignedOperatorConsume.body.ok).toBe(true);
+
+      const adminMyAuthCodesAfterConsume = await request(
+        '/admin/owner-portal/auth-codes/mine',
+        { headers: adminHeaders },
+      );
+      expect(adminMyAuthCodesAfterConsume.status).toBe(200);
+      expect(
+        (adminMyAuthCodesAfterConsume.body as unknown as Array<{ id: string }>).some(
+          (item) => item.id === String(generatedAuthCode.body.id),
+        ),
+      ).toBe(false);
 
       const usedAuthCodeRegister = await request('/admin/owner-portal/auth-codes', {
         headers: ownerHeaders,
