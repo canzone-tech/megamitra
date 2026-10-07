@@ -135,8 +135,11 @@ export class RevokeEpinDto {
   @IsOptional() @IsString() @MaxLength(255) reason?: string;
 }
 
+export const OWNER_AUTH_ROLE_SCOPES = ['ADMIN', 'AGENT'] as const;
+
 export class GenerateOwnerAuthCodeDto {
-  @IsString() @Length(2, 40) roleScope!: string;
+  @IsIn(OWNER_AUTH_ROLE_SCOPES) roleScope!: (typeof OWNER_AUTH_ROLE_SCOPES)[number];
+  @IsString() @Length(36, 36) operatorUserId!: string;
   @IsIn(OWNER_AUTH_PURPOSES) purpose!: (typeof OWNER_AUTH_PURPOSES)[number];
   @IsInt() @Min(1) @Max(1440) validityMinutes!: number;
 }
