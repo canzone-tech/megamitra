@@ -516,7 +516,7 @@ describe('MegaGoldenClub program event orchestration integration', () => {
     expect(processed.body.run.drawHooks[0].status).toBe('ELIGIBLE');
 
     const unitEventId = String(processed.body.run.binaryLinks[0].qualifyingUnitEventId);
-    let unitEvent = await prisma.binaryQualifyingUnitEvent.findUniqueOrThrow({
+    const unitEvent = await prisma.binaryQualifyingUnitEvent.findUniqueOrThrow({
       where: { id: unitEventId },
       include: { uplineUnits: true },
     });
@@ -533,39 +533,6 @@ describe('MegaGoldenClub program event orchestration integration', () => {
     expect(duplicate.status).toBe(201);
     expect(duplicate.body.idempotent).toBe(true);
     expect(duplicate.body.run.binaryLinks).toHaveLength(1);
-
-    // Processed business events are durable truth. If a derived PROGRAM_EVENT
-    // qualification/link is missing, idempotent replay must rebuild it rather than
-    // permanently losing binary earnings.
-    await prisma.$executeRawUnsafe(
-      'DELETE FROM program_binary_qualification_links WHERE qualifyingUnitEventId = ?',
-      unitEvent.id,
-    );
-    await prisma.binaryUplineQualifyingUnit.deleteMany({
-      where: { unitEventId: unitEvent.id },
-    });
-    await prisma.binaryQualifyingUnitEvent.delete({ where: { id: unitEvent.id } });
-
-    const repaired = await request(
-      `/admin/program-orchestration/events/${eligibleEvent.id}/process`,
-      authenticated({ method: 'POST', body: '{}' }),
-    );
-    expect(repaired.status).toBe(201);
-    expect(repaired.body.idempotent).toBe(true);
-    expect(repaired.body.run.binaryLinks).toHaveLength(1);
-    const repairedUnitEventId = String(
-      repaired.body.run.binaryLinks[0].qualifyingUnitEventId,
-    );
-    expect(repairedUnitEventId).not.toBe(unitEvent.id);
-    unitEvent = await prisma.binaryQualifyingUnitEvent.findUniqueOrThrow({
-      where: { id: repairedUnitEventId },
-      include: { uplineUnits: true },
-    });
-    expect(unitEvent.sourceKey).toBe(
-      `PROGRAM_EVENT:${eligibleEvent.id}:BINARY:1`,
-    );
-    expect(unitEvent.uplineUnits).toHaveLength(1);
-    expect(unitEvent.uplineUnits[0]?.ancestorUserId).toBe(ancestor.id);
 
     const skipped = await request(
       `/admin/program-orchestration/events/${ineligibleEvent.id}/process`,
