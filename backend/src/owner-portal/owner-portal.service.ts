@@ -1099,40 +1099,73 @@ export class OwnerPortalService {
   }
 
   async generateAuthCode(dto: GenerateOwnerAuthCodeDto, actorUserId: string) {
-    const operators = await this.rows<{ id: string; username: string }>(
-      `SELECT u.id, u.username
-       FROM users u
-       INNER JOIN user_roles ur ON ur.userId=u.id
-       INNER JOIN roles r ON r.id=ur.roleId
-       WHERE u.id=? AND u.status='ACTIVE' AND r.status='ACTIVE' AND r.name=?
-       LIMIT 1`,
-      [dto.operatorUserId, dto.roleScope],
-    );
-    const operator = operators[0];
-    if (!operator) {
-      throw new BadRequestException(
-        `Selected operator must be an active ${dto.roleScope} account`,
-      );
-    }
-
     const raw = this.readableSecret('MGC-AUTH');
     const id = randomUUID();
     const expiresAt = new Date(Date.now() + dto.validityMinutes * 60_000);
-    await this.db.execute(
-      `INSERT INTO owner_auth_codes
-       (id, codeHash, displaySuffix, codeCiphertext, roleScope, purpose, operatorUserId, status, expiresAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'ACTIVE', ?)`,
-      [
-        id,
-        this.secretHash('auth', raw),
-        raw.slice(-6),
-        this.encryptAuthCode(raw),
-        dto.roleScope,
-        dto.purpose,
-        operator.id,
-        expiresAt,
-      ],
-    );
+
+    const operator = await this.db.transaction(async (connection) => {
+      // Serialize generation per operator so double-clicks/concurrent requests
+      // cannot create two active codes for the same operator and purpose.
+      const users = (await connection.query(
+        `SELECT id, username
+         FROM users
+         WHERE id=? AND status='ACTIVE'
+         LIMIT 1 FOR UPDATE`,
+        [dto.operatorUserId],
+      )) as { id: string; username: string }[];
+      const selected = users[0];
+      if (!selected) {
+        throw new BadRequestException('Selected operator must be an active account');
+      }
+
+      const roles = (await connection.query(
+        `SELECT r.name
+         FROM user_roles ur
+         INNER JOIN roles r ON r.id=ur.roleId
+         WHERE ur.userId=? AND r.status='ACTIVE' AND r.name=?
+         LIMIT 1`,
+        [selected.id, dto.roleScope],
+      )) as { name: string }[];
+      if (!roles[0]) {
+        throw new BadRequestException(
+          `Selected operator must be an active ${dto.roleScope} account`,
+        );
+      }
+
+      const existing = (await connection.query(
+        `SELECT id, expiresAt
+         FROM owner_auth_codes
+         WHERE operatorUserId=? AND purpose=? AND status='ACTIVE'
+           AND expiresAt>CURRENT_TIMESTAMP(3)
+         ORDER BY createdAt DESC
+         LIMIT 1`,
+        [selected.id, dto.purpose],
+      )) as { id: string; expiresAt: Date }[];
+      if (existing[0]) {
+        throw new ConflictException(
+          'An active authorization code already exists for this operator and purpose',
+        );
+      }
+
+      await connection.query(
+        `INSERT INTO owner_auth_codes
+         (id, codeHash, displaySuffix, codeCiphertext, roleScope, purpose, operatorUserId, status, expiresAt)
+         VALUES (?, ?, ?, ?, ?, ?, ?, 'ACTIVE', ?)`,
+        [
+          id,
+          this.secretHash('auth', raw),
+          raw.slice(-6),
+          this.encryptAuthCode(raw),
+          dto.roleScope,
+          dto.purpose,
+          selected.id,
+          expiresAt,
+        ],
+      );
+
+      return selected;
+    });
+
     await this.audit.log({
       actorUserId,
       action: AuditAction.CREATE,
