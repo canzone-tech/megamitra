@@ -110,6 +110,8 @@ describe('MegaGoldenClub program event orchestration integration', () => {
   let accessToken: string;
   const userIds: string[] = [];
   const eventIds: string[] = [];
+  const cleanupQualifyingEventIds: string[] = [];
+  let externalSentinelQualifyingEventId: string | null = null;
   const paymentIds: string[] = [];
   const attemptIds: string[] = [];
   const enrollmentIds: string[] = [];
@@ -177,6 +179,35 @@ describe('MegaGoldenClub program event orchestration integration', () => {
 
   afterAll(async () => {
     if (prisma) {
+      const linkedQualifyingEvents =
+        eventIds.length > 0
+          ? await prisma.$queryRawUnsafe<Array<{ qualifyingUnitEventId: string }>>(
+              `SELECT qualifyingUnitEventId
+               FROM program_binary_qualification_links
+               WHERE businessEventId IN (${eventIds.map(() => '?').join(',')})`,
+              ...eventIds,
+            )
+          : [];
+      const qualifyingEventIds = [
+        ...new Set([
+          ...linkedQualifyingEvents.map((row) => row.qualifyingUnitEventId),
+          ...cleanupQualifyingEventIds,
+        ]),
+      ];
+      await deleteProgramEventQualifyingArtifacts(prisma, qualifyingEventIds);
+
+      if (externalSentinelQualifyingEventId) {
+        const preservedSentinel = await prisma.binaryQualifyingUnitEvent.findUnique({
+          where: { id: externalSentinelQualifyingEventId },
+          select: { id: true },
+        });
+        expect(preservedSentinel?.id).toBe(externalSentinelQualifyingEventId);
+        await prisma.binaryQualifyingUnitEvent.delete({
+          where: { id: externalSentinelQualifyingEventId },
+        });
+        externalSentinelQualifyingEventId = null;
+      }
+
       await prisma.$executeRawUnsafe(
         `DELETE FROM program_draw_eligibility_hooks WHERE businessEventId IN (${eventIds.map(() => '?').join(',') || "''"})`,
         ...eventIds,
@@ -197,13 +228,6 @@ describe('MegaGoldenClub program event orchestration integration', () => {
         `DELETE FROM program_event_policy_versions WHERE id IN (${policyIds.map(() => '?').join(',') || "''"})`,
         ...policyIds,
       );
-
-      const qualifyingEvents = await prisma.binaryQualifyingUnitEvent.findMany({
-        where: { sourceKey: { startsWith: 'PROGRAM_EVENT:' } },
-        select: { id: true },
-      });
-      const qualifyingEventIds = qualifyingEvents.map((row) => row.id);
-      await deleteProgramEventQualifyingArtifacts(prisma, qualifyingEventIds);
 
       await prisma.auditLog.deleteMany({
         where: {
@@ -481,7 +505,7 @@ describe('MegaGoldenClub program event orchestration integration', () => {
     expect(processed.body.run.drawHooks[0].status).toBe('ELIGIBLE');
 
     const unitEventId = String(processed.body.run.binaryLinks[0].qualifyingUnitEventId);
-    const unitEvent = await prisma.binaryQualifyingUnitEvent.findUniqueOrThrow({
+    let unitEvent = await prisma.binaryQualifyingUnitEvent.findUniqueOrThrow({
       where: { id: unitEventId },
       include: { uplineUnits: true },
     });
@@ -498,6 +522,39 @@ describe('MegaGoldenClub program event orchestration integration', () => {
     expect(duplicate.status).toBe(201);
     expect(duplicate.body.idempotent).toBe(true);
     expect(duplicate.body.run.binaryLinks).toHaveLength(1);
+
+    // Processed business events are durable truth. If a derived PROGRAM_EVENT
+    // qualification/link is missing, idempotent replay must rebuild it rather than
+    // permanently losing binary earnings.
+    await prisma.$executeRawUnsafe(
+      'DELETE FROM program_binary_qualification_links WHERE qualifyingUnitEventId = ?',
+      unitEvent.id,
+    );
+    await prisma.binaryUplineQualifyingUnit.deleteMany({
+      where: { unitEventId: unitEvent.id },
+    });
+    await prisma.binaryQualifyingUnitEvent.delete({ where: { id: unitEvent.id } });
+
+    const repaired = await request(
+      `/admin/program-orchestration/events/${eligibleEvent.id}/process`,
+      authenticated({ method: 'POST', body: '{}' }),
+    );
+    expect(repaired.status).toBe(201);
+    expect(repaired.body.idempotent).toBe(true);
+    expect(repaired.body.run.binaryLinks).toHaveLength(1);
+    const repairedUnitEventId = String(
+      repaired.body.run.binaryLinks[0].qualifyingUnitEventId,
+    );
+    expect(repairedUnitEventId).not.toBe(unitEvent.id);
+    unitEvent = await prisma.binaryQualifyingUnitEvent.findUniqueOrThrow({
+      where: { id: repairedUnitEventId },
+      include: { uplineUnits: true },
+    });
+    expect(unitEvent.sourceKey).toBe(
+      `PROGRAM_EVENT:${eligibleEvent.id}:BINARY:1`,
+    );
+    expect(unitEvent.uplineUnits).toHaveLength(1);
+    expect(unitEvent.uplineUnits[0]?.ancestorUserId).toBe(ancestor.id);
 
     const skipped = await request(
       `/admin/program-orchestration/events/${ineligibleEvent.id}/process`,
@@ -550,6 +607,7 @@ describe('MegaGoldenClub program event orchestration integration', () => {
         occurredAt: new Date(),
       },
     });
+    cleanupQualifyingEventIds.push(cleanupRightEvent.id);
     const cleanupRightUnit = await prisma.binaryUplineQualifyingUnit.create({
       data: {
         unitEventId: cleanupRightEvent.id,
@@ -600,5 +658,19 @@ describe('MegaGoldenClub program event orchestration integration', () => {
         payoutAmount: '10.00',
       },
     });
+
+    // This represents unrelated persisted UAT/business data. Test teardown must
+    // never discover it through a global PROGRAM_EVENT prefix sweep.
+    const externalSentinel = await prisma.binaryQualifyingUnitEvent.create({
+      data: {
+        sourceKey: `PROGRAM_EVENT:UAT-SENTINEL:${suffix}`,
+        requestFingerprint: 'd'.repeat(64),
+        sourceMemberUserId: cleanupSibling.id,
+        planVersionId: binaryVersion.id,
+        eventType: 'QUALIFY',
+        occurredAt: new Date(),
+      },
+    });
+    externalSentinelQualifyingEventId = externalSentinel.id;
   });
 });
