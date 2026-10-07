@@ -565,7 +565,7 @@ describe('MegaGoldenClub authenticated runtime UAT', () => {
       );
       expect(wrongOperatorConsume.status).toBe(400);
 
-      const assignedOperatorConsume = await request(
+      const assignedOperatorUse = await request(
         '/admin/owner-portal/auth-codes/consume',
         {
           method: 'POST',
@@ -576,47 +576,106 @@ describe('MegaGoldenClub authenticated runtime UAT', () => {
           }),
         },
       );
-      expect(assignedOperatorConsume.status).toBe(201);
-      expect(assignedOperatorConsume.body.ok).toBe(true);
+      expect(assignedOperatorUse.status).toBe(201);
+      expect(assignedOperatorUse.body.ok).toBe(true);
 
-      const adminMyAuthCodesAfterConsume = await request(
+      const repeatedOperatorUse = await request(
+        '/admin/owner-portal/auth-codes/consume',
+        {
+          method: 'POST',
+          headers: adminHeaders,
+          body: JSON.stringify({
+            code,
+            purpose: 'PAYMENT_AUTHORIZATION',
+          }),
+        },
+      );
+      expect(repeatedOperatorUse.status).toBe(201);
+      expect(repeatedOperatorUse.body.ok).toBe(true);
+
+      const adminMyAuthCodesAfterUse = await request(
         '/admin/owner-portal/auth-codes/mine',
         { headers: adminHeaders },
       );
-      expect(adminMyAuthCodesAfterConsume.status).toBe(200);
+      expect(adminMyAuthCodesAfterUse.status).toBe(200);
       expect(
-        (adminMyAuthCodesAfterConsume.body as unknown as Array<{ id: string }>).some(
+        (adminMyAuthCodesAfterUse.body as unknown as Array<{
+          id: string;
+          code: string;
+          status: string;
+        }>).find(
+          (item) => item.id === String(generatedAuthCode.body.id),
+        ),
+      ).toMatchObject({ code, status: 'ACTIVE' });
+
+      const activeAuthCodeRegister = await request('/admin/owner-portal/auth-codes', {
+        headers: ownerHeaders,
+      });
+      expect(activeAuthCodeRegister.status).toBe(200);
+      const activeAuthCodeRows = activeAuthCodeRegister.body as unknown as Array<{
+        id: string;
+        code: string | null;
+        status: string;
+        usedAt: string | null;
+      }>;
+      const activeAfterUse = activeAuthCodeRows.find(
+        (item) => item.id === String(generatedAuthCode.body.id),
+      );
+      expect(activeAfterUse).toMatchObject({ code, status: 'ACTIVE' });
+      expect(activeAfterUse?.usedAt).toBeTruthy();
+
+      const duplicateAfterUse = await request('/admin/owner-portal/auth-codes', {
+        method: 'POST',
+        headers: ownerHeaders,
+        body: JSON.stringify({
+          roleScope: 'ADMIN',
+          operatorUserId: adminUserId,
+          purpose: 'PAYMENT_AUTHORIZATION',
+          validityMinutes: 30,
+        }),
+      });
+      expect(duplicateAfterUse.status).toBe(409);
+
+      const expiredAt = new Date(Date.now() - 60_000);
+      await prisma.$executeRawUnsafe(
+        'UPDATE owner_auth_codes SET expiresAt=? WHERE id=?',
+        expiredAt,
+        String(generatedAuthCode.body.id),
+      );
+
+      const adminMyAuthCodesAfterExpiry = await request(
+        '/admin/owner-portal/auth-codes/mine',
+        { headers: adminHeaders },
+      );
+      expect(adminMyAuthCodesAfterExpiry.status).toBe(200);
+      expect(
+        (adminMyAuthCodesAfterExpiry.body as unknown as Array<{ id: string }>).some(
           (item) => item.id === String(generatedAuthCode.body.id),
         ),
       ).toBe(false);
 
-      const usedAuthCodeRegister = await request('/admin/owner-portal/auth-codes', {
+      const expiredUse = await request('/admin/owner-portal/auth-codes/consume', {
+        method: 'POST',
+        headers: adminHeaders,
+        body: JSON.stringify({
+          code,
+          purpose: 'PAYMENT_AUTHORIZATION',
+        }),
+      });
+      expect(expiredUse.status).toBe(400);
+
+      const expiredAuthCodeRegister = await request('/admin/owner-portal/auth-codes', {
         headers: ownerHeaders,
       });
-      expect(usedAuthCodeRegister.status).toBe(200);
-      const usedAuthCodeRows = usedAuthCodeRegister.body as unknown as Array<{
-        id: string;
-        code: string | null;
-        status: string;
-      }>;
+      expect(expiredAuthCodeRegister.status).toBe(200);
       expect(
-        usedAuthCodeRows.find(
+        (expiredAuthCodeRegister.body as unknown as Array<{
+          id: string;
+          status: string;
+        }>).find(
           (item) => item.id === String(generatedAuthCode.body.id),
         ),
-      ).toMatchObject({ code, status: 'USED' });
-
-      const reusedCode = await request(
-        '/admin/owner-portal/auth-codes/consume',
-        {
-          method: 'POST',
-          headers: adminHeaders,
-          body: JSON.stringify({
-            code,
-            purpose: 'PAYMENT_AUTHORIZATION',
-          }),
-        },
-      );
-      expect(reusedCode.status).toBe(400);
+      ).toMatchObject({ status: 'EXPIRED' });
 
       const replacementRequest = () =>
         request('/admin/owner-portal/auth-codes', {
