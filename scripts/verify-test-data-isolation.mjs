@@ -52,6 +52,23 @@ for (const file of candidates) {
   }
 }
 
+const packageJson = JSON.parse(
+  readFileSync(resolve(rootDir, 'backend/package.json'), 'utf8'),
+);
+if (!String(packageJson.scripts?.['test:integration'] ?? '').includes('NODE_ENV=test')) {
+  throw new Error('backend/package.json: test:integration must force NODE_ENV=test');
+}
+
+for (const workerPath of [
+  'backend/src/program/program-automation.service.ts',
+  'backend/src/rank-achievement/rank-achievement.service.ts',
+]) {
+  const worker = readFileSync(resolve(rootDir, workerPath), 'utf8');
+  if (!worker.includes("process.env.JEST_WORKER_ID")) {
+    throw new Error(`${workerPath}: background worker must hard-disable under Jest`);
+  }
+}
+
 const orchestrationPath = resolve(
   rootDir,
   'backend/test/program-orchestration.integration-spec.ts',
