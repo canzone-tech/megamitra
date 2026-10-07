@@ -100,11 +100,27 @@ describe('MegaGoldenClub explicit binary pair matching and ledger integration', 
           ],
         },
       });
+      const discoveredSettlements = await prisma.binaryPairSettlement.findMany({
+        where: {
+          OR: [
+            { memberUserId: { in: userIds } },
+            { planVersionId: { in: versionIds } },
+          ],
+        },
+        select: { id: true, ledgerTransactionId: true },
+      });
+      settlementIds.push(...discoveredSettlements.map((item) => item.id));
+      ledgerTransactionIds.push(
+        ...discoveredSettlements
+          .map((item) => item.ledgerTransactionId)
+          .filter((id): id is string => Boolean(id)),
+      );
+      const cleanupSettlementIds = [...new Set(settlementIds)];
       await prisma.binaryPairMatch.deleteMany({
-        where: { settlementId: { in: settlementIds } },
+        where: { settlementId: { in: cleanupSettlementIds } },
       });
       await prisma.binaryUnitDisposition.deleteMany({
-        where: { settlementId: { in: settlementIds } },
+        where: { settlementId: { in: cleanupSettlementIds } },
       });
       const ownedAccounts = await prisma.ledgerAccount.findMany({
         where: { ownerUserId: { in: userIds } },
@@ -123,7 +139,7 @@ describe('MegaGoldenClub explicit binary pair matching and ledger integration', 
         where: { transactionId: { in: cleanupTransactionIds } },
       });
       await prisma.binaryPairSettlement.deleteMany({
-        where: { id: { in: settlementIds } },
+        where: { id: { in: cleanupSettlementIds } },
       });
       await prisma.ledgerTransaction.deleteMany({
         where: { id: { in: cleanupTransactionIds } },
