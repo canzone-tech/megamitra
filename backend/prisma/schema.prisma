@@ -81,6 +81,13 @@ enum BinaryPlacementSide {
   RIGHT
 }
 
+enum BinaryPlacementSlot {
+  A
+  B
+  C
+  D
+}
+
 enum BinaryVolumeEventType {
   CREDIT
   ADJUSTMENT
@@ -710,13 +717,15 @@ model BinaryPlacement {
   memberUserId    String              @unique @db.Char(36)
   parentUserId    String              @db.Char(36)
   side            BinaryPlacementSide
+  slot            BinaryPlacementSlot
   createdByUserId String?             @db.Char(36)
   createdAt       DateTime            @default(now()) @db.DateTime(3)
   member          User                @relation("PlacementMember", fields: [memberUserId], references: [id], onDelete: Restrict)
   parent          User                @relation("PlacementParent", fields: [parentUserId], references: [id], onDelete: Restrict)
 
-  @@unique([parentUserId, side])
+  @@unique([parentUserId, slot], map: "binary_placements_parentUserId_slot_key")
   @@index([parentUserId])
+  @@index([parentUserId, side, slot], map: "binary_placements_parentUserId_side_slot_idx")
   @@map("binary_placements")
 }
 
@@ -725,6 +734,7 @@ model BinaryAncestry {
   descendantUserId String              @db.Char(36)
   depth            Int
   firstLegSide     BinaryPlacementSide
+  firstLegSlot     BinaryPlacementSlot
   createdAt        DateTime            @default(now()) @db.DateTime(3)
   ancestor         User                @relation("BinaryAncestor", fields: [ancestorUserId], references: [id], onDelete: Restrict)
   descendant       User                @relation("BinaryDescendant", fields: [descendantUserId], references: [id], onDelete: Restrict)
@@ -732,6 +742,7 @@ model BinaryAncestry {
   @@id([ancestorUserId, descendantUserId])
   @@index([ancestorUserId, depth])
   @@index([descendantUserId, depth])
+  @@index([ancestorUserId, firstLegSlot, depth], map: "binary_ancestry_ancestor_slot_depth_idx")
   @@map("binary_ancestry")
 }
 
@@ -819,6 +830,7 @@ model BinaryUplineVolumeCredit {
   ancestorUserId String              @db.Char(36)
   planVersionId  String              @db.Char(36)
   side           BinaryPlacementSide
+  slot           BinaryPlacementSlot
   depth          Int
   volume         Decimal             @db.Decimal(18, 4)
   createdAt      DateTime            @default(now()) @db.DateTime(3)
@@ -828,6 +840,7 @@ model BinaryUplineVolumeCredit {
 
   @@unique([volumeEventId, ancestorUserId])
   @@index([ancestorUserId, side, createdAt])
+  @@index([ancestorUserId, slot, createdAt], map: "binary_upline_volume_credits_ancestor_slot_createdAt_idx")
   @@index([planVersionId, createdAt])
   @@map("binary_upline_volume_credits")
 }
@@ -861,6 +874,7 @@ model BinaryUplineQualifyingUnit {
   ancestorUserId String                     @db.Char(36)
   planVersionId  String                     @db.Char(36)
   side           BinaryPlacementSide
+  slot           BinaryPlacementSlot
   depth          Int
   sequence       Int
   createdAt      DateTime                   @default(now()) @db.DateTime(3)
@@ -872,8 +886,8 @@ model BinaryUplineQualifyingUnit {
   disposition    BinaryUnitDisposition?
 
   @@unique([unitEventId, ancestorUserId], map: "binary_upline_qualifying_units_event_ancestor_key")
-  @@unique([ancestorUserId, planVersionId, side, sequence], map: "binary_upline_qualifying_units_sequence_key")
-  @@index([ancestorUserId, planVersionId, side, sequence], map: "binary_upline_qualifying_units_queue_idx")
+  @@unique([ancestorUserId, planVersionId, slot, sequence], map: "binary_upline_qualifying_units_sequence_key")
+  @@index([ancestorUserId, planVersionId, slot, sequence], map: "binary_upline_qualifying_units_queue_idx")
   @@index([planVersionId, createdAt], map: "binary_upline_qualifying_units_plan_idx")
   @@map("binary_upline_qualifying_units")
 }
