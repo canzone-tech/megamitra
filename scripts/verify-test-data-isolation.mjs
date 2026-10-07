@@ -79,7 +79,9 @@ const isolatedRunner = readFileSync(
 );
 for (const required of [
   'TEST_DB=',
-  'trap drop_test_db EXIT INT TERM',
+  'trap drop_test_db EXIT',
+  "trap 'exit 130' INT",
+  "trap 'exit 143' TERM",
   'npx prisma migrate deploy',
   'npm run test:integration:raw',
 ]) {
