@@ -75,21 +75,22 @@ export function RankAchievementPanel() {
     ]);
     setOverview(summary);
     setPolicies(versions);
-    setSelected((current) => current && versions.some((p) => p.id === current)
-      ? current : versions.find((p) => p.lifecycle === 'PUBLISHED')?.id ?? versions[0]?.id ?? '');
-  }, []);
+    const currentPolicy = versions.find((p) => p.id === selected)
+      ?? versions.find((p) => p.lifecycle === 'PUBLISHED') ?? versions[0];
+    setSelected(currentPolicy?.id ?? '');
+    setEditing(currentPolicy?.tiers.map((tier) => ({ ...tier })) ?? []);
+  }, [selected]);
 
   useEffect(() => {
-    void load().catch((reason: unknown) => setError(message(reason)));
+    const timer = setTimeout(() => {
+      void load().catch((reason: unknown) => setError(message(reason)));
+    }, 0);
+    return () => clearTimeout(timer);
   }, [load]);
 
   const policy = policies.find((p) => p.id === selected);
   const active = overview.policies[0];
   const displayTiers = active?.tiers ?? [];
-
-  useEffect(() => {
-    setEditing(policy ? policy.tiers.map((tier) => ({ ...tier })) : []);
-  }, [policy?.id, policy?.tiers]);
 
   async function perform(work: () => Promise<unknown>, success: string) {
     setBusy(true);
@@ -200,7 +201,11 @@ export function RankAchievementPanel() {
         <small>Admin governance • Draft → Publish</small>
       </div>
       <div className={styles.buttonLine}>
-        <select className={styles.select} disabled={busy} value={selected} onChange={(event) => setSelected(event.target.value)}>
+        <select className={styles.select} disabled={busy} value={selected} onChange={(event) => {
+            const id = event.target.value;
+            setSelected(id);
+            setEditing(policies.find((p) => p.id === id)?.tiers.map((tier) => ({ ...tier })) ?? []);
+          }}>
           {policies.map((p) => <option key={p.id} value={p.id}>
             {p.programVersion.program.code} • Version {p.version} • {p.lifecycle}
           </option>)}
