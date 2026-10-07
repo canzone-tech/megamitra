@@ -1074,7 +1074,40 @@ export class OwnerPortalService {
     return { ok: true };
   }
 
+  async listAuthCodeOperators() {
+    return this.rows<{
+      id: string;
+      username: string;
+      firstName: string | null;
+      lastName: string | null;
+      roleScope: 'ADMIN' | 'AGENT';
+    }>(
+      `SELECT u.id, u.username, u.firstName, u.lastName, r.name AS roleScope
+       FROM users u
+       INNER JOIN user_roles ur ON ur.userId=u.id
+       INNER JOIN roles r ON r.id=ur.roleId
+       WHERE u.status='ACTIVE' AND r.status='ACTIVE' AND r.name IN ('ADMIN','AGENT')
+       ORDER BY r.name ASC, u.username ASC`,
+    );
+  }
+
   async generateAuthCode(dto: GenerateOwnerAuthCodeDto, actorUserId: string) {
+    const operators = await this.rows<{ id: string; username: string }>(
+      `SELECT u.id, u.username
+       FROM users u
+       INNER JOIN user_roles ur ON ur.userId=u.id
+       INNER JOIN roles r ON r.id=ur.roleId
+       WHERE u.id=? AND u.status='ACTIVE' AND r.status='ACTIVE' AND r.name=?
+       LIMIT 1`,
+      [dto.operatorUserId, dto.roleScope],
+    );
+    const operator = operators[0];
+    if (!operator) {
+      throw new BadRequestException(
+        `Selected operator must be an active ${dto.roleScope} account`,
+      );
+    }
+
     const raw = this.readableSecret('MGC-AUTH');
     const id = randomUUID();
     const expiresAt = new Date(Date.now() + dto.validityMinutes * 60_000);
@@ -1082,7 +1115,15 @@ export class OwnerPortalService {
       `INSERT INTO owner_auth_codes
        (id, codeHash, displaySuffix, roleScope, purpose, operatorUserId, status, expiresAt)
        VALUES (?, ?, ?, ?, ?, ?, 'ACTIVE', ?)`,
-      [id, this.secretHash('auth', raw), raw.slice(-6), dto.roleScope.trim().toUpperCase(), dto.purpose, actorUserId, expiresAt],
+      [
+        id,
+        this.secretHash('auth', raw),
+        raw.slice(-6),
+        dto.roleScope,
+        dto.purpose,
+        operator.id,
+        expiresAt,
+      ],
     );
     await this.audit.log({
       actorUserId,
@@ -1090,9 +1131,23 @@ export class OwnerPortalService {
       entityType: 'OwnerAuthCode',
       entityId: id,
       description: 'Purpose-bound operation authorization code generated',
-      metadata: { purpose: dto.purpose, roleScope: dto.roleScope, expiresAt },
+      metadata: {
+        purpose: dto.purpose,
+        roleScope: dto.roleScope,
+        operatorUserId: operator.id,
+        operatorUsername: operator.username,
+        expiresAt,
+      },
     });
-    return { id, code: raw, expiresAt, purpose: dto.purpose };
+    return {
+      id,
+      code: raw,
+      expiresAt,
+      purpose: dto.purpose,
+      roleScope: dto.roleScope,
+      operatorUserId: operator.id,
+      operatorUsername: operator.username,
+    };
   }
 
   async listAuthCodes() {
@@ -1106,13 +1161,24 @@ export class OwnerPortalService {
     const hash = this.secretHash('auth', dto.code);
     return this.db.transaction(async (connection) => {
       const rows = (await connection.query(
-        `SELECT id, operatorUserId, expiresAt FROM owner_auth_codes
-         WHERE codeHash=? AND purpose=? AND status='ACTIVE' LIMIT 1 FOR UPDATE`,
-        [hash, dto.purpose],
+        `SELECT c.id, c.operatorUserId, c.expiresAt
+         FROM owner_auth_codes c
+         INNER JOIN users u
+           ON u.id=c.operatorUserId AND u.status='ACTIVE'
+         INNER JOIN user_roles ur
+           ON ur.userId=u.id
+         INNER JOIN roles r
+           ON r.id=ur.roleId AND r.status='ACTIVE' AND r.name=c.roleScope
+         WHERE c.codeHash=? AND c.purpose=? AND c.status='ACTIVE'
+           AND c.operatorUserId=?
+         LIMIT 1 FOR UPDATE`,
+        [hash, dto.purpose, actorUserId],
       )) as { id: string; operatorUserId: string; expiresAt: Date }[];
       const row = rows[0];
       if (!row || new Date(row.expiresAt) <= new Date()) {
-        throw new BadRequestException('Authorization code is invalid or expired');
+        throw new BadRequestException(
+          'Authorization code is invalid, expired, or not assigned to this operator',
+        );
       }
       await connection.query(
         "UPDATE owner_auth_codes SET status='USED', usedAt=CURRENT_TIMESTAMP(3) WHERE id=?",
