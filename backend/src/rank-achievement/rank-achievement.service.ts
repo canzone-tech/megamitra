@@ -26,6 +26,13 @@ export type RankTier = {
   trip: string | null;
 };
 
+type RecurringRankRow = {
+  id: string;
+  tierCode: string;
+  achievedAt: Date;
+  policyTiers: unknown;
+};
+
 type EnrollmentRow = {
   id: string;
   userId: string;
@@ -274,7 +281,10 @@ export class RankAchievementService {
       }
     }
 
-    // Recurring payments are independent of new ranks and must catch up after downtime.
+    // Recurring income is EXCLUSIVE: on promotion, the higher tier replaces the lower
+    // tier immediately. Previously due lower-tier installments remain eligible.
+    // Rank awards are evaluated first so a same-cycle promotion closes the old income.
+    // Missed installments catch up without creating simultaneous Gold/Diamond income.
     const achievements = await this.prisma.rankAchievement.findMany({
       where: { monthlyMonths: { gt: 0 }, monthlyAmount: { gt: 0 }, enrollmentId: { in: qualified.map((e) => e.id) } },
       include: { enrollment: { select: { currencyCode: true } }, monthlyPayouts: { select: { sequence: true } } },
@@ -287,8 +297,8 @@ export class RankAchievementService {
           if (existing.has(period)) continue;
           const dueAt = this.monthAfter(row.achievedAt, period);
           if (dueAt > now) break;
-          await this.postMonthly(row.id, row.userId, row.tierCode, row.enrollmentId, row.enrollment.currencyCode, dueAt, period, row.monthlyAmount.toString());
-          monthlyPaid++;
+          const posted = await this.postMonthly(row.id, row.userId, row.tierCode, row.enrollmentId, row.enrollment.currencyCode, dueAt, period, row.monthlyAmount.toString());
+          if (posted) monthlyPaid++;
         }
       } catch (error) {
         failed++;
@@ -405,7 +415,20 @@ export class RankAchievementService {
         'SELECT id FROM rank_monthly_payouts WHERE achievementId=? AND sequence=? LIMIT 1',
         [achievementId, sequence],
       );
-      if (prior.length > 0) return;
+      if (prior.length > 0) return false;
+      // Recheck inside the same financial transaction and enrollment mutex as award().
+      // The most recently achieved income tier is the ONLY payable tier for dueAt.
+      // An older tier can still receive past-due installments from before promotion,
+      // but never an installment due at or after the higher rank's achievement instant.
+      const recurringRanks = await connection.query<RecurringRankRow[]>(
+        `SELECT a.id, a.tierCode, a.achievedAt, v.tiers AS policyTiers
+         FROM rank_achievements a
+         INNER JOIN rank_reward_policy_versions v ON v.id = a.policyVersionId
+         WHERE a.enrollmentId = ? AND a.monthlyMonths > 0 AND a.monthlyAmount > 0
+           AND a.achievedAt <= ?`,
+        [enrollmentId, this.utcSql(dueAt)],
+      );
+      if (this.activeRecurringRankId(recurringRanks) !== achievementId) return false;
       const member = await this.prisma.user.findUnique({
         where: { id: userId }, select: { username: true },
       });
@@ -419,7 +442,26 @@ export class RankAchievementService {
         'INSERT INTO rank_monthly_payouts (id,achievementId,sequence,dueAt,amount,ledgerTransactionId,createdAt) VALUES (?,?,?,?,?,?,CURRENT_TIMESTAMP(3))',
         [randomUUID(), achievementId, sequence, this.utcSql(dueAt), amount, transactionId],
       );
+      return true;
     });
+  }
+
+  // If milestones share an instant, the later tier in the versioned policy wins.
+  // No rank-specific names or payout amounts are hardcoded into promotion logic.
+  private activeRecurringRankId(rows: RecurringRankRow[]): string | null {
+    let active: { id: string; at: number; priority: number } | null = null;
+    for (const row of rows) {
+      const raw: unknown = typeof row.policyTiers === 'string'
+        ? JSON.parse(row.policyTiers) as unknown : row.policyTiers;
+      const priority = this.validateTiers(raw).findIndex((tier) => tier.code === row.tierCode);
+      if (priority < 0) throw new ConflictException('Rank income policy tier no longer matches achievement');
+      const at = new Date(row.achievedAt).getTime();
+      if (!Number.isFinite(at)) throw new ConflictException('Rank achievement instant is invalid');
+      if (!active || at > active.at || (at === active.at && priority > active.priority)) {
+        active = { id: row.id, at, priority };
+      }
+    }
+    return active?.id ?? null;
   }
 
   private async lock(connection: PoolConnection, mutex: string) {
