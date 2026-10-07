@@ -41,7 +41,9 @@ drop_test_db() {
   printf 'DROP DATABASE IF EXISTS `%s`;\n' "${TEST_DB}" |
     compose exec -T mysql sh -lc 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD"' >/dev/null
 }
-trap drop_test_db EXIT INT TERM
+trap drop_test_db EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 printf "CREATE DATABASE `%s` CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci;\nGRANT ALL PRIVILEGES ON `%s`.* TO '%s'@'%%';\nFLUSH PRIVILEGES;\n"   "${TEST_DB}" "${TEST_DB}" "${APP_USER}" |
   compose exec -T mysql sh -lc 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD"' >/dev/null
