@@ -45,6 +45,9 @@ echo "==> Validating and generating Prisma client"
 npm run prisma:validate
 npm run prisma:generate
 
+echo "==> Checking for safely recoverable rank migration interruption"
+node scripts/recover-failed-rank-migration.mjs
+
 echo "==> Applying pending MegaGoldenClub migrations"
 npx prisma migrate deploy
 npx prisma migrate status
