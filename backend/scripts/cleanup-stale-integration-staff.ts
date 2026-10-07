@@ -1,3 +1,4 @@
+import 'dotenv/config';
 import { PrismaService } from '../src/database/prisma.service';
 
 const TEST_STAFF_PREFIXES = [
