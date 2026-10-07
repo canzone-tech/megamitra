@@ -1,5 +1,7 @@
-import 'dotenv/config';
+import { loadEnvFile } from 'node:process';
 import { PrismaService } from '../src/database/prisma.service';
+
+loadEnvFile();
 
 const TEST_STAFF_PREFIXES = [
   '__uat_verify_admin_',
