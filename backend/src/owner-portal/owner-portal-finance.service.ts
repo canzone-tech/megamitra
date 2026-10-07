@@ -244,8 +244,8 @@ export class OwnerPortalFinanceService {
   }
 
   async listAuthCodes() {
-    return this.rows<Record<string, unknown>>(
-      `SELECT c.id, c.displaySuffix, c.roleScope, c.purpose,
+    const rows = await this.rows<Record<string, unknown> & { codeCiphertext: string | null }>(
+      `SELECT c.id, c.codeCiphertext, c.displaySuffix, c.roleScope, c.purpose,
               CASE
                 WHEN c.status='ACTIVE' AND c.expiresAt<=CURRENT_TIMESTAMP(3) THEN 'EXPIRED'
                 ELSE c.status
@@ -256,6 +256,10 @@ export class OwnerPortalFinanceService {
        LEFT JOIN users operator ON operator.id=c.operatorUserId
        ORDER BY c.createdAt DESC LIMIT 200`,
     );
+    return rows.map(({ codeCiphertext, ...row }) => ({
+      ...row,
+      code: codeCiphertext ? this.portal.decryptAuthCode(codeCiphertext) : null,
+    }));
   }
 
   private formatPaymentRow(row: PaymentListRow) {
