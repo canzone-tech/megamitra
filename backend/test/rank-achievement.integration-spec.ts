@@ -64,7 +64,7 @@ describe('MegaGoldenClub Lightning/level cash rank ledger integration', () => {
     if (app) await app.close();
   });
 
-  it('automatically credits a balanced, idempotent Lightning bonus once for four new paid direct referrals', async () => {
+  it('credits Lightning once and never overlaps Gold/Diamond recurring rank income', async () => {
     const suffix = randomUUID().replaceAll('-', '').slice(0, 10);
     const joiningAt = new Date(Date.now() - 2 * 60 * 60 * 1000);
     const referralAt = new Date(joiningAt.getTime() + 60 * 60 * 1000);
@@ -152,5 +152,51 @@ describe('MegaGoldenClub Lightning/level cash rank ledger integration', () => {
     expect(second.awarded).toBe(0);
     const replayWallet = await ledger.getUserWallet(sponsor.id, 'INR');
     expect(Number(replayWallet.balance)).toBe(1000);
+
+    // Fixture prior ranks solely to exercise the income scheduler, not achievement
+    // qualification. Diamond begins at the exact instant Gold month #4 is due:
+    // Gold #1–#3 remain payable, Gold #4–#18 MUST never be credited.
+    const sponsorEnrollment = await prisma.programEnrollment.findFirstOrThrow({
+      where: { userId: sponsor.id, programVersionId },
+    });
+    const year = new Date().getUTCFullYear() + 2;
+    const goldAt = new Date(Date.UTC(year, 0, 5, 12));
+    const diamondAt = new Date(Date.UTC(year, 4, 5, 12));
+    const asOf = new Date(Date.UTC(year, 7, 20, 12));
+    await prisma.rankAchievement.createMany({ data: [
+      {
+        id: randomUUID(), enrollmentId: sponsorEnrollment.id, userId: sponsor.id,
+        policyVersionId: draft.id, tierCode: 'GOLD', tierName: 'Gold Leader',
+        directCount: 50, teamCount: 250, deadlineAt: goldAt, achievedAt: goldAt,
+        cashAmount: '0.00', monthlyAmount: '2000.00', monthlyMonths: 18,
+      },
+      {
+        id: randomUUID(), enrollmentId: sponsorEnrollment.id, userId: sponsor.id,
+        policyVersionId: draft.id, tierCode: 'DIAMOND', tierName: 'Diamond Director',
+        directCount: 100, teamCount: 500, deadlineAt: diamondAt, achievedAt: diamondAt,
+        cashAmount: '0.00', monthlyAmount: '5000.00', monthlyMonths: 18,
+      },
+    ] });
+
+    const afterPromotion = await ranks.runCycle(asOf);
+    expect(afterPromotion.failed).toBe(0);
+    expect(afterPromotion.monthlyPaid).toBe(6);
+    const recurring = await prisma.rankAchievement.findMany({
+      where: { enrollmentId: sponsorEnrollment.id, tierCode: { in: ['GOLD', 'DIAMOND'] } },
+      include: { monthlyPayouts: { orderBy: { sequence: 'asc' } } },
+    });
+    const gold = recurring.find((a) => a.tierCode === 'GOLD');
+    const diamond = recurring.find((a) => a.tierCode === 'DIAMOND');
+    expect(gold?.monthlyPayouts.map((p) => p.sequence)).toEqual([1, 2, 3]);
+    expect(diamond?.monthlyPayouts.map((p) => p.sequence)).toEqual([1, 2, 3]);
+    expect(gold?.monthlyPayouts.every((p) => p.dueAt < diamondAt)).toBe(true);
+    expect(diamond?.monthlyPayouts.every((p) => p.dueAt > diamondAt)).toBe(true);
+    const promotedWallet = await ledger.getUserWallet(sponsor.id, 'INR');
+    expect(Number(promotedWallet.balance)).toBe(22000); // 1k fast-start + 6k Gold + 15k Diamond
+
+    const rerun = await ranks.runCycle(asOf);
+    expect(rerun.monthlyPaid).toBe(0);
+    const stableWallet = await ledger.getUserWallet(sponsor.id, 'INR');
+    expect(Number(stableWallet.balance)).toBe(22000);
   });
 });
