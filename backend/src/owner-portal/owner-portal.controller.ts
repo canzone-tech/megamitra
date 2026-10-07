@@ -379,6 +379,12 @@ export class OwnerPortalController {
     return this.portal.revokeEpin(id, dto, actor.id);
   }
 
+  @Permissions('platform.config.read')
+  @Get('auth-code-operators')
+  authCodeOperators() {
+    return this.portal.listAuthCodeOperators();
+  }
+
   @Permissions('platform.config.manage')
   @Post('auth-codes')
   generateAuthCode(
