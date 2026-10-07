@@ -5,6 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import { ApiClientError, apiJson } from '@/lib/client-api';
 import { MemberSearchSelect } from './member-search-select';
+import { RankAchievementPanel } from './rank-achievement-panel';
 import { OwnerManagementShell } from './owner-management-shell';
 import { WorkspaceTabs } from './workspace-tabs';
 import styles from './owner-portal.module.css';
@@ -248,6 +249,7 @@ export function OwnerCoreV14Portal({ section, extension }: { section: OwnerCoreV
     return <>
       <Hero title="9 Income / Reward Types" subtitle="Read-only overview. No standalone income editor exists." pill="INFORMATIONAL • NOT AN EDITOR" />
       <div className={styles.card}><IncomeCards season={active} currencyCode={currency} /></div>
+      <RankAchievementPanel />
       <div className={styles.card}>
         <SectionHead icon="🧮" title="Core Calculation" />
         <div className={styles.notice}><b>Direct Referral:</b> {money(active.directReferral, currency)} per qualifying direct referral. <b>Binary Pair:</b> A:C or B:D = one qualifying pair at {money(active.pairValue, currency)}. <b>Daily cap:</b> {money(active.dailyCap, currency)}.</div>
@@ -444,7 +446,7 @@ function IncomeCards({ season, currencyCode }: { season: Row; currencyCode: stri
     ['Direct Referral', money(season.directReferral, currencyCode), 'Per qualifying direct referral'],
     ['Binary Pair', money(season.pairValue, currencyCode), 'A:C or B:D = one qualifying pair'],
     ['Daily Performance', `${money(season.dailyCap, currencyCode)} Cap`, 'Configured daily maximum'],
-    ['Rank Achievement', 'Information only', 'Formula not defined in supplied source'],
+    ['Rank Achievement', 'Auto Level 1–4', 'Joining-date targets and fresh direct/team members; see below'],
     ['Leadership', 'Information only', 'Formula not defined in supplied source'],
     ['Monthly Lucky Draw', 'Prize Based', 'Monthwise prize schedule'],
     ['Recognition Reward', 'Information only', 'Formula not defined in supplied source'],
