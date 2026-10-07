@@ -383,7 +383,7 @@ export class RankAchievementService {
           cashAmount,monthlyAmount,monthlyMonths,tripDescription,tripStatus,ledgerTransactionId,createdAt)
          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,CURRENT_TIMESTAMP(3))`,
         [randomUUID(), enrollment.id, enrollment.userId, policyVersionId, tier.code, tier.name,
-          directCount, teamCount, deadlineAt, achievedAt, tier.cash, tier.monthly, tier.months,
+          directCount, teamCount, this.utcSql(deadlineAt), this.utcSql(achievedAt), tier.cash, tier.monthly, tier.months,
           tier.trip, tier.trip ? 'PENDING' : 'NOT_APPLICABLE', transactionId],
       );
     });
@@ -417,7 +417,7 @@ export class RankAchievementService {
       );
       await connection.query(
         'INSERT INTO rank_monthly_payouts (id,achievementId,sequence,dueAt,amount,ledgerTransactionId,createdAt) VALUES (?,?,?,?,?,?,CURRENT_TIMESTAMP(3))',
-        [randomUUID(), achievementId, sequence, dueAt, amount, transactionId],
+        [randomUUID(), achievementId, sequence, this.utcSql(dueAt), amount, transactionId],
       );
     });
   }
@@ -453,7 +453,7 @@ export class RankAchievementService {
     const id = randomUUID();
     await connection.query(
       'INSERT INTO ledger_transactions (id,sourceKey,type,description,occurredAt,createdByUserId,createdAt) VALUES (?,?,?,?,?,?,CURRENT_TIMESTAMP(3))',
-      [id, sourceKey, type, description, at, userId],
+      [id, sourceKey, type, description, this.utcSql(at), userId],
     );
     await connection.query(
       `INSERT INTO ledger_entries (id,transactionId,accountId,direction,amount,currencyCode,createdAt)
@@ -462,6 +462,10 @@ export class RankAchievementService {
         randomUUID(), id, walletId, 'CREDIT', amount, currency],
     );
     return id;
+  }
+
+  private utcSql(value: Date) {
+    return value.toISOString().slice(0, 23).replace('T', ' ');
   }
 
   monthAfter(date: Date, months: number) {
