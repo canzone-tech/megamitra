@@ -476,6 +476,24 @@ describe('MegaGoldenClub authenticated runtime UAT', () => {
 
       const code = String(generatedAuthCode.body.code);
 
+      const duplicateActiveAuthCode = await request(
+        '/admin/owner-portal/auth-codes',
+        {
+          method: 'POST',
+          headers: ownerHeaders,
+          body: JSON.stringify({
+            roleScope: 'ADMIN',
+            operatorUserId: adminUserId,
+            purpose: 'PAYMENT_AUTHORIZATION',
+            validityMinutes: 60,
+          }),
+        },
+      );
+      expect(duplicateActiveAuthCode.status).toBe(409);
+      expect(String(duplicateActiveAuthCode.body.message)).toContain(
+        'active authorization code already exists',
+      );
+
       const authCodeRegister = await request('/admin/owner-portal/auth-codes', {
         headers: ownerHeaders,
       });
@@ -560,6 +578,30 @@ describe('MegaGoldenClub authenticated runtime UAT', () => {
         },
       );
       expect(reusedCode.status).toBe(400);
+
+      const replacementRequest = () =>
+        request('/admin/owner-portal/auth-codes', {
+          method: 'POST',
+          headers: ownerHeaders,
+          body: JSON.stringify({
+            roleScope: 'ADMIN',
+            operatorUserId: adminUserId,
+            purpose: 'PAYMENT_AUTHORIZATION',
+            validityMinutes: 30,
+          }),
+        });
+      const replacementResults = await Promise.all([
+        replacementRequest(),
+        replacementRequest(),
+      ]);
+      expect(replacementResults.map((result) => result.status).sort()).toEqual([
+        201,
+        409,
+      ]);
+      const replacement = replacementResults.find(
+        (result) => result.status === 201,
+      );
+      expect(String(replacement?.body.code)).toMatch(/^MGC-AUTH-/);
 
       const setAdminReadOnly = await request('/admin/rbac/roles/ADMIN/permissions', {
         method: 'PUT',
