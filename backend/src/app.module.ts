@@ -57,6 +57,7 @@ import { WithdrawalModule } from './withdrawal/withdrawal.module';
     BinaryUnitModule,
     BinarySettlementModule,
     ReferralRewardModule,
+    RankAchievementModule,
     ProgramModule,
     MemberPaymentModule,
     LuckyDrawModule,
