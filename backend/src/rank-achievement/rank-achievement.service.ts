@@ -36,15 +36,7 @@ type EnrollmentRow = {
   payments: Array<{ amount: { toString(): string }; refunds: Array<{ amount: { toString(): string } }> }>;
 };
 
-type PayoutInfo = {
-  id: string;
-  enrollmentId: string;
-  userId: string;
-  tierCode: string;
-  tierName: string;
-  achievedAt: Date;
-  monthlyAmount: { toString(): string };
-  monthlyMonths: number;
+ monthlyMonths: number;
   currencyCode: string;
 };
 
