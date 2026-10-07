@@ -149,7 +149,7 @@ export function RankAchievementPanel() {
       {error ? <div className={styles.notice}>{error}</div> : null}
       {notice ? <div className={styles.notice}>{notice}</div> : null}
       <div className={styles.notice}>
-        Each level starts a fresh direct-referral and sponsor-team member count. All deadlines remain anchored to the original paid joining date. Verified cash bonuses and eligible monthly income are credited automatically. Gold and Diamond incomes never run together: Diamond achievement immediately closes future Gold installments, while previously due Gold installments remain valid. Each tier's 18 months is a maximum, not a second concurrent salary. Family-trip fulfilment is recorded manually.
+        Each level starts a fresh direct-referral and sponsor-team member count. All deadlines remain anchored to the original paid joining date. Verified cash bonuses and eligible monthly income are credited automatically. Gold and Diamond incomes never run together: Diamond achievement immediately closes future Gold installments, while previously due Gold installments remain valid. The 18-month term is a maximum for each tier, never two concurrent incomes. Family-trip fulfilment is recorded manually.
       </div>
       {displayTiers.length ? <div className={styles.tableBox}>
         <table className={styles.table}>
