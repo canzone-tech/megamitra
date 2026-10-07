@@ -17,6 +17,9 @@ fi
 echo "==> Validating operational shell scripts"
 bash -n scripts/*.sh
 
+echo "==> Verifying canonical UAT documentation"
+node "${ROOT_DIR}/scripts/verify-uat-docs.mjs"
+
 echo "==> Starting MegaGoldenClub data services"
 docker compose --env-file "${ROOT_DIR}/.env" -f "${ROOT_DIR}/docker-compose.yml" up -d
 
