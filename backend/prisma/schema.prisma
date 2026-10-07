@@ -164,6 +164,7 @@ enum LedgerAccountKind {
   USER_WALLET
   COMMISSION_EXPENSE
   REFERRAL_REWARD_EXPENSE
+  RANK_REWARD_EXPENSE
 }
 
 enum LedgerEntryDirection {
@@ -176,6 +177,8 @@ enum LedgerTransactionType {
   REFERRAL_REWARD
   ADJUSTMENT
   REVERSAL
+  RANK_ACHIEVEMENT
+  RANK_MONTHLY
 }
 
 model User {
@@ -222,6 +225,7 @@ model User {
   kycSubmissions            KycSubmission[]              @relation("KycSubmissionUser")
   kycReviews                KycSubmission[]              @relation("KycReviewer")
   ledgerAccounts            LedgerAccount[]              @relation("LedgerAccountOwner")
+  rankAchievements          RankAchievement[]            @relation("RankAchievementMember")
 
   @@index([email])
   @@index([phone])
@@ -530,6 +534,7 @@ model ProgramVersion {
   updatedAt                   DateTime             @updatedAt @db.DateTime(3)
   program                     Program              @relation(fields: [programId], references: [id], onDelete: Restrict)
   enrollments                 ProgramEnrollment[]
+  rankPolicies                RankRewardPolicyVersion[]
 
   @@unique([programId, version], map: "program_versions_program_version_key")
   @@index([programId, lifecycle], map: "program_versions_program_lifecycle_idx")
@@ -564,6 +569,7 @@ model ProgramEnrollment {
   paymentAllocations        ProgramPaymentAllocation[]
   refunds                   ProgramRefundRecord[]
   businessEvents            ProgramBusinessEvent[]
+  rankAchievements          RankAchievement[]
 
   @@index([userId, status, enrolledAt], map: "program_enrollments_user_status_idx")
   @@index([programVersionId, status, enrolledAt], map: "program_enrollments_version_status_idx")
@@ -1083,6 +1089,8 @@ model LedgerTransaction {
   entries             LedgerEntry[]
   binarySettlement    BinaryPairSettlement?
   referralRewardEvent ReferralRewardEvent?
+  rankAchievement     RankAchievement?
+  rankMonthlyPayout   RankMonthlyPayout?
 
   @@index([type, occurredAt])
   @@index([createdAt])
@@ -1103,4 +1111,77 @@ model LedgerEntry {
   @@index([transactionId])
   @@index([accountId, createdAt])
   @@map("ledger_entries")
+}
+
+model RankRewardPolicyVersion {
+  id               String            @id @db.Char(36)
+  programVersionId String            @db.Char(36)
+  version          Int
+  lifecycle        PolicyLifecycle   @default(DRAFT)
+  effectiveFrom    DateTime          @db.DateTime(3)
+  effectiveTo      DateTime?         @db.DateTime(3)
+  tiers            Json
+  createdByUserId  String?           @db.Char(36)
+  publishedAt      DateTime?         @db.DateTime(3)
+  createdAt        DateTime          @default(now()) @db.DateTime(3)
+  updatedAt        DateTime          @updatedAt @db.DateTime(3)
+  programVersion   ProgramVersion    @relation(fields: [programVersionId], references: [id], onDelete: Restrict)
+  achievements     RankAchievement[]
+
+  @@unique([programVersionId, version], map: "rank_policy_program_version_key")
+  @@index([programVersionId, lifecycle, effectiveFrom], map: "rank_policy_active_idx")
+  @@map("rank_reward_policy_versions")
+}
+
+enum RankTripStatus {
+  NOT_APPLICABLE
+  PENDING
+  FULFILLED
+}
+
+model RankAchievement {
+  id                  String                  @id @db.Char(36)
+  enrollmentId        String                  @db.Char(36)
+  userId              String                  @db.Char(36)
+  policyVersionId     String                  @db.Char(36)
+  tierCode            String                  @db.VarChar(32)
+  tierName            String                  @db.VarChar(120)
+  directCount         Int
+  teamCount           Int
+  deadlineAt          DateTime                @db.DateTime(3)
+  achievedAt          DateTime                @db.DateTime(3)
+  cashAmount          Decimal                 @db.Decimal(18, 2)
+  monthlyAmount       Decimal                 @db.Decimal(18, 2)
+  monthlyMonths       Int                     @default(0)
+  tripDescription     String?                 @db.VarChar(255)
+  tripStatus          RankTripStatus          @default(NOT_APPLICABLE)
+  tripReference       String?                 @db.VarChar(191)
+  fulfilledAt         DateTime?               @db.DateTime(3)
+  fulfilledByUserId   String?                 @db.Char(36)
+  ledgerTransactionId String?                 @unique(map: "rank_achievement_ledger_key") @db.Char(36)
+  createdAt           DateTime                @default(now()) @db.DateTime(3)
+  enrollment          ProgramEnrollment       @relation(fields: [enrollmentId], references: [id], onDelete: Restrict)
+  member              User                    @relation("RankAchievementMember", fields: [userId], references: [id], onDelete: Restrict)
+  policyVersion       RankRewardPolicyVersion @relation(fields: [policyVersionId], references: [id], onDelete: Restrict)
+  ledgerTransaction   LedgerTransaction?      @relation(fields: [ledgerTransactionId], references: [id], onDelete: Restrict)
+  monthlyPayouts      RankMonthlyPayout[]
+
+  @@unique([enrollmentId, tierCode], map: "rank_achievement_enrollment_tier_key")
+  @@index([userId, achievedAt], map: "rank_achievement_user_idx")
+  @@map("rank_achievements")
+}
+
+model RankMonthlyPayout {
+  id                  String            @id @db.Char(36)
+  achievementId       String            @db.Char(36)
+  sequence            Int
+  dueAt               DateTime          @db.DateTime(3)
+  amount              Decimal           @db.Decimal(18, 2)
+  ledgerTransactionId String            @unique(map: "rank_monthly_ledger_key") @db.Char(36)
+  createdAt           DateTime          @default(now()) @db.DateTime(3)
+  achievement         RankAchievement   @relation(fields: [achievementId], references: [id], onDelete: Restrict)
+  ledgerTransaction   LedgerTransaction @relation(fields: [ledgerTransactionId], references: [id], onDelete: Restrict)
+
+  @@unique([achievementId, sequence], map: "rank_monthly_achievement_sequence_key")
+  @@map("rank_monthly_payouts")
 }
