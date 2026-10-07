@@ -409,7 +409,7 @@ export class RankAchievementService {
     achievementId: string, userId: string, tierCode: string, enrollmentId: string,
     currencyCode: string, dueAt: Date, sequence: number, amount: string,
   ) {
-    await this.financialDb.transaction(async (connection) => {
+    return this.financialDb.transaction(async (connection) => {
       await this.lock(connection, 'RANK:' + enrollmentId);
       const prior = await connection.query<Array<{ id: string }>>(
         'SELECT id FROM rank_monthly_payouts WHERE achievementId=? AND sequence=? LIMIT 1',
