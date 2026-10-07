@@ -20,7 +20,7 @@ CREATE TABLE rank_reward_policy_versions (
   CONSTRAINT rank_policy_program_fk FOREIGN KEY (programVersionId) REFERENCES program_versions(id) ON DELETE RESTRICT,
   UNIQUE KEY rank_policy_program_version_key (programVersionId, version),
   INDEX rank_policy_active_idx (programVersionId, lifecycle, effectiveFrom)
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 CREATE TABLE rank_achievements (
   id CHAR(36) NOT NULL PRIMARY KEY,
@@ -50,7 +50,7 @@ CREATE TABLE rank_achievements (
   UNIQUE KEY rank_achievement_enrollment_tier_key (enrollmentId, tierCode),
   UNIQUE KEY rank_achievement_ledger_key (ledgerTransactionId),
   INDEX rank_achievement_user_idx (userId, achievedAt)
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 CREATE TABLE rank_monthly_payouts (
   id CHAR(36) NOT NULL PRIMARY KEY,
@@ -64,7 +64,7 @@ CREATE TABLE rank_monthly_payouts (
   CONSTRAINT rank_monthly_ledger_fk FOREIGN KEY (ledgerTransactionId) REFERENCES ledger_transactions(id) ON DELETE RESTRICT,
   UNIQUE KEY rank_monthly_achievement_sequence_key (achievementId, sequence),
   UNIQUE KEY rank_monthly_ledger_key (ledgerTransactionId)
-) ENGINE=InnoDB;
+) ENGINE=InnoDB DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 -- Initial flyer is published for already-published program versions only.
 -- Future versions require an explicitly published rank policy; values remain configurable.
