@@ -1161,25 +1161,43 @@ export class OwnerPortalService {
     const hash = this.secretHash('auth', dto.code);
     return this.db.transaction(async (connection) => {
       const rows = (await connection.query(
-        `SELECT c.id, c.operatorUserId, c.expiresAt
-         FROM owner_auth_codes c
-         INNER JOIN users u
-           ON u.id=c.operatorUserId AND u.status='ACTIVE'
-         INNER JOIN user_roles ur
-           ON ur.userId=u.id
-         INNER JOIN roles r
-           ON r.id=ur.roleId AND r.status='ACTIVE' AND r.name=c.roleScope
-         WHERE c.codeHash=? AND c.purpose=? AND c.status='ACTIVE'
-           AND c.operatorUserId=?
+        `SELECT id, operatorUserId, roleScope, expiresAt
+         FROM owner_auth_codes
+         WHERE codeHash=? AND purpose=? AND status='ACTIVE'
          LIMIT 1 FOR UPDATE`,
-        [hash, dto.purpose, actorUserId],
-      )) as { id: string; operatorUserId: string; expiresAt: Date }[];
+        [hash, dto.purpose],
+      )) as {
+        id: string;
+        operatorUserId: string;
+        roleScope: string;
+        expiresAt: Date;
+      }[];
       const row = rows[0];
-      if (!row || new Date(row.expiresAt) <= new Date()) {
+      if (
+        !row ||
+        row.operatorUserId !== actorUserId ||
+        new Date(row.expiresAt) <= new Date()
+      ) {
         throw new BadRequestException(
           'Authorization code is invalid, expired, or not assigned to this operator',
         );
       }
+
+      const activeOperator = (await connection.query(
+        `SELECT u.id
+         FROM users u
+         INNER JOIN user_roles ur ON ur.userId=u.id
+         INNER JOIN roles r ON r.id=ur.roleId
+         WHERE u.id=? AND u.status='ACTIVE' AND r.status='ACTIVE' AND r.name=?
+         LIMIT 1`,
+        [actorUserId, row.roleScope],
+      )) as { id: string }[];
+      if (!activeOperator[0]) {
+        throw new BadRequestException(
+          'Authorization code operator role is no longer active',
+        );
+      }
+
       await connection.query(
         "UPDATE owner_auth_codes SET status='USED', usedAt=CURRENT_TIMESTAMP(3) WHERE id=?",
         [row.id],
