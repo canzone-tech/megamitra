@@ -212,6 +212,8 @@ export function OwnerFinancePortal({ section }: { section: OwnerFinanceSection }
   const [epinTotal, setEpinTotal] = useState(0);
   const [epinTotalPages, setEpinTotalPages] = useState(1);
   const [generatedAuthCode, setGeneratedAuthCode] = useState('');
+  const [authOperators, setAuthOperators] = useState<Row[]>([]);
+  const [authRoleScope, setAuthRoleScope] = useState<'ADMIN' | 'AGENT'>('ADMIN');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -254,7 +256,12 @@ export function OwnerFinancePortal({ section }: { section: OwnerFinanceSection }
         if (inventory.page !== epinPage) setEpinPage(inventory.page);
         setSeasons(seasonRows);
       } else if (section === 'auth-codes') {
-        setData(await apiJson<Row[]>(`${API}/auth-codes`));
+        const [codes, operators] = await Promise.all([
+          apiJson<Row[]>(`${API}/auth-codes`),
+          apiJson<Row[]>(`${API}/auth-code-operators`),
+        ]);
+        setData(codes);
+        setAuthOperators(operators);
         setSeasons([]);
       } else {
         setData([]);
@@ -417,6 +424,7 @@ export function OwnerFinancePortal({ section }: { section: OwnerFinanceSection }
         method: 'POST',
         body: JSON.stringify({
           roleScope: formString(form, 'roleScope'),
+          operatorUserId: formString(form, 'operatorUserId'),
           purpose: formString(form, 'purpose'),
           validityMinutes: formNumber(form, 'validityMinutes', 30),
         }),
@@ -424,6 +432,17 @@ export function OwnerFinancePortal({ section }: { section: OwnerFinanceSection }
       'Authorization code generated',
     );
     if (result) setGeneratedAuthCode(result.code);
+  }
+
+  async function copyGeneratedAuthCode() {
+    if (!generatedAuthCode) return;
+    try {
+      await navigator.clipboard.writeText(generatedAuthCode);
+      setError('');
+      setNotice('Authorization code copied to clipboard');
+    } catch {
+      setError('Unable to copy automatically. Select the full code and copy it manually.');
+    }
   }
 
   return (
@@ -490,7 +509,7 @@ export function OwnerFinancePortal({ section }: { section: OwnerFinanceSection }
         { id: 'authcode-register', label: 'Authorization Register', count: rows.length },
       ]}>
         {(activeTab) => <>
-          {activeTab === 'authcode-generate' ? <div className={styles.card}><SectionHead icon="➕" title="Generate Authorization Code" /><form method="post" onSubmit={generateAuthCode}><div className={styles.fields}><Field label="Role"><select name="roleScope" className={styles.select}><option value="SUPER_ADMIN">Super Admin</option><option value="ADMIN">Admin</option><option value="AGENT">Agent</option></select></Field><Field label="Validity"><select name="validityMinutes" className={styles.select}><option value="30">30 Minutes</option><option value="60">1 Hour</option><option value="1440">24 Hours</option></select></Field><Field label="Operator"><input className={styles.input} value="Current signed-in administrator" readOnly /></Field><Field label="Purpose"><select name="purpose" className={styles.select}><option value="PAYMENT_AUTHORIZATION">Payment Authorization</option><option value="WINNER_APPROVAL">Winner Approval</option><option value="SEASON_CHANGE">Season Change</option><option value="EPIN_OPERATION">E-PIN Operation</option></select></Field></div><div className={styles.buttonLine}><button className={styles.button} disabled={busy}>GENERATE AUTH CODE</button></div></form>{generatedAuthCode ? <div className={classNames(styles.notice, styles.success)}><b>{generatedAuthCode}</b> • Copy this one-time authorization code now. Only its masked suffix remains visible in the register.</div> : null}</div> : null}
+          {activeTab === 'authcode-generate' ? <div className={styles.card}><SectionHead icon="➕" title="Generate Authorization Code" /><form method="post" onSubmit={generateAuthCode}><div className={styles.fields}><Field label="Role"><select name="roleScope" className={styles.select} value={authRoleScope} onChange={(event) => { setAuthRoleScope(event.target.value as 'ADMIN' | 'AGENT'); setGeneratedAuthCode(''); }}><option value="ADMIN">Admin</option><option value="AGENT">Agent</option></select></Field><Field label="Validity"><select name="validityMinutes" className={styles.select}><option value="30">30 Minutes</option><option value="60">1 Hour</option><option value="1440">24 Hours</option></select></Field><Field label="Operator"><select name="operatorUserId" className={styles.select} required defaultValue=""><option value="">Select active {authRoleScope.toLowerCase()}</option>{authOperators.filter((operator) => text(operator.roleScope, '') === authRoleScope).map((operator) => { const name = [text(operator.firstName, ''), text(operator.lastName, '')].filter(Boolean).join(' '); return <option key={text(operator.id)} value={text(operator.id)}>{text(operator.username)}{name ? ` • ${name}` : ''}</option>; })}</select></Field><Field label="Purpose"><select name="purpose" className={styles.select}><option value="PAYMENT_AUTHORIZATION">Payment Authorization</option><option value="WINNER_APPROVAL">Winner Approval</option><option value="SEASON_CHANGE">Season Change</option><option value="EPIN_OPERATION">E-PIN Operation</option></select></Field></div><div className={styles.buttonLine}><button className={styles.button} disabled={busy}>GENERATE AUTH CODE</button></div></form>{generatedAuthCode ? <div className={classNames(styles.notice, styles.success)}><b>One-time authorization code</b><div className={styles.buttonLine} style={{ marginTop: 10 }}><input className={styles.input} value={generatedAuthCode} readOnly aria-label="Generated authorization code" onFocus={(event) => event.currentTarget.select()} /><button type="button" className={classNames(styles.button, styles.dark)} onClick={() => void copyGeneratedAuthCode()}>COPY CODE</button></div><small>Full code is shown only after generation. The authorization register keeps only the masked suffix.</small></div> : null}</div> : null}
           {activeTab === 'authcode-register' ? <div className={styles.card}><SectionHead icon="🔐" title="Authorization Register" note="Operator, purpose, expiry and consumption state" />{rows.length ? <div className={styles.tableBox}><table className={styles.table}><thead><tr><th>CODE</th><th>ROLE</th><th>OPERATOR</th><th>PURPOSE</th><th>CREATED</th><th>EXPIRY</th><th>STATUS</th></tr></thead><tbody>{rows.map((row) => <tr key={text(row.id)}><td>••••{text(row.displaySuffix)}</td><td>{text(row.roleScope)}</td><td>{text(row.operatorUsername)}</td><td>{text(row.purpose)}</td><td>{dateTime(row.createdAt, displayTimeZone)}</td><td>{dateTime(row.expiresAt, displayTimeZone)}</td><td className={text(row.status) === 'ACTIVE' ? styles.status : styles.statusOff}>{text(row.status)}</td></tr>)}</tbody></table></div> : <Empty>No authorization codes generated yet.</Empty>}</div> : null}
         </>}
       </WorkspaceTabs>
