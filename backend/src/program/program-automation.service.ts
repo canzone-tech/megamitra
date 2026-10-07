@@ -285,7 +285,7 @@ export class ProgramAutomationWorkerService implements OnModuleInit, OnModuleDes
   constructor(private readonly automation: ProgramAutomationService) {}
 
   onModuleInit() {
-    if (process.env.NODE_ENV === 'test') return;
+    if (process.env.NODE_ENV === 'test' || process.env.JEST_WORKER_ID) return;
     const initial = setTimeout(() => void this.run(), 250);
     initial.unref();
     this.timer = setInterval(() => void this.run(), 60_000);
