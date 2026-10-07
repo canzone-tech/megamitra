@@ -24,6 +24,7 @@ import { ProgramModule } from './program/program.module';
 import { RbacModule } from './rbac/rbac.module';
 import { RedisModule } from './redis/redis.module';
 import { ReferralRewardModule } from './referral-reward/referral-reward.module';
+import { RankAchievementModule } from './rank-achievement/rank-achievement.module';
 import { SecurityModule } from './security/security.module';
 import { UsersModule } from './users/users.module';
 import { WithdrawalModule } from './withdrawal/withdrawal.module';
