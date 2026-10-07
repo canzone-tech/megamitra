@@ -117,7 +117,19 @@
 .genealogySlotHead b{display:grid;place-items:center;width:26px;height:26px;border-radius:8px;background:#f0e9ff;color:#5b21b6;font-size:11px}
 .genealogySlotHead span{font-size:9px;font-weight:800;color:#737789}
 .genealogySlotCard>strong{display:block;font-size:12px;color:#17152b}
-.genealogySlotCard>span,.genealogySlotCard>small,.genealogyEmptySlot>span{display:block;margin-top:4px;font-size:9px;color:#737789;line-height:1.35}
+.genealogySlotCard>span,.genealogySlotCard>small,.genealogyEmptySlot>span,.genealogyEmptySlot>strong{display:block;margin-top:4px;font-size:9px;color:#737789;line-height:1.35}
+.genealogyEmptySlot>strong{font-size:12px;color:#4e9872}
+.genealogyNavigation{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin:0 0 12px}
+.genealogyNavigation>span{color:var(--muted);font-size:11px}
+.genealogySlotButton{display:block;width:100%;font:inherit;text-align:left;cursor:pointer;transition:border-color .15s ease,transform .15s ease,box-shadow .15s ease}
+.genealogySlotButton:hover:not(:disabled){border-color:#7c3aed;transform:translateY(-2px);box-shadow:0 9px 17px #32155b20}
+.genealogySlotButton:focus-visible,.genealogyMemberLink:focus-visible{outline:3px solid #7c3aed;outline-offset:3px}
+.genealogySlotButton:disabled{cursor:wait;opacity:.65}
+.genealogySlotButton .genealogyDrillHint{color:#5b21b6;font-weight:800;margin-top:9px}
+.genealogyMemberLink{border:0;background:transparent;color:#5b21b6;font:inherit;font-weight:800;cursor:pointer;text-align:left;padding:4px}
+.genealogyMemberLink:hover{text-decoration:underline}
+.genealogyToolbar label{min-width:min(100%,260px)}
+
 @media(max-width:680px){
   .genealogyToolbar{align-items:stretch}
   .genealogyCount{text-align:left}
