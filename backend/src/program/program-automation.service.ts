@@ -21,6 +21,8 @@ type ReadyPairRow = {
 
 @Injectable()
 export class ProgramAutomationService {
+  private readonly logger = new Logger(ProgramAutomationService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly orchestration: ProgramOrchestrationService,
@@ -42,12 +44,6 @@ export class ProgramAutomationService {
     const actor = actorUserId ?? event.enrollment.userId;
     const processed = await this.orchestration.processEvent(event.id, actor);
     const run = processed.run as unknown as AutomationRun;
-
-    const referrals = [];
-    for (const hook of run.referralHooks ?? []) {
-      if (hook.status !== 'READY') continue;
-      referrals.push(await this.referralConsumer.consumeHook(hook.id, actor));
-    }
 
     const settlementResults = [];
     if (run.status === 'PROCESSED' && (run.binaryLinks?.length ?? 0) > 0) {
@@ -81,6 +77,18 @@ export class ProgramAutomationService {
             },
             actor,
           ),
+        );
+      }
+    }
+
+    const referrals = [];
+    for (const hook of run.referralHooks ?? []) {
+      if (hook.status !== 'READY') continue;
+      try {
+        referrals.push(await this.referralConsumer.consumeHook(hook.id, actor));
+      } catch (error) {
+        this.logger.warn(
+          `Automatic referral hook ${hook.id} failed after event ${event.id}: ${this.errorMessage(error)}`,
         );
       }
     }
@@ -132,10 +140,19 @@ export class ProgramAutomationService {
        ORDER BY occurredAt ASC, createdAt ASC
        LIMIT ${safeLimit}`,
     );
+    let processed = 0;
+    const failures: Array<{ id: string; error: string }> = [];
     for (const hook of hooks) {
-      await this.referralConsumer.consumeHook(hook.id, hook.referredUserId);
+      try {
+        await this.referralConsumer.consumeHook(hook.id, hook.referredUserId);
+        processed += 1;
+      } catch (error) {
+        const message = this.errorMessage(error);
+        failures.push({ id: hook.id, error: message });
+        this.logger.warn(`Automatic referral hook ${hook.id} failed: ${message}`);
+      }
     }
-    return hooks.length;
+    return { processed, failed: failures.length, failures };
   }
 
   async reconcilePendingReferralRefunds(limit = 100) {
@@ -151,10 +168,19 @@ export class ProgramAutomationService {
        ORDER BY be.occurredAt ASC, be.createdAt ASC
        LIMIT ${safeLimit}`,
     );
+    let processed = 0;
+    const failures: Array<{ id: string; error: string }> = [];
     for (const event of events) {
-      await this.referralConsumer.reconcileRefundEvent(event.id, event.actorUserId);
+      try {
+        await this.referralConsumer.reconcileRefundEvent(event.id, event.actorUserId);
+        processed += 1;
+      } catch (error) {
+        const message = this.errorMessage(error);
+        failures.push({ id: event.id, error: message });
+        this.logger.warn(`Automatic referral refund ${event.id} failed: ${message}`);
+      }
     }
-    return events.length;
+    return { processed, failed: failures.length, failures };
   }
 
   async settleReadyPairs(limit = 100) {
@@ -184,31 +210,50 @@ export class ProgramAutomationService {
     );
     const settledAt = new Date();
     const results = [];
+    const failures: Array<{ memberUserId: string; planVersionId: string; error: string }> = [];
     for (const row of rows) {
       const localDate = this.businessDate(settledAt, row.settlementTimezone || 'UTC');
       const latest = new Date(row.latestCreatedAt).toISOString();
-      results.push(
-        await this.settlements.runIfPairReady(
-          {
-            sourceKey:
-              `AUTO_BINARY_SWEEP:${row.ancestorUserId}:${row.planVersionId}:${localDate}:${latest}:${Number(row.unitCount)}`,
-            memberUserId: row.ancestorUserId,
-            planVersionId: row.planVersionId,
-            settledAt: settledAt.toISOString(),
-          },
-          row.ancestorUserId,
-        ),
-      );
+      try {
+        results.push(
+          await this.settlements.runIfPairReady(
+            {
+              sourceKey:
+                `AUTO_BINARY_SWEEP:${row.ancestorUserId}:${row.planVersionId}:${localDate}:${latest}:${Number(row.unitCount)}`,
+              memberUserId: row.ancestorUserId,
+              planVersionId: row.planVersionId,
+              settledAt: settledAt.toISOString(),
+            },
+            row.ancestorUserId,
+          ),
+        );
+      } catch (error) {
+        const message = this.errorMessage(error);
+        failures.push({
+          memberUserId: row.ancestorUserId,
+          planVersionId: row.planVersionId,
+          error: message,
+        });
+        this.logger.warn(
+          `Automatic binary settlement failed for ${row.ancestorUserId}/${row.planVersionId}: ${message}`,
+        );
+      }
     }
-    return { processed: results.length, results };
+    return { processed: results.length, failed: failures.length, results, failures };
   }
 
   async runCycle() {
     const pending = await this.processPending();
+    // Settlement runs immediately after qualification so a stale referral/reconciliation
+    // item can never starve ready A:C / B:D earnings.
+    const settlements = await this.settleReadyPairs();
     const referralHooks = await this.consumeReadyReferralHooks();
     const referralRefunds = await this.reconcilePendingReferralRefunds();
-    const settlements = await this.settleReadyPairs();
-    return { pending, referralHooks, referralRefunds, settlements };
+    return { pending, settlements, referralHooks, referralRefunds };
+  }
+
+  private errorMessage(error: unknown) {
+    return error instanceof Error ? error.message.slice(0, 500) : 'Unknown automation error';
   }
 
   private businessDate(value: Date, timeZone: string) {
