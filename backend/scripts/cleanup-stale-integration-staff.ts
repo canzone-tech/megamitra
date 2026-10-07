@@ -3,8 +3,9 @@ import { PrismaService } from '../src/database/prisma.service';
 
 loadEnvFile();
 
-const TEST_STAFF_PREFIXES = [
+const TEST_PRINCIPAL_PREFIXES = [
   '__uat_verify_admin_',
+  '__uat_verify_member_',
   'orchestration_admin_',
   'domain_admin_',
   'ent_orch_admin_',
@@ -42,7 +43,7 @@ async function run() {
       where: {
         AND: [
           {
-            OR: TEST_STAFF_PREFIXES.map((prefix) => ({
+            OR: TEST_PRINCIPAL_PREFIXES.map((prefix) => ({
               username: { startsWith: prefix },
             })),
           },
@@ -50,7 +51,7 @@ async function run() {
             roles: {
               some: {
                 role: {
-                  name: { in: ['SUPER_ADMIN', 'ADMIN', 'AGENT'] },
+                  name: { in: ['SUPER_ADMIN', 'ADMIN', 'AGENT', 'MEMBER'] },
                 },
               },
             },
@@ -69,7 +70,7 @@ async function run() {
       (user) => user.email === null || user.email.endsWith('@example.test'),
     );
     if (removable.length === 0) {
-      console.log('MegaGoldenClub stale integration staff cleanup: no fixtures found');
+      console.log('MegaGoldenClub stale integration principal cleanup: no fixtures found');
       return;
     }
 
@@ -89,7 +90,7 @@ async function run() {
     });
 
     console.log(
-      `MegaGoldenClub stale integration staff cleanup: removed ${removable
+      `MegaGoldenClub stale integration principal cleanup: removed ${removable
         .map((user) => user.username)
         .join(', ')}`,
     );
