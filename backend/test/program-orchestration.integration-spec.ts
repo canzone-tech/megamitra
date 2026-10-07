@@ -17,6 +17,91 @@ import {
   UserStatus,
 } from '../src/generated/prisma/enums';
 
+async function deleteProgramEventQualifyingArtifacts(
+  prisma: PrismaService,
+  qualifyingEventIds: string[],
+) {
+  if (qualifyingEventIds.length === 0) return;
+
+  // A stale local verify may have already auto-settled these units. Pair matches and
+  // dispositions use RESTRICT FKs to qualifying units, so remove the settlement
+  // graph first instead of assuming PROGRAM_EVENT units are always unmatched.
+  const units = await prisma.binaryUplineQualifyingUnit.findMany({
+    where: { unitEventId: { in: qualifyingEventIds } },
+    select: { id: true },
+  });
+  const unitIds = units.map((row) => row.id);
+
+  if (unitIds.length > 0) {
+    const [matches, dispositions] = await Promise.all([
+      prisma.binaryPairMatch.findMany({
+        where: {
+          OR: [
+            { leftUnitId: { in: unitIds } },
+            { rightUnitId: { in: unitIds } },
+          ],
+        },
+        select: { settlementId: true },
+      }),
+      prisma.binaryUnitDisposition.findMany({
+        where: { uplineUnitId: { in: unitIds } },
+        select: { settlementId: true },
+      }),
+    ]);
+    const settlementIds = [
+      ...new Set([
+        ...matches.map((row) => row.settlementId),
+        ...dispositions.map((row) => row.settlementId),
+      ]),
+    ];
+
+    if (settlementIds.length > 0) {
+      const settlements = await prisma.binaryPairSettlement.findMany({
+        where: { id: { in: settlementIds } },
+        select: { ledgerTransactionId: true },
+      });
+      const ledgerTransactionIds = settlements
+        .map((row) => row.ledgerTransactionId)
+        .filter((id): id is string => Boolean(id));
+
+      await prisma.binaryPairMatch.deleteMany({
+        where: { settlementId: { in: settlementIds } },
+      });
+      await prisma.binaryUnitDisposition.deleteMany({
+        where: { settlementId: { in: settlementIds } },
+      });
+      if (ledgerTransactionIds.length > 0) {
+        await prisma.ledgerEntry.deleteMany({
+          where: { transactionId: { in: ledgerTransactionIds } },
+        });
+      }
+      await prisma.binaryPairSettlement.deleteMany({
+        where: { id: { in: settlementIds } },
+      });
+      if (ledgerTransactionIds.length > 0) {
+        await prisma.ledgerTransaction.deleteMany({
+          where: { id: { in: ledgerTransactionIds } },
+        });
+      }
+    }
+  }
+
+  await prisma.$executeRawUnsafe(
+    `DELETE FROM program_binary_qualification_links
+     WHERE qualifyingUnitEventId IN (${qualifyingEventIds.map(() => '?').join(',')})`,
+    ...qualifyingEventIds,
+  );
+  await prisma.binaryUplineQualifyingUnit.deleteMany({
+    where: { unitEventId: { in: qualifyingEventIds } },
+  });
+  await prisma.binaryQualifyingUnitEvent.deleteMany({
+    where: { id: { in: qualifyingEventIds }, reversalOfEventId: { not: null } },
+  });
+  await prisma.binaryQualifyingUnitEvent.deleteMany({
+    where: { id: { in: qualifyingEventIds } },
+  });
+}
+
 describe('MegaGoldenClub program event orchestration integration', () => {
   let app: Awaited<ReturnType<typeof NestFactory.create>>;
   let prisma: PrismaService;
@@ -118,19 +203,7 @@ describe('MegaGoldenClub program event orchestration integration', () => {
         select: { id: true },
       });
       const qualifyingEventIds = qualifyingEvents.map((row) => row.id);
-      if (qualifyingEventIds.length > 0) {
-        await prisma.$executeRawUnsafe(
-          `DELETE FROM program_binary_qualification_links
-           WHERE qualifyingUnitEventId IN (${qualifyingEventIds.map(() => '?').join(',')})`,
-          ...qualifyingEventIds,
-        );
-        await prisma.binaryUplineQualifyingUnit.deleteMany({
-          where: { unitEventId: { in: qualifyingEventIds } },
-        });
-        await prisma.binaryQualifyingUnitEvent.deleteMany({
-          where: { id: { in: qualifyingEventIds } },
-        });
-      }
+      await deleteProgramEventQualifyingArtifacts(prisma, qualifyingEventIds);
 
       await prisma.auditLog.deleteMany({
         where: {
@@ -438,5 +511,92 @@ describe('MegaGoldenClub program event orchestration integration', () => {
     expect(skipped.body.run.referralHooks[0].status).toBe('INELIGIBLE');
     expect(skipped.body.run.drawHooks).toHaveLength(1);
     expect(skipped.body.run.drawHooks[0].status).toBe('INELIGIBLE');
+
+    // Regression fixture for persistent local databases: simulate a PROGRAM_EVENT
+    // qualifying unit that was already consumed by a pair settlement. afterAll must
+    // remove pair/disposition dependencies before deleting the qualifying unit.
+    const cleanupSibling = await prisma.user.create({
+      data: {
+        username: `orch_cleanup_sibling_${suffix}`,
+        passwordHash: 'integration-not-used',
+        status: UserStatus.ACTIVE,
+      },
+    });
+    userIds.push(cleanupSibling.id);
+    await prisma.binaryPlacement.create({
+      data: {
+        memberUserId: cleanupSibling.id,
+        parentUserId: ancestor.id,
+        side: BinaryPlacementSide.RIGHT,
+        slot: 'C',
+      },
+    });
+    await prisma.binaryAncestry.create({
+      data: {
+        ancestorUserId: ancestor.id,
+        descendantUserId: cleanupSibling.id,
+        depth: 1,
+        firstLegSide: BinaryPlacementSide.RIGHT,
+        firstLegSlot: 'C',
+      },
+    });
+    const cleanupRightEvent = await prisma.binaryQualifyingUnitEvent.create({
+      data: {
+        sourceKey: `PROGRAM_EVENT:CLEANUP:${suffix}`,
+        sourceMemberUserId: cleanupSibling.id,
+        planVersionId: binaryVersion.id,
+        occurredAt: new Date(),
+      },
+    });
+    const cleanupRightUnit = await prisma.binaryUplineQualifyingUnit.create({
+      data: {
+        unitEventId: cleanupRightEvent.id,
+        ancestorUserId: ancestor.id,
+        planVersionId: binaryVersion.id,
+        side: BinaryPlacementSide.RIGHT,
+        slot: 'C',
+        depth: 1,
+        sequence: 1,
+      },
+    });
+    const cleanupSettlement = await prisma.binaryPairSettlement.create({
+      data: {
+        sourceKey: `PROGRAM_EVENT:CLEANUP:SETTLEMENT:${suffix}`,
+        memberUserId: ancestor.id,
+        planVersionId: binaryVersion.id,
+        settledAt: new Date(),
+        settlementLocalDate: '2026-10-07',
+        settlementLocalMonth: '2026-10',
+        leftAvailableBefore: '1.0000',
+        rightAvailableBefore: '1.0000',
+        pairCountCalculated: 1,
+        pairCountPayable: 1,
+        capLimitedPairs: 0,
+        leftVolumeConsumed: '1.0000',
+        rightVolumeConsumed: '1.0000',
+        leftCarryAfter: '0.0000',
+        rightCarryAfter: '0.0000',
+        leftUnitsAvailableBefore: 1,
+        rightUnitsAvailableBefore: 1,
+        leftUnitsConsumed: 1,
+        rightUnitsConsumed: 1,
+        leftUnitsCarryAfter: 0,
+        rightUnitsCarryAfter: 0,
+        payoutAmount: '10.00',
+        currencyCode: 'INR',
+      },
+    });
+    await prisma.binaryPairMatch.create({
+      data: {
+        settlementId: cleanupSettlement.id,
+        memberUserId: ancestor.id,
+        planVersionId: binaryVersion.id,
+        pairSequence: 1,
+        leftUnitId: unitEvent.uplineUnits[0]!.id,
+        rightUnitId: cleanupRightUnit.id,
+        payable: true,
+        payoutAmount: '10.00',
+      },
+    });
   });
 });
