@@ -36,9 +36,6 @@ type EnrollmentRow = {
   payments: Array<{ amount: { toString(): string }; refunds: Array<{ amount: { toString(): string } }> }>;
 };
 
- monthlyMonths: number;
-  currencyCode: string;
-};
 
 const DEFAULT_TIERS: RankTier[] = [
   { code: 'LIGHTNING', name: 'Lightning Start Bonus', newDirect: 4, newTeam: 0,
