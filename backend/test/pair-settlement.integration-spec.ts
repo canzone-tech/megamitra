@@ -106,14 +106,27 @@ describe('MegaGoldenClub explicit binary pair matching and ledger integration', 
       await prisma.binaryUnitDisposition.deleteMany({
         where: { settlementId: { in: settlementIds } },
       });
+      const ownedAccounts = await prisma.ledgerAccount.findMany({
+        where: { ownerUserId: { in: userIds } },
+        select: { id: true },
+      });
+      const ownedAccountIds = ownedAccounts.map((account) => account.id);
+      if (ownedAccountIds.length) {
+        const ownedEntries = await prisma.ledgerEntry.findMany({
+          where: { accountId: { in: ownedAccountIds } },
+          select: { transactionId: true },
+        });
+        ledgerTransactionIds.push(...ownedEntries.map((entry) => entry.transactionId));
+      }
+      const cleanupTransactionIds = [...new Set(ledgerTransactionIds)];
       await prisma.ledgerEntry.deleteMany({
-        where: { transactionId: { in: ledgerTransactionIds } },
+        where: { transactionId: { in: cleanupTransactionIds } },
       });
       await prisma.binaryPairSettlement.deleteMany({
         where: { id: { in: settlementIds } },
       });
       await prisma.ledgerTransaction.deleteMany({
-        where: { id: { in: ledgerTransactionIds } },
+        where: { id: { in: cleanupTransactionIds } },
       });
       await prisma.ledgerAccount.deleteMany({
         where: { ownerUserId: { in: userIds } },
