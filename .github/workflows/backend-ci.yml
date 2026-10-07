@@ -62,6 +62,10 @@ jobs:
         working-directory: .
         run: node scripts/verify-uat-docs.mjs
 
+      - name: Verify integration test data isolation
+        working-directory: .
+        run: node scripts/verify-test-data-isolation.mjs
+
       - name: Start CI data services
         run: |
           docker compose -f ../docker-compose.yml up -d --wait --wait-timeout 120
