@@ -214,6 +214,7 @@ export function OwnerFinancePortal({ section }: { section: OwnerFinanceSection }
   const [generatedAuthCode, setGeneratedAuthCode] = useState('');
   const [authOperators, setAuthOperators] = useState<Row[]>([]);
   const [authRoleScope, setAuthRoleScope] = useState<'ADMIN' | 'AGENT'>('ADMIN');
+  const [canManageAuthCodes, setCanManageAuthCodes] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
@@ -233,6 +234,26 @@ export function OwnerFinancePortal({ section }: { section: OwnerFinanceSection }
 
   const load = useCallback(async () => {
     try {
+      if (section === 'auth-codes') {
+        try {
+          const [codes, operators] = await Promise.all([
+            apiJson<Row[]>(`${API}/auth-codes`),
+            apiJson<Row[]>(`${API}/auth-code-operators`),
+          ]);
+          setData(codes);
+          setAuthOperators(operators);
+          setCanManageAuthCodes(true);
+        } catch (err) {
+          if (!(err instanceof ApiClientError) || err.status !== 403) throw err;
+          const mine = await apiJson<Row[]>(`${API}/auth-codes/mine`);
+          setData(mine);
+          setAuthOperators([]);
+          setCanManageAuthCodes(false);
+        }
+        setSeasons([]);
+        return;
+      }
+
       const portalSettings = await apiJson<Settings>(`${API}/settings`);
       if (section === 'payments') {
         const rows = await apiJson<Row[]>(`${API}/payments`);
@@ -255,14 +276,6 @@ export function OwnerFinancePortal({ section }: { section: OwnerFinanceSection }
         setEpinTotalPages(inventory.totalPages);
         if (inventory.page !== epinPage) setEpinPage(inventory.page);
         setSeasons(seasonRows);
-      } else if (section === 'auth-codes') {
-        const [codes, operators] = await Promise.all([
-          apiJson<Row[]>(`${API}/auth-codes`),
-          apiJson<Row[]>(`${API}/auth-code-operators`),
-        ]);
-        setData(codes);
-        setAuthOperators(operators);
-        setSeasons([]);
       } else {
         setData([]);
         setSeasons([]);
