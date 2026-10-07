@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Delete,
   Get,
   Param,
@@ -392,6 +393,14 @@ export class OwnerPortalController {
     @CurrentUser() actor: AuthUser,
   ) {
     return this.portal.generateAuthCode(dto, actor.id);
+  }
+
+  @Get('auth-codes/mine')
+  myAuthCodes(@CurrentUser() actor: AuthUser) {
+    if (!actor.roles.some((role) => role === 'ADMIN' || role === 'AGENT')) {
+      throw new ForbiddenException('Authorization codes are assigned to ADMIN or AGENT operators');
+    }
+    return this.finance.listAuthCodesForOperator(actor.id);
   }
 
   @Permissions('platform.config.read')
