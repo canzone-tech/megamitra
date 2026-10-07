@@ -67,7 +67,10 @@ npm run lint
 echo "==> Unit tests"
 npm test -- --runInBand
 
-echo "==> Integration tests"
+echo "==> Cleaning stale local integration staff fixtures"
+NODE_ENV=test npx ts-node scripts/cleanup-stale-integration-staff.ts
+
+echo "==> Integration tests (disposable MySQL schema)"
 npm run test:integration
 
 echo "==> Cleaning backend build artifacts"
