@@ -315,18 +315,6 @@ export class ProgramOrchestrationService {
   async processEvent(businessEventId: string, actorUserId: string) {
     const existing = await this.getRunByEventId(businessEventId);
     if (existing && (existing.status === 'PROCESSED' || existing.status === 'SKIPPED')) {
-      if (
-        existing.status === 'PROCESSED' &&
-        this.truthy(existing.eligible) &&
-        existing.policyVersionId
-      ) {
-        await this.ensureBinaryQualifications(
-          existing.id,
-          await this.getPolicy(existing.policyVersionId),
-          businessEventId,
-          actorUserId,
-        );
-      }
       return { run: await this.getRun(existing.id), idempotent: true };
     }
 
@@ -383,8 +371,37 @@ export class ProgramOrchestrationService {
     });
 
     try {
-      if (eligibility.eligible) {
-        await this.ensureBinaryQualifications(runId, policy, businessEventId, actorUserId);
+      if (eligibility.eligible && policy.binaryPlanVersionId && policy.binaryUnitsPerEvent > 0) {
+        for (let sequence = 1; sequence <= policy.binaryUnitsPerEvent; sequence += 1) {
+          const sourceKey = `PROGRAM_EVENT:${businessEventId}:BINARY:${sequence}`;
+          const result = await this.binaryUnits.createEvent(
+            {
+              sourceKey,
+              sourceMemberUserId: event.enrollment.userId,
+              planVersionId: policy.binaryPlanVersionId,
+              occurredAt: event.occurredAt.toISOString(),
+              metadata: {
+                programBusinessEventId: businessEventId,
+                programEnrollmentId: event.enrollmentId,
+                programEventPolicyVersionId: policy.id,
+                unitSequence: sequence,
+              },
+            },
+            actorUserId,
+          );
+          await this.prisma.$executeRawUnsafe(
+            `INSERT INTO program_binary_qualification_links
+               (id, sourceKey, runId, businessEventId, qualifyingUnitEventId, unitSequence, createdAt)
+             VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP(3))
+             ON DUPLICATE KEY UPDATE qualifyingUnitEventId = VALUES(qualifyingUnitEventId)`,
+            randomUUID(),
+            sourceKey,
+            runId,
+            businessEventId,
+            result.event.id,
+            sequence,
+          );
+        }
       }
 
       if (this.truthy(policy.referralHookEnabled) && policy.referralPolicyVersionId) {
@@ -423,57 +440,6 @@ export class ProgramOrchestrationService {
         runId,
       );
       throw error;
-    }
-  }
-
-  private async ensureBinaryQualifications(
-    runId: string,
-    policy: PolicyRow,
-    businessEventId: string,
-    actorUserId: string,
-  ) {
-    if (!policy.binaryPlanVersionId || policy.binaryUnitsPerEvent <= 0) return;
-
-    const event = await this.prisma.programBusinessEvent.findUnique({
-      where: { id: businessEventId },
-      select: {
-        id: true,
-        enrollmentId: true,
-        occurredAt: true,
-        enrollment: { select: { userId: true } },
-      },
-    });
-    if (!event) throw new NotFoundException('Program business event not found');
-
-    for (let sequence = 1; sequence <= policy.binaryUnitsPerEvent; sequence += 1) {
-      const sourceKey = `PROGRAM_EVENT:${businessEventId}:BINARY:${sequence}`;
-      const result = await this.binaryUnits.createEvent(
-        {
-          sourceKey,
-          sourceMemberUserId: event.enrollment.userId,
-          planVersionId: policy.binaryPlanVersionId,
-          occurredAt: event.occurredAt.toISOString(),
-          metadata: {
-            programBusinessEventId: businessEventId,
-            programEnrollmentId: event.enrollmentId,
-            programEventPolicyVersionId: policy.id,
-            unitSequence: sequence,
-          },
-        },
-        actorUserId,
-      );
-      await this.prisma.$executeRawUnsafe(
-        `INSERT INTO program_binary_qualification_links
-           (id, sourceKey, runId, businessEventId, qualifyingUnitEventId, unitSequence, createdAt)
-         VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP(3))
-         ON DUPLICATE KEY UPDATE qualifyingUnitEventId = VALUES(qualifyingUnitEventId)`,
-        randomUUID(),
-        sourceKey,
-        runId,
-        businessEventId,
-        result.event.id,
-        sequence,
-      );
     }
   }
 
