@@ -86,6 +86,18 @@ describe('RankAchievementService joining-date and fresh-member contracts', () =>
     expect(awarded).not.toHaveBeenCalled();
   });
 
+  it('keeps recurring rank income exclusive even when Gold and Diamond coincide', () => {
+    const { service } = setup();
+    const policyTiers = JSON.stringify(service.initialFlyerTiers());
+    const at = new Date('2027-01-05T12:00:00.000Z');
+    const gold = { id: 'g', tierCode: 'GOLD', achievedAt: at, policyTiers };
+    const diamond = { id: 'd', tierCode: 'DIAMOND', achievedAt: at, policyTiers };
+    expect(service['activeRecurringRankId']([gold])).toBe('g');
+    expect(service['activeRecurringRankId']([gold, diamond])).toBe('d');
+    expect(service['activeRecurringRankId']([diamond, gold])).toBe('d');
+    expect(service['activeRecurringRankId']([])).toBeNull();
+  });
+
   it('clamps recurring monthly payouts to month end while preserving UTC time', () => {
     const { service } = setup();
     const jan31 = new Date('2027-01-31T12:34:56.000Z');
