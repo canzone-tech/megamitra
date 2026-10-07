@@ -259,7 +259,18 @@ describe('MegaGoldenClub program event orchestration integration', () => {
       await prisma.binaryPlan.deleteMany({ where: { id: { in: binaryPlanIds } } });
       await prisma.referralRewardPolicyVersion.deleteMany({ where: { id: { in: referralVersionIds } } });
       await prisma.referralRewardPolicy.deleteMany({ where: { id: { in: referralPolicyIds } } });
-      await prisma.systemSequence.deleteMany({ where: { key: { startsWith: 'BU:' } } });
+      const binarySequenceKeys = userIds.flatMap((userId) =>
+        binaryPlanVersionIds.flatMap((planVersionId) =>
+          ['A', 'B', 'C', 'D'].map(
+            (slot) => `BU:${userId}:${planVersionId}:${slot}`,
+          ),
+        ),
+      );
+      if (binarySequenceKeys.length > 0) {
+        await prisma.systemSequence.deleteMany({
+          where: { key: { in: binarySequenceKeys } },
+        });
+      }
       await prisma.userRole.deleteMany({ where: { userId: { in: userIds } } });
       await prisma.authSession.deleteMany({ where: { userId: { in: userIds } } });
       await prisma.user.deleteMany({ where: { id: { in: userIds } } });
