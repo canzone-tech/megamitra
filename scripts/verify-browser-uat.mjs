@@ -322,11 +322,22 @@ async function runScenario(debugPort, scenario) {
     await waitForExpression(client, 'document.readyState === "complete"', `${scenario.name} document ready`);
 
     for (const expected of scenario.expectedTexts) {
-      await waitForExpression(
-        client,
-        `document.body && document.body.innerText.includes(${escapeJs(expected)})`,
-        `${scenario.name} text: ${expected}`,
-      );
+      try {
+        await waitForExpression(
+          client,
+          `document.body && document.body.innerText.includes(${escapeJs(expected)})`,
+          `${scenario.name} text: ${expected}`,
+        );
+      } catch (error) {
+        // Report the failed component's state without dumping member data or credentials.
+        const state = await evaluate(client, `(() => ({
+          route: location.pathname,
+          headings: [...document.querySelectorAll("h1")].map((node) => node.textContent?.trim()),
+          error: document.querySelector(".mm-error[role=alert]")?.textContent?.trim() ?? null,
+          loading: Boolean([...document.querySelectorAll(".mm-empty")].some((node) => node.textContent?.includes("Loading"))),
+        }))()`).catch(() => ({ unavailable: true }));
+        throw new Error(`${error.message}; diagnostics: ${JSON.stringify({ state, memberApiErrors, serverErrors, pageExceptions })}`);
+      }
     }
 
     if (scenario.waitForRefresh) {
