@@ -838,7 +838,6 @@ export function OwnerCorePortal({ section, extension }: { section: OwnerCoreSect
             <SectionHead
               icon="🎁"
               title="Season Prize Schedule"
-              action={<button type="button" className={classNames(styles.button, styles.outline)} disabled={!prizeDraft.length} onClick={() => exportCsv(prizeDraft as unknown as Row[], `${text(selectedSeason.code, 'season').toLowerCase()}-prize-schedule.csv`)}>EXPORT CSV</button>}
             />
             <div className={styles.fields}>
               <Field label="Season"><select className={styles.select} value={selectedSeasonId} onChange={(event) => void changePrizeSeason(event.target.value)}><option value="">Select season</option>{seasons.map((row) => <option key={text(row.id)} value={text(row.id)}>{text(row.name)} • {text(row.status)}</option>)}</select></Field>
