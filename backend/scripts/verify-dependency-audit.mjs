@@ -2,7 +2,7 @@ import { spawnSync } from 'node:child_process';
 
 const NPM = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 const ALLOWED_DEV_MODERATE_ADVISORIES = new Set([
-  'GHSA-hp3w-g68c-fv3c',
+  'GHSA-HP3W-G68C-FV3C',
 ]);
 
 function runAudit(extraArgs = []) {
