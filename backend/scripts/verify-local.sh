@@ -45,16 +45,13 @@ if [[ "${MONGO_READY}" != *"1"* ]]; then
 fi
 
 echo "==> Installing exact backend dependencies"
-npm ci
+npm ci --no-audit
 
 echo "==> Checking patched transitive dependency versions"
 npm ls deepmerge-ts mariadb mongodb mysql2
 
-echo "==> Auditing production dependencies"
-npm audit --omit=dev --audit-level=high
-
-echo "==> Auditing full dependency tree for high/critical findings"
-npm audit --audit-level=high
+echo "==> Verifying dependency audit policy"
+node scripts/verify-dependency-audit.mjs
 
 echo "==> Validating and generating Prisma client"
 npm run prisma:validate
