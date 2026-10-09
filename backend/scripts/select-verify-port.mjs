@@ -1,4 +1,6 @@
 import net from 'node:net';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 function parsePort(value) {
   const port = Number(value);
@@ -43,7 +45,7 @@ export async function selectVerifyPort(preferredPort) {
   return { port, preferredAvailable: false };
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
   const preferred = process.argv[2] ?? '3100';
   const selected = await selectVerifyPort(preferred);
   if (!selected.preferredAvailable) {
