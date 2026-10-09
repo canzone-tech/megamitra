@@ -351,6 +351,15 @@ describe('MegaGoldenClub authenticated runtime UAT', () => {
         { headers: ownerHeaders },
       );
       expect(dashboardBeforeStaff.status).toBe(200);
+      expect(dashboardBeforeStaff.body.activeSeason).toMatchObject({
+        id: paidRegistration.seasonId,
+        registrationFee: '1000.00',
+        installmentAmount: '1000.00',
+        monthlyEmi: '1000.00',
+        installmentCount: 18,
+        totalMonths: 18,
+        currencyCode: 'INR',
+      });
 
       const adminUsername = `uat_admin_${suffix}`;
       const agentUsername = `uat_agent_${suffix}`;
