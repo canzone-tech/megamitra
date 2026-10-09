@@ -50,6 +50,20 @@ function money(value: unknown, currencyCode = 'INR') {
     return `${code} ${number(value).toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
   }
 }
+function dateTime(value: unknown, timeZone?: string) {
+  if (!value) return '—';
+  const parsed = new Date(String(value));
+  if (!Number.isFinite(parsed.getTime())) return text(value);
+  try {
+    return new Intl.DateTimeFormat('en-IN', {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+      ...(timeZone ? { timeZone } : {}),
+    }).format(parsed);
+  } catch {
+    return parsed.toLocaleString('en-IN');
+  }
+}
 function formString(form: FormData, name: string) {
   return String(form.get(name) ?? '').trim();
 }
@@ -214,26 +228,128 @@ export function OwnerCoreV14Portal({ section, extension }: { section: OwnerCoreV
     const row = (data ?? {}) as Row;
     const active = (row.activeSeason && typeof row.activeSeason === 'object' ? row.activeSeason : {}) as Row;
     const currency = text(active.currencyCode, settings.currencyCode ?? 'INR');
+    const recentMembers = (Array.isArray(row.recentMembers) ? row.recentMembers : []) as Row[];
+    const recentPayments = (Array.isArray(row.recentPayments) ? row.recentPayments : []) as Row[];
+    const displayTimeZone = settings.timezone || text(active.settlementTimezone, '') || undefined;
+
     return <>
-      <Hero title="MegaGoldenClub Management Dashboard" subtitle="Central control for seasons, members, Binary 1:4, payments, monthly draws and reporting." pill="LIVE MANAGEMENT ENVIRONMENT" />
+      <Hero
+        title="MegaGoldenClub Management Dashboard"
+        subtitle="Live member, finance, Binary 1:4, compliance, E-PIN, draw and reward snapshot from authoritative records."
+        pill="LIVE MANAGEMENT ENVIRONMENT"
+      />
+
       <div className={styles.kpis}>
         <Kpi label="Active Season" value={text(active.name, 'No active season')} note={text(active.status, 'Create or activate a season')} />
-        <Kpi label="Members" value={number(row.memberCount).toLocaleString('en-IN')} note="Registered accounts" />
-        <Kpi label="Qualified Pairs" value={number(row.qualifiedPairs).toLocaleString('en-IN')} note="A:C + B:D only" />
-        <Kpi label="Daily Cap" value={money(row.dailyCap, currency)} note="Current season rule" />
+        <Kpi label="Members" value={number(row.memberCount).toLocaleString('en-IN')} note={`${number(row.activeMemberCount).toLocaleString('en-IN')} active MEMBER accounts`} />
+        <Kpi label="Active Enrollments" value={number(row.activeEnrollmentCount).toLocaleString('en-IN')} note="Current program enrollments" />
+        <Kpi label="Qualified Pairs" value={number(row.qualifiedPairs).toLocaleString('en-IN')} note={`${money(row.pairPayoutTotal, currency)} posted pair value`} />
+        <Kpi label="Net Collections" value={money(row.netCollections, currency)} note={`${number(row.paymentCount).toLocaleString('en-IN')} recorded payments`} />
+        <Kpi label="Member Wallets" value={money(row.walletBalance, currency)} note="Combined authoritative balance" />
+        <Kpi label="KYC Attention" value={number(row.pendingKyc).toLocaleString('en-IN')} note={`${number(row.approvedKyc).toLocaleString('en-IN')} approved`} />
+        <Kpi label="Open Draws" value={number(row.openDraws).toLocaleString('en-IN')} note={`${number(row.totalWinners).toLocaleString('en-IN')} winners recorded`} />
       </div>
+
+      <div className={styles.grid2}>
+        <div className={styles.card}>
+          <SectionHead icon="👥" title="Members & Compliance" note="Live account and onboarding snapshot" />
+          <div className={styles.summary}>
+            <div><small>ACTIVE MEMBERS</small><b>{number(row.activeMemberCount).toLocaleString('en-IN')}</b></div>
+            <div><small>PLACED IN 1:4</small><b>{number(row.placedMemberCount).toLocaleString('en-IN')}</b></div>
+            <div><small>ACTIVE ENROLLMENTS</small><b>{number(row.activeEnrollmentCount).toLocaleString('en-IN')}</b></div>
+            <div><small>KYC APPROVED</small><b>{number(row.approvedKyc).toLocaleString('en-IN')}</b></div>
+          </div>
+          <div className={classNames(styles.notice, number(row.pendingKyc) > 0 && styles.warn)}>
+            <b>KYC pending / review:</b> {number(row.pendingKyc).toLocaleString('en-IN')}
+          </div>
+        </div>
+
+        <div className={styles.card}>
+          <SectionHead icon="💳" title="Finance & Earnings" note="Authoritative ledger and payment totals" />
+          <div className={styles.summary}>
+            <div><small>GROSS COLLECTED</small><b>{money(row.grossCollections, currency)}</b></div>
+            <div><small>REFUNDS</small><b>{money(row.totalRefunds, currency)}</b></div>
+            <div><small>WALLET CREDITS</small><b>{money(row.walletCredits, currency)}</b></div>
+            <div><small>WALLET DEBITS</small><b>{money(row.walletDebits, currency)}</b></div>
+          </div>
+          <div className={classNames(styles.notice, styles.success)}>
+            <b>Net collections:</b> {money(row.netCollections, currency)} • <b>Member wallet balance:</b> {money(row.walletBalance, currency)}
+          </div>
+        </div>
+      </div>
+
+      <div className={styles.grid2}>
+        <div className={styles.card}>
+          <SectionHead icon="🎯" title="Draws & Rewards" note="Owner-action and reward lifecycle snapshot" />
+          <div className={styles.summary}>
+            <div><small>OPEN DRAWS</small><b>{number(row.openDraws).toLocaleString('en-IN')}</b></div>
+            <div><small>WINNERS</small><b>{number(row.totalWinners).toLocaleString('en-IN')}</b></div>
+            <div><small>OPEN CLAIMS</small><b>{number(row.openPrizeClaims).toLocaleString('en-IN')}</b></div>
+            <div><small>RANK ACHIEVEMENTS</small><b>{number(row.rankAchievementCount).toLocaleString('en-IN')}</b></div>
+          </div>
+          <div className={styles.notice}><b>Rank cash awarded:</b> {money(row.rankCashAwarded, currency)}</div>
+        </div>
+
+        <div className={styles.card}>
+          <SectionHead icon="🔐" title="Inventory & Authorization" note="Operational inventory available now" />
+          <div className={styles.summary}>
+            <div><small>ACTIVE E-PINS</small><b>{number(row.activeEpins).toLocaleString('en-IN')}</b></div>
+            <div><small>UNUSED E-PINS</small><b>{number(row.unusedEpins).toLocaleString('en-IN')}</b></div>
+            <div><small>USED E-PINS</small><b>{number(row.usedEpins).toLocaleString('en-IN')}</b></div>
+            <div><small>ACTIVE AUTH CODES</small><b>{number(row.activeAuthCodes).toLocaleString('en-IN')}</b></div>
+          </div>
+          <div className={styles.notice}>Authorization-code count includes only active, unexpired operator codes.</div>
+        </div>
+      </div>
+
+      <div className={styles.grid2}>
+        <div className={styles.card}>
+          <SectionHead icon="🆕" title="Latest Members" note="Most recently created MEMBER accounts" />
+          {recentMembers.length ? <div className={styles.tableBox}><table className={styles.table}>
+            <thead><tr><th>MEMBER</th><th>NAME</th><th>STATUS</th><th>CREATED</th></tr></thead>
+            <tbody>{recentMembers.map((member) => <tr key={text(member.id)}>
+              <td><b>{text(member.username)}</b></td>
+              <td>{memberDisplayName(member)}</td>
+              <td className={text(member.status) === 'ACTIVE' ? styles.status : styles.statusOff}>{text(member.status)}</td>
+              <td>{dateTime(member.createdAt, displayTimeZone)}</td>
+            </tr>)}</tbody>
+          </table></div> : <Empty>No MEMBER accounts yet.</Empty>}
+        </div>
+
+        <div className={styles.card}>
+          <SectionHead icon="🧾" title="Latest Payments" note="Most recent confirmed payment records" />
+          {recentPayments.length ? <div className={styles.tableBox}><table className={styles.table}>
+            <thead><tr><th>MEMBER</th><th>AMOUNT</th><th>DATE / TIME</th></tr></thead>
+            <tbody>{recentPayments.map((payment) => <tr key={text(payment.id)}>
+              <td><b>{text(payment.username)}</b><br />{memberDisplayName(payment)}</td>
+              <td>{money(payment.amount, text(payment.currencyCode, currency))}</td>
+              <td>{dateTime(payment.occurredAt, displayTimeZone)}</td>
+            </tr>)}</tbody>
+          </table></div> : <Empty>No payments recorded yet.</Empty>}
+        </div>
+      </div>
+
       <div className={styles.grid2}>
         <div className={styles.card}>
           <SectionHead icon="🌳" title="Binary 1:4 Rule" note="Client revised topology" />
           <div className={styles.notice}><b>A + B = LEFT</b> • <b>C + D = RIGHT</b></div>
           <div className={classNames(styles.notice, styles.success)}><b>Valid pair lanes:</b> A:C and B:D only.</div>
+          <div className={styles.summary}>
+            <div><small>TOTAL PAIR MATCHES</small><b>{number(row.totalPairs).toLocaleString('en-IN')}</b></div>
+            <div><small>PAYABLE PAIRS</small><b>{number(row.qualifiedPairs).toLocaleString('en-IN')}</b></div>
+            <div><small>PAIR VALUE</small><b>{money(active.pairPayoutAmount ?? active.pairValue, currency)}</b></div>
+            <div><small>DAILY CAP</small><b>{money(row.dailyCap, currency)}</b></div>
+          </div>
         </div>
+
         <div className={styles.card}>
           <SectionHead icon="ℹ️" title="Current Configuration" />
           <div className={styles.notice}><b>Joining:</b> {money(number(active.registrationFee) + number(active.installmentAmount), currency)} = {money(active.installmentAmount, currency)} monthly EMI + {money(active.registrationFee, currency)} registration.</div>
           <div className={classNames(styles.notice, styles.warn)}>Income / Reward Types remain informational; editable financial truth lives in versioned Season policies.</div>
+          <div className={styles.notice}><b>Dashboard refreshed:</b> {dateTime(row.generatedAt, displayTimeZone)}</div>
         </div>
       </div>
+
       <div className={styles.card}>
         <SectionHead icon="⚙️" title="Automatic Earnings Processing" note="No operator action required" />
         <div className={classNames(styles.notice, styles.success)}>
