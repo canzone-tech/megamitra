@@ -71,9 +71,6 @@ jobs:
           docker compose -f ../docker-compose.yml up -d --wait --wait-timeout 120
           docker compose -f ../docker-compose.yml ps
 
-      - name: Probe patched Handlebars metadata
-        run: npm view handlebars@4.7.10 version dist.tarball dist.integrity
-
       - name: Install exact dependencies
         run: npm ci
 
