@@ -90,7 +90,8 @@
   "overrides": {
     "deepmerge-ts": "8.0.0",
     "mariadb": "3.5.4",
-    "mysql2": "3.23.1"
+    "mysql2": "3.23.1",
+    "handlebars": "4.7.10"
   },
   "allowScripts": {
     "@parcel/watcher@2.6.0": true,
