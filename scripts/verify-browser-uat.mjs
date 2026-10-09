@@ -634,7 +634,7 @@ async function main() {
   // Tests use an isolated MEMBER account and do not mutate financial state.
   const memberPages = [
     { slug: 'payments', heading: 'Installments & E-PINs', readyText: 'Payment receipts', waitForRefresh: true },
-    { slug: 'withdrawals', heading: 'Withdrawals', readyText: 'Wallet balance' },
+    { slug: 'withdrawals', heading: 'Withdrawals', readyText: 'Withdrawal limits & fees' },
     { slug: 'kyc', heading: 'KYC', readyText: 'Verification status' },
     { slug: 'entitlements', heading: 'My product benefits', readyText: 'Benefit history' },
     { slug: 'security', heading: 'Identity & email', readyText: 'uat-verify-member-' },
