@@ -80,6 +80,9 @@ jobs:
       - name: Audit production dependencies
         run: npm audit --omit=dev --audit-level=high
 
+      - name: Audit full dependency tree for high/critical findings
+        run: npm audit --audit-level=high
+
       - name: Validate operational scripts
         run: bash -n scripts/*.sh
 
