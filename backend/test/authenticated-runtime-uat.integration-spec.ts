@@ -332,6 +332,20 @@ describe('MegaGoldenClub authenticated runtime UAT', () => {
       expect(ownerLogin.status).toBe(200);
       const ownerHeaders = bearer(ownerLogin.body.accessToken);
 
+      const retiredDeploymentExport = await request(
+        '/admin/owner-portal/seasons/retired-deployment-contract/deployment-package',
+        { headers: ownerHeaders },
+      );
+      expect(retiredDeploymentExport.status).toBe(404);
+      const retiredDeploymentImport = await request(
+        '/admin/owner-portal/season-deployment/import',
+        {
+          method: 'POST',
+          headers: ownerHeaders,
+        },
+      );
+      expect(retiredDeploymentImport.status).toBe(404);
+
       const adminUsername = `uat_admin_${suffix}`;
       const agentUsername = `uat_agent_${suffix}`;
       const adminInitialPassword = 'Uat-Admin-Initial-123!';
