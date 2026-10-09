@@ -170,13 +170,11 @@ export class OwnerPortalService {
   async dashboard() {
     const now = new Date();
     const activeSeason = await this.rows<SeasonRow>(
-      `SELECT s.*, bpv.pairPayoutAmount, bpv.dailyPairCap, bpv.currencyCode, bpv.settlementTimezone
-       FROM owner_seasons s
-       LEFT JOIN binary_plan_versions bpv ON bpv.id = s.binaryPlanVersionId
-       WHERE s.status IN ('ACTIVE','PAUSED')
-       ORDER BY s.startDate DESC LIMIT 1`,
+      this.seasonSelectSql(
+        "WHERE s.status IN ('ACTIVE','PAUSED') ORDER BY s.startDate DESC LIMIT 1",
+      ),
     );
-    const season = activeSeason[0] ?? null;
+    const season = activeSeason[0] ? this.formatSeason(activeSeason[0]) : null;
 
     const [
       memberStats,
