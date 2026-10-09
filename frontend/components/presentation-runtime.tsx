@@ -3,6 +3,7 @@
 import type { CSSProperties, ReactNode } from 'react';
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { apiJson } from '@/lib/client-api';
+import { usePathname } from 'next/navigation';
 
 export type RuntimeTheme = {
   primary: string; secondary: string; accent: string; pageBackground: string; cardBackground: string;
@@ -51,6 +52,7 @@ export function usePresentationRuntime() {
 
 export function PresentationRuntimeProvider({ children }: { children: ReactNode }) {
   const [runtime, setRuntime] = useState<PresentationRuntime>(defaults);
+  const pathname = usePathname();
 
   useEffect(() => {
     let active = true;
@@ -63,6 +65,13 @@ export function PresentationRuntimeProvider({ children }: { children: ReactNode 
   const theme = runtime.theme.content;
   const template = runtime.template.content;
   const cms = runtime.cms.content;
+  const activeSection = ({
+    '/member/payments': ['Payments & E-PINs', 'Installments, payment receipts and E-PIN inventory'],
+    '/member/entitlements': ['My product benefits', 'Benefits, claims and fulfilment'],
+    '/member/withdrawals': ['Withdrawals', 'Wallet payouts, destinations and requests'],
+    '/member/kyc': ['KYC verification', 'Identity verification and review status'],
+    '/member/security': ['Account security', 'Email verification and account details'],
+  } as Record<string, [string, string]>)[pathname];
   const style = useMemo(() => ({
     '--portal-primary': theme.primary,
     '--portal-secondary': theme.secondary,
@@ -98,7 +107,7 @@ export function PresentationRuntimeProvider({ children }: { children: ReactNode 
         data-shadow={theme.shadow}
       >
         <div className="mm-runtime-topbar" aria-label="Member portal topbar">
-          <div><strong>{cms.dashboardEyebrow}</strong><span>{cms.dashboardSubtitle}</span></div>
+          <div><strong>{activeSection?.[0] ?? cms.dashboardEyebrow}</strong><span>{activeSection?.[1] ?? cms.dashboardSubtitle}</span></div>
           <span className="mm-runtime-status">Secure member workspace</span>
         </div>
         {children}

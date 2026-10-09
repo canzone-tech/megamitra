@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ApiClientError, apiJson } from '@/lib/client-api';
+import { MemberHeader } from '@/components/member-header';
 
 type Row = Record<string, unknown>;
 type Page<T> = { items: T[]; page: number; limit: number; total: number; totalPages: number };
@@ -143,11 +144,6 @@ export function MemberDashboard() {
     return full || data.dashboard.user.username;
   }, [data]);
 
-  async function logout() {
-    await apiJson<{ ok: boolean }>('/api/session/logout', { method: 'POST' });
-    router.replace('/login');
-    router.refresh();
-  }
 
   const primaryWallet = data?.dashboard.wallets[0];
   const dues = data?.dashboard.enrollments.dues ?? [];
@@ -176,20 +172,7 @@ export function MemberDashboard() {
 
   return (
     <div className="mm-member-shell">
-      <header className="mm-site-header">
-        <Link className="mm-brand" href="/member">
-          <span className="mm-brand-mark">M</span>
-          <span>Mega<span className="mm-brand-accent">GoldenClub</span></span>
-        </Link>
-        <nav className="mm-nav" aria-label="Member navigation">
-          <Link className="mm-button light" href="/member/entitlements">Products</Link>
-          <Link className="mm-button light" href="/member/withdrawals">Withdrawals</Link>
-          <Link className="mm-button light" href="/member/kyc">KYC</Link>
-          <Link className="mm-button light" href="/member/security">Security</Link>
-          <Link className="mm-button light" href="/">Public site</Link>
-          <button className="mm-button" type="button" onClick={() => void logout()}>Sign out</button>
-        </nav>
-      </header>
+      <MemberHeader />
 
       <main className="mm-member-main">
         <div className="mm-member-hero">

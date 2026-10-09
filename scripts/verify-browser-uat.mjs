@@ -383,6 +383,21 @@ async function runScenario(debugPort, scenario) {
       }
     }
 
+    if (scenario.requireMemberMobileNav) {
+      const opened = await evaluate(client, `(() => {
+        const button = document.querySelector('nav[aria-label="Member navigation"] button[data-member-label="More"]');
+        if (!button) return false;
+        button.click();
+        return true;
+      })()`);
+      if (!opened) throw new Error('Member mobile More navigation button was not found');
+      await waitForExpression(
+        client,
+        'document.querySelector("#member-more-menu:not([hidden])")?.textContent?.includes("Sign out")',
+        'member mobile More menu',
+      );
+    }
+
     if (scenario.action === 'open-admin-mobile-more') {
       const clicked = await evaluate(client, `(() => {
         const button = [...document.querySelectorAll('button')].find((node) => node.textContent?.trim() === '☰More' || node.textContent?.trim() === 'More' || node.textContent?.includes('More'));
@@ -405,7 +420,7 @@ async function runScenario(debugPort, scenario) {
       const memberNavLabels = memberNav
         ? [...memberNav.querySelectorAll('a,button')]
             .filter((node) => getComputedStyle(node).display !== 'none' && getComputedStyle(node).visibility !== 'hidden')
-            .map((node) => node.textContent?.trim())
+            .map((node) => node.getAttribute('data-member-label') ?? node.textContent?.trim())
             .filter(Boolean)
         : [];
       return {
@@ -418,6 +433,7 @@ async function runScenario(debugPort, scenario) {
         primaryHeadings: [...document.querySelectorAll('h1')].map((node) => node.textContent?.trim()).filter(Boolean),
         navLabels: [...document.querySelectorAll('nav a, nav button')].map((node) => node.textContent?.trim()).filter(Boolean),
         memberNavLabels,
+        memberMoreLabels: [...document.querySelectorAll('#member-more-menu:not([hidden]) [data-member-label]')].map((node) => node.getAttribute('data-member-label')),
         memberNavScrollable: memberNav ? memberNav.scrollWidth > memberNav.clientWidth : false,
         adminNavIcons: Object.fromEntries(
           [...document.querySelectorAll('aside nav a')]
@@ -472,11 +488,14 @@ async function runScenario(debugPort, scenario) {
         throw new Error(`${scenario.name} admin navigation icon mismatch: ${mismatches.join('; ')}`);
       }
     }
-    if (scenario.requireMemberMobileNav) {
-      const required = ['Products', 'Withdrawals', 'KYC', 'Security', 'Public site', 'Sign out'];
-      const missing = required.filter((label) => !metrics.memberNavLabels.includes(label));
-      if (missing.length) {
-        throw new Error(`${scenario.name} hides member mobile navigation actions: ${missing.join(', ')}`);
+    if (scenario.requireMemberMobileNav || scenario.requireMemberDesktopNav) {
+      const primary = ['Dashboard', 'Payments & E-PINs', 'Products'];
+      const missingPrimary = primary.filter((label) => !metrics.memberNavLabels.includes(label));
+      const secondary = ['Withdrawals', 'KYC', 'Security', 'Public site', 'Sign out'];
+      const availableSecondary = scenario.requireMemberMobileNav ? metrics.memberMoreLabels : metrics.memberNavLabels;
+      const missingSecondary = secondary.filter((label) => !availableSecondary.includes(label));
+      if (missingPrimary.length || missingSecondary.length || (scenario.requireMemberMobileNav && !metrics.memberNavLabels.includes('More'))) {
+        throw new Error(`${scenario.name} navigation missing primary=${missingPrimary.join(', ')} secondary=${missingSecondary.join(', ')}`);
       }
     }
     if (scenario.requireMemberApi) {
@@ -615,6 +634,7 @@ async function main() {
       height: 1000,
       mobile: false,
       expectedTexts: ['MegaGoldenClub', 'Hello, UAT Member', 'Binary performance'],
+      requireMemberDesktopNav: true,
     },
     {
       name: 'member-dashboard-mobile-nav',
@@ -656,6 +676,8 @@ async function main() {
         expectedTexts: [page.heading, page.readyText],
         waitForRefresh: page.waitForRefresh,
         requireMemberApi: true,
+        requireMemberMobileNav: viewport.mobile,
+        requireMemberDesktopNav: !viewport.mobile,
       });
     }
   }

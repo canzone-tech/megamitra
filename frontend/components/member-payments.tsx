@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import { ApiClientError, apiJson } from '@/lib/client-api';
+import { MemberHeader } from '@/components/member-header';
 
 type Season = {
   id: string;
@@ -238,10 +239,7 @@ export function MemberPayments() {
   const rail = config?.paymentRail;
   return (
     <div className="mm-member-shell">
-      <header className="mm-site-header">
-        <Link className="mm-brand" href="/member"><span className="mm-brand-mark">M</span><span>Mega<span className="mm-brand-accent">GoldenClub</span></span></Link>
-        <nav className="mm-nav" aria-label="Payment navigation"><Link className="mm-button light" href="/member">Dashboard</Link><Link className="mm-button light" href="/member/entitlements">Products</Link><Link className="mm-button light" href="/member/withdrawals">Withdrawals</Link></nav>
-      </header>
+      <MemberHeader />
       <main className="mm-member-main">
         <div className="mm-member-hero"><div><p className="mm-eyebrow">Member payments</p><h1 className="mm-title">Installments & E-PINs</h1><p className="mm-subtitle">Pay by QR / UPI, submit UTR and screenshot, and keep the same public receipt through verification.</p><span className="mm-portal-pill">Super Admin verification required</span></div><button className="mm-button blue" type="button" disabled={loading} onClick={() => void load()}>{loading ? 'Refreshing…' : 'Refresh'}</button></div>
         {error ? <div className="mm-error" role="alert">{error}</div> : null}

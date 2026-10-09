@@ -1,9 +1,9 @@
 'use client';
 
-import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ApiClientError, apiJson } from '@/lib/client-api';
+import { MemberHeader } from '@/components/member-header';
 
 type Row = Record<string, unknown>;
 type Data = { items: Row[]; counts: Row[] };
@@ -86,18 +86,10 @@ export function MemberEntitlements() {
     }
   }
 
-  async function logout() {
-    await apiJson<{ ok: boolean }>('/api/session/logout', { method: 'POST' });
-    router.replace('/login');
-    router.refresh();
-  }
 
   return (
     <div className="mm-member-shell">
-      <header className="mm-site-header">
-        <Link className="mm-brand" href="/member"><span className="mm-brand-mark">M</span><span>Mega<span className="mm-brand-accent">GoldenClub</span></span></Link>
-        <nav className="mm-nav"><Link className="mm-button light" href="/member/entitlements">Products</Link><Link className="mm-button light" href="/member/withdrawals">Withdrawals</Link><Link className="mm-button light" href="/member/kyc">KYC</Link><Link className="mm-button light" href="/member/security">Security</Link><button className="mm-button" type="button" onClick={() => void logout()}>Sign out</button></nav>
-      </header>
+      <MemberHeader />
 
       <main className="mm-member-main">
         <div className="mm-member-hero">

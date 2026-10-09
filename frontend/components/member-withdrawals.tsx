@@ -1,9 +1,9 @@
 'use client';
 
-import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ApiClientError, apiJson } from '@/lib/client-api';
+import { MemberHeader } from '@/components/member-header';
 
 type Destination = {
   id: string;
@@ -221,10 +221,7 @@ export function MemberWithdrawals() {
 
   return (
     <div className="mm-member-shell">
-      <header className="mm-site-header">
-        <Link className="mm-brand" href="/member"><span className="mm-brand-mark">M</span><span>Mega<span className="mm-brand-accent">GoldenClub</span></span></Link>
-        <nav className="mm-nav"><Link className="mm-button light" href="/member">Dashboard</Link><Link className="mm-button light" href="/member/kyc">KYC</Link><Link className="mm-button light" href="/member/security">Security</Link><Link className="mm-button light" href="/">Public site</Link></nav>
-      </header>
+      <MemberHeader />
 
       <main className="mm-member-main">
         <div className="mm-member-hero">
