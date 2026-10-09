@@ -89,7 +89,7 @@
   },
   "overrides": {
     "deepmerge-ts": "8.0.0",
-    "mariadb": "3.5.3",
+    "mariadb": "3.5.4",
     "mysql2": "3.23.1"
   },
   "allowScripts": {
