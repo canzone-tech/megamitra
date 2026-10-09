@@ -17,6 +17,9 @@ fi
 echo "==> Validating operational shell scripts"
 bash -n scripts/*.sh
 
+echo "==> Verifying compiled API port fallback"
+node scripts/test-select-verify-port.mjs
+
 echo "==> Verifying canonical UAT documentation"
 node "${ROOT_DIR}/scripts/verify-uat-docs.mjs"
 
@@ -90,8 +93,9 @@ fi
 echo "==> Verify Next.js admin and public/member apps"
 bash "${ROOT_DIR}/scripts/verify-frontends.sh"
 
-PORT_VALUE="$(grep -E '^PORT=' .env | tail -n1 | cut -d= -f2- || true)"
-PORT_VALUE="${PORT_VALUE:-3100}"
+CONFIGURED_PORT_VALUE="$(grep -E '^PORT=' .env | tail -n1 | cut -d= -f2- || true)"
+CONFIGURED_PORT_VALUE="${CONFIGURED_PORT_VALUE:-3100}"
+PORT_VALUE="$(node scripts/select-verify-port.mjs "${CONFIGURED_PORT_VALUE}")"
 LOG_FILE="$(mktemp -t megagoldenclub-api.XXXXXX.log)"
 UAT_FIXTURE_FILE="$(mktemp -t megagoldenclub-uat-auth.XXXXXX)"
 UAT_FIXTURE_READY=""
@@ -151,7 +155,7 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 if ! assert_port_available; then
-  echo "ERROR: port ${PORT_VALUE} is already in use before compiled API verification"
+  echo "ERROR: selected verification port ${PORT_VALUE} became unavailable before compiled API startup"
   exit 1
 fi
 
@@ -165,8 +169,8 @@ if [[ -z "${UAT_ADMIN_TOKEN_VALUE}" || -z "${UAT_MEMBER_TOKEN_VALUE}" ]]; then
   exit 1
 fi
 
-echo "==> Booting compiled API on port ${PORT_VALUE}"
-setsid npm run start:prod >"${LOG_FILE}" 2>&1 &
+echo "==> Booting compiled API on verification port ${PORT_VALUE}"
+setsid env PORT="${PORT_VALUE}" npm run start:prod >"${LOG_FILE}" 2>&1 &
 API_PID=$!
 
 HEALTH=""
@@ -208,7 +212,7 @@ fi
 rm -f "${LOG_FILE}"
 trap - EXIT INT TERM
 if ! assert_port_available; then
-  echo "ERROR: verification left port ${PORT_VALUE} in use"
+  echo "ERROR: verification left temporary API port ${PORT_VALUE} in use"
   exit 1
 fi
 
