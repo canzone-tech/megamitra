@@ -9,6 +9,7 @@ import {
   ReassignEpinDto,
   ReviewMemberPaymentDto,
   SubmitEpinPaymentDto,
+  RedeemInstallmentEpinDto,
   SubmitInstallmentPaymentDto,
   UpdatePaymentSettingsDto,
 } from './member-payment.dto';
@@ -35,6 +36,14 @@ export class MemberPaymentController {
     @CurrentUser() actor: AuthUser,
   ) {
     return this.payments.submitInstallment(actor.id, dto);
+  }
+
+  @Post('installments/redeem-epin')
+  redeemInstallmentEpin(
+    @Body() dto: RedeemInstallmentEpinDto,
+    @CurrentUser() actor: AuthUser,
+  ) {
+    return this.payments.redeemInstallmentEpin(actor.id, dto.epinId);
   }
 
   @Post('epins')

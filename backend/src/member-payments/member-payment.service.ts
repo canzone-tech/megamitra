@@ -101,6 +101,7 @@ type InstallmentRow = {
   sequence: number;
   amount: string;
   paid: string | number | null;
+  dueDate: Date | string;
 };
 
 type EpinRow = {
@@ -146,7 +147,7 @@ export class MemberPaymentService {
          WHERE s.status='ACTIVE' AND pv.lifecycle='PUBLISHED'
          ORDER BY s.startDate ASC, s.createdAt ASC`,
       ),
-      this.findEnrollment(userId, false),
+      this.findEnrollment(userId, false, true),
     ]);
     return {
       paymentRail: {
@@ -241,6 +242,158 @@ export class MemberPaymentService {
       },
     });
     return this.receiptEnvelope(submission);
+  }
+
+  /**
+   * Redeem one previously paid installment E-PIN. All authoritative writes
+   * (pin, payment, allocation, event) are atomic and scoped to this member.
+   */
+  async redeemInstallmentEpin(userId: string, epinId: string) {
+    const now = new Date();
+    const occurredAt = now.toISOString().replace('T', ' ').replace('Z', '');
+    const outcome = await this.db.transaction(async (connection) => {
+      const enrollmentRows = await connection.query<Array<{
+        id: string; currencyCode: string; installmentAmountSnapshot: string; seasonId: string;
+      }>>(
+        "SELECT e.id, e.currencyCode, e.installmentAmountSnapshot, s.id AS seasonId " +
+        "FROM program_enrollments e JOIN owner_seasons s ON s.programVersionId=e.programVersionId " +
+        "WHERE e.userId=? AND e.status='ACTIVE' ORDER BY e.enrolledAt DESC LIMIT 1 FOR UPDATE",
+        [userId],
+      );
+      const enrollment = enrollmentRows[0];
+      if (!enrollment) throw new ConflictException('No active session enrollment for installment redemption');
+
+      const pins = await connection.query<Array<{
+        id: string; status: string; pinType: string; seasonId: string | null;
+        currencyCodeSnapshot: string | null; registrationFeeSnapshot: string | null;
+        installmentAmountSnapshot: string | null; expiresAt: Date; usedByUserId: string | null;
+      }>>(
+        "SELECT id, status, pinType, seasonId, currencyCodeSnapshot, registrationFeeSnapshot, " +
+        "installmentAmountSnapshot, expiresAt, usedByUserId FROM owner_epins " +
+        "WHERE id=? AND assignedUserId=? LIMIT 1 FOR UPDATE",
+        [epinId, userId],
+      );
+      const pin = pins[0];
+      if (!pin || pin.status !== 'ACTIVE' || pin.usedByUserId ||
+          new Date(pin.expiresAt).getTime() <= now.getTime()) {
+        throw new ConflictException('Installment E-PIN is unavailable, expired or already used');
+      }
+      if (pin.pinType !== 'INSTALLMENT' || pin.seasonId !== enrollment.seasonId ||
+          pin.currencyCodeSnapshot !== enrollment.currencyCode ||
+          Number(pin.registrationFeeSnapshot ?? 0) !== 0 ||
+          Number(pin.installmentAmountSnapshot) !== Number(enrollment.installmentAmountSnapshot)) {
+        throw new ConflictException('E-PIN must match installment type, session and commercial value');
+      }
+      const pending = await connection.query<Array<{ total: string | number }>>(
+        "SELECT COUNT(*) AS total FROM member_payment_submissions " +
+        "WHERE requesterUserId=? AND enrollmentId=? AND purpose='INSTALLMENT' " +
+        "AND status IN ('PENDING_VERIFICATION','PROCESSING')",
+        [userId, enrollment.id],
+      );
+      if (Number(pending[0]?.total ?? 0) > 0) {
+        throw new ConflictException('UPI payment pending review; wait before redeeming an installment E-PIN');
+      }
+      const installments = await connection.query<Array<{ id: string; sequence: number; amount: string }>>(
+        'SELECT id, sequence, amount FROM program_installments WHERE enrollmentId=? ORDER BY sequence ASC FOR UPDATE',
+        [enrollment.id],
+      );
+      let next: { id: string; sequence: number; amount: string } | undefined;
+      let remainingCount = 0;
+      for (const item of installments) {
+        const amounts = await connection.query<Array<{ paid: string | number }>>(
+          "SELECT COALESCE(SUM(a.amount - COALESCE(ra.refunded,0)),0) AS paid " +
+          "FROM program_payment_allocations a LEFT JOIN " +
+          "(SELECT paymentAllocationId,SUM(amount) AS refunded FROM program_refund_allocations GROUP BY paymentAllocationId) ra " +
+          "ON ra.paymentAllocationId=a.id WHERE a.installmentId=? AND a.allocationType='INSTALLMENT'",
+          [item.id],
+        );
+        const paid = Number(amounts[0]?.paid ?? 0);
+        if (paid + 0.0001 < Number(item.amount)) {
+          if (!next) {
+            if (paid !== 0) throw new ConflictException('Partially paid installment cannot use a full E-PIN');
+            next = item;
+          }
+          remainingCount++;
+        }
+      }
+      if (!next || Number(next.amount) !== Number(pin.installmentAmountSnapshot)) {
+        throw new ConflictException('No matching unpaid installment remains for this E-PIN');
+      }
+
+      const amount = this.money(Number(next.amount));
+      const attemptId = randomUUID();
+      const paymentId = randomUUID();
+      const eventId = randomUUID();
+      const source = 'epin-installment-payment:' + pin.id;
+      const fingerprint = createHash('sha256').update(pin.id + ':' + enrollment.id + ':' + next.id).digest('hex');
+      const metadata = JSON.stringify({
+        source: 'SESSION_BOUND_INSTALLMENT_EPIN', epinId: pin.id,
+        seasonId: pin.seasonId, installmentSequence: next.sequence,
+      });
+      await connection.query(
+        "INSERT INTO program_payment_attempts " +
+        "(id,sourceKey,requestFingerprint,enrollmentId,amount,currencyCode,provider,providerReference," +
+        "status,initiatedAt,finalizedAt,metadata,createdByUserId) " +
+        "VALUES (?,?,?,?,?,?,'EPIN_PREPAID',?,'CONFIRMED',?,?,?,?)",
+        [attemptId, source, fingerprint, enrollment.id, amount, enrollment.currencyCode,
+         pin.id, occurredAt, occurredAt, metadata, userId],
+      );
+      await connection.query(
+        "INSERT INTO program_payment_records " +
+        "(id,sourceKey,requestFingerprint,paymentAttemptId,enrollmentId,amount,currencyCode," +
+        "provider,providerReference,occurredAt,metadata,createdByUserId) " +
+        "VALUES (?,?,?,?,?,?,?,'EPIN_PREPAID',?,?,?,?)",
+        [paymentId, source + ':confirmed', fingerprint, attemptId, enrollment.id,
+         amount, enrollment.currencyCode, pin.id, occurredAt, metadata, userId],
+      );
+      await connection.query(
+        "INSERT INTO program_payment_allocations " +
+        "(id,paymentRecordId,enrollmentId,allocationType,installmentId,amount) " +
+        "VALUES (?,?,?,'INSTALLMENT',?,?)",
+        [randomUUID(), paymentId, enrollment.id, next.id, amount],
+      );
+      const consumed = await connection.query<{ affectedRows: number }>(
+        "UPDATE owner_epins SET status='USED', usedByUserId=?, usedAt=?, updatedAt=CURRENT_TIMESTAMP(3) " +
+        "WHERE id=? AND assignedUserId=? AND status='ACTIVE' AND usedByUserId IS NULL AND expiresAt>?",
+        [userId, occurredAt, pin.id, userId, occurredAt],
+      );
+      if (Number(consumed.affectedRows ?? 0) !== 1) {
+        throw new ConflictException('Installment E-PIN was already consumed');
+      }
+      await connection.query(
+        "INSERT INTO program_business_events " +
+        "(id,sourceKey,type,enrollmentId,paymentRecordId,occurredAt,payload) " +
+        "VALUES (?,?,'PAYMENT_CONFIRMED',?,?,?,?)",
+        [eventId, 'PROGRAM_PAYMENT:' + paymentId + ':CONFIRMED', enrollment.id,
+         paymentId, occurredAt, JSON.stringify({ paymentAttemptId: attemptId, amount, currencyCode: enrollment.currencyCode, epinId: pin.id })],
+      );
+      if (remainingCount === 1) {
+        await connection.query(
+          "UPDATE program_enrollments SET status='COMPLETED',updatedAt=CURRENT_TIMESTAMP(3) WHERE id=? AND status='ACTIVE'",
+          [enrollment.id],
+        );
+        await connection.query(
+          "INSERT INTO program_business_events (id,sourceKey,type,enrollmentId,paymentRecordId,occurredAt,payload) " +
+          "VALUES (?,?,'ENROLLMENT_COMPLETED',?,?,?,?)",
+          [randomUUID(), 'PROGRAM_ENROLLMENT:' + enrollment.id + ':COMPLETED:' + paymentId,
+           enrollment.id, paymentId, occurredAt, JSON.stringify({ reason: 'FULLY_PAID', epinId: pin.id })],
+        );
+      }
+      return {
+        status: 'CONFIRMED' as const, enrollmentId: enrollment.id, seasonId: enrollment.seasonId,
+        currencyCode: enrollment.currencyCode, amount, installmentSequence: Number(next.sequence),
+        paymentRecordId: paymentId, businessEventId: eventId, epinId: pin.id,
+      };
+    });
+    await this.audit.log({
+      actorUserId: userId, action: AuditAction.UPDATE, entityType: 'OwnerEpin',
+      entityId: epinId, description: 'Member redeemed a prepaid installment E-PIN',
+      metadata: {
+        enrollmentId: outcome.enrollmentId, seasonId: outcome.seasonId,
+        installmentSequence: outcome.installmentSequence, paymentRecordId: outcome.paymentRecordId,
+      },
+    });
+    return outcome;
   }
 
   async submitEpinPurchase(userId: string, dto: SubmitEpinPaymentDto) {
@@ -895,7 +1048,7 @@ export class MemberPaymentService {
 
   private async installmentSummary(enrollment: EnrollmentRow) {
     const installments = await this.rows<InstallmentRow>(
-      `SELECT i.id, i.sequence, i.amount,
+      `SELECT i.id, i.sequence, i.amount, i.dueDate,
               COALESCE(SUM(a.amount - COALESCE(ra.refunded, 0)), 0) AS paid
        FROM program_installments i
        LEFT JOIN program_payment_allocations a
@@ -905,12 +1058,13 @@ export class MemberPaymentService {
          FROM program_refund_allocations GROUP BY paymentAllocationId
        ) ra ON ra.paymentAllocationId=a.id
        WHERE i.enrollmentId=?
-       GROUP BY i.id, i.sequence, i.amount
+       GROUP BY i.id, i.sequence, i.amount, i.dueDate
        ORDER BY i.sequence ASC`,
       [enrollment.id],
     );
     const normalized = installments.map((item) => ({
       sequence: Number(item.sequence),
+      dueDate: item.dueDate instanceof Date ? item.dueDate.toISOString().slice(0, 10) : String(item.dueDate).slice(0, 10),
       amount: Number(item.amount),
       paid: Number(item.paid ?? 0),
       complete: Number(item.paid ?? 0) + 0.0001 >= Number(item.amount),
@@ -928,6 +1082,7 @@ export class MemberPaymentService {
       paidInstallmentCount,
       remainingInstallmentCount: remaining.length,
       nextUnpaidSequence: remaining[0]?.sequence ?? null,
+      unpaidInstallments: remaining.map((item) => ({ sequence: item.sequence, dueDate: item.dueDate, amount: this.money(item.amount) })),
       fullyPaid: remaining.length === 0,
     };
   }

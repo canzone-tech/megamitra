@@ -1,10 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AuditService } from '../audit/audit.service';
 import { FinancialDbService } from '../database/financial-db.service';
 import { PrismaService } from '../database/prisma.service';
 import { LuckyDrawTokenService } from '../lucky-draw/lucky-draw-token.service';
 import { ProgramPaymentService } from '../program/program-payment.service';
+import { ProgramAutomationService } from '../program/program-automation.service';
 import { MemberPaymentService } from './member-payment.service';
 
 type ReceiptRecord = Record<string, unknown> & {
@@ -26,6 +27,7 @@ type MemberSubmissionRows = Awaited<ReturnType<MemberPaymentService['memberSubmi
 
 @Injectable()
 export class TokenizedMemberPaymentService extends MemberPaymentService {
+  private readonly logger = new Logger(TokenizedMemberPaymentService.name);
 
   constructor(
     prisma: PrismaService,
@@ -34,8 +36,34 @@ export class TokenizedMemberPaymentService extends MemberPaymentService {
     config: ConfigService,
     audit: AuditService,
     private readonly drawTokens: LuckyDrawTokenService,
+    private readonly automation: ProgramAutomationService,
   ) {
     super(prisma, db, programPayments, config, audit);
+  }
+
+  async redeemInstallmentEpin(userId: string, epinId: string) {
+    const result = await super.redeemInstallmentEpin(userId, epinId);
+    let reconciliationPending = false;
+    let drawTokens: Awaited<ReturnType<LuckyDrawTokenService['ensurePaymentRecordInstallmentTokens']>> = [];
+    try {
+      drawTokens = await this.drawTokens.ensurePaymentRecordInstallmentTokens(result.paymentRecordId);
+    } catch (error) {
+      reconciliationPending = true;
+      this.logger.warn('Installment E-PIN draw token provisioning requires reconciliation: ' +
+        (error instanceof Error ? error.message : String(error)));
+    }
+    try {
+      await this.automation.processEvent(result.businessEventId, userId);
+    } catch (error) {
+      reconciliationPending = true;
+      this.logger.warn('Installment E-PIN business event requires retry: ' +
+        (error instanceof Error ? error.message : String(error)));
+    }
+    return {
+      ...result,
+      drawTokens: drawTokens.map((item) => ({ token: item.token, installmentSequence: item.installmentSequence })),
+      reconciliationPending,
+    };
   }
 
   async reviewSubmission(...args: Parameters<MemberPaymentService['reviewSubmission']>) {

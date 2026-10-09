@@ -287,3 +287,39 @@
     bottom: auto;
   }
 }
+
+
+/* Session-aware installment payment methods, accessible across portal templates. */
+.mm-payment-qr { display: block; width: min(100%, 260px); height: auto; border: 1px solid var(--portal-border); border-radius: 12px; background: white; }
+.mm-payment-qr-missing, .mm-payment-pending {
+  padding: 14px 16px; border: 1px solid var(--portal-border); border-radius: 12px;
+  background: color-mix(in srgb, var(--portal-accent) 10%, var(--portal-card));
+  line-height: 1.5; font-size: 13px;
+}
+.mm-payment-due {
+  display: grid; gap: 5px; padding: 14px 16px; border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--portal-primary) 30%, var(--portal-border));
+  background: color-mix(in srgb, var(--portal-primary) 6%, var(--portal-card));
+}
+.mm-payment-due strong:last-child { color: var(--portal-primary); font-size: 21px; }
+.mm-payment-context { margin: 0 0 16px; line-height: 1.55; }
+.mm-payment-note { margin: 12px 0 0; color: var(--portal-muted); font-size: 13px; line-height: 1.5; }
+.mm-payment-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+.mm-payment-tab {
+  border: 1px solid var(--portal-border); border-radius: 12px; padding: 11px 18px;
+  background: var(--portal-card); color: var(--portal-text); font: inherit;
+  font-weight: 800; cursor: pointer;
+}
+.mm-payment-tab.active, .mm-payment-tab[aria-pressed='true'] {
+  border-color: var(--portal-primary); color: var(--portal-primary);
+  background: color-mix(in srgb, var(--portal-primary) 10%, var(--portal-card));
+}
+.mm-payment-tab:focus-visible { outline: 3px solid var(--portal-primary); outline-offset: 2px; }
+.mm-payment-form { max-width: 760px; }
+.mm-payment-form > p { font-size: 13px; line-height: 1.55; }
+.mm-member-shell .mm-payment-form .mm-field { min-width: 0; }
+.mm-member-shell .mm-payment-form .mm-input { min-width: 0; }
+@media (max-width: 430px) {
+  .mm-payment-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .mm-payment-tab { padding: 11px 9px; }
+}

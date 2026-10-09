@@ -8,6 +8,7 @@ import {
   Length,
   Max,
   MaxLength,
+  IsUUID,
   Min,
 } from 'class-validator';
 
@@ -23,6 +24,10 @@ export class SubmitInstallmentPaymentDto {
   @IsNumberString() amount!: string;
   @IsString() @Length(4, 191) utr!: string;
   @IsString() @MaxLength(120_000) paymentProofDataUrl!: string;
+}
+
+export class RedeemInstallmentEpinDto {
+  @IsUUID() epinId!: string;
 }
 
 export class SubmitEpinPaymentDto {

@@ -16,6 +16,7 @@ type Season = {
   joiningAmount: string;
 };
 type Installment = {
+  seasonId: string;
   seasonCode: string;
   seasonName: string;
   currencyCode: string;
@@ -24,6 +25,7 @@ type Installment = {
   paidInstallmentCount: number;
   remainingInstallmentCount: number;
   nextUnpaidSequence: number | null;
+  unpaidInstallments: Array<{ sequence: number; dueDate: string; amount: string }>;
   fullyPaid: boolean;
 };
 type Config = {
@@ -54,6 +56,7 @@ type Receipt = {
 type Epin = {
   id: string;
   pin: string | null;
+  seasonId: string | null;
   displaySuffix: string;
   status: string;
   pinType: 'ACTIVATION' | 'INSTALLMENT';
@@ -129,8 +132,10 @@ export function MemberPayments() {
   const [history, setHistory] = useState<Receipt[]>([]);
   const [epins, setEpins] = useState<Epin[]>([]);
   const [seasonId, setSeasonId] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<'UPI' | 'EPIN'>('UPI');
+  const [selectedEpinId, setSelectedEpinId] = useState('');
   const [epinQuantity, setEpinQuantity] = useState(1);
-  const [epinType, setEpinType] = useState<'ACTIVATION' | 'INSTALLMENT'>('ACTIVATION');
+  const [epinType, setEpinType] = useState<'ACTIVATION' | 'INSTALLMENT'>('INSTALLMENT');
   const [installmentCount, setInstallmentCount] = useState(1);
   const [installmentProof, setInstallmentProof] = useState('');
   const [epinProof, setEpinProof] = useState('');
@@ -164,7 +169,7 @@ export function MemberPayments() {
       setConfig(nextConfig);
       setHistory(nextHistory);
       setEpins(nextEpins);
-      setSeasonId((current) => current || nextConfig.seasons[0]?.id || '');
+      setSeasonId((current) => current || nextConfig.installment?.seasonId || nextConfig.seasons[0]?.id || '');
       const remaining = nextConfig.installment?.remainingInstallmentCount ?? 0;
       setInstallmentCount((current) => Math.max(1, Math.min(current, Math.max(1, remaining))));
     } catch (reason) {
@@ -182,6 +187,12 @@ export function MemberPayments() {
   const selectedSeason = useMemo(() => config?.seasons.find((item) => item.id === seasonId) ?? null, [config, seasonId]);
   const installment = config?.installment ?? null;
   const installmentTotal = Number(installment?.installmentAmount ?? 0) * installmentCount;
+  const unpaidInstallments = installment?.unpaidInstallments ?? [];
+  const dueSelection = unpaidInstallments.slice(0, installmentCount);
+  const upiReady = Boolean(config?.paymentRail?.enabled && config.paymentRail.upiId && config.paymentRail.qrImageDataUrl);
+  const assignedInstallmentEpins = epins.filter((item) => item.pinType === 'INSTALLMENT' && item.status === 'ACTIVE' && item.seasonId === installment?.seasonId);
+  const chosenEpinId = assignedInstallmentEpins.some((item) => item.id === selectedEpinId) ? selectedEpinId : assignedInstallmentEpins[0]?.id ?? '';
+  const pendingInstallment = history.some((item) => item.purpose === 'INSTALLMENT' && (item.status === 'PENDING_VERIFICATION' || item.status === 'PROCESSING'));
   const epinUnitValue = epinType === 'ACTIVATION'
     ? Number(selectedSeason?.joiningAmount ?? 0)
     : Number(selectedSeason?.installmentAmount ?? 0);
@@ -218,6 +229,27 @@ export function MemberPayments() {
     } catch (reason) { handleError(reason); } finally { setBusy(false); }
   }
 
+  async function redeemInstallmentEpin(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!installment || installment.fullyPaid || !chosenEpinId) {
+      setError('Select an available INSTALLMENT E-PIN for this session');
+      return;
+    }
+    setBusy(true); setError(''); setNotice('');
+    try {
+      const redeemed = await apiJson<{ status: string; installmentSequence: number; reconciliationPending?: boolean }>(
+        '/api/backend/member/payments/installments/redeem-epin',
+        { method: 'POST', body: JSON.stringify({ epinId: chosenEpinId }) },
+      );
+      setSelectedEpinId('');
+      setNotice(
+        'Installment #' + redeemed.installmentSequence + ' confirmed using your prepaid E-PIN.' +
+        (redeemed.reconciliationPending ? ' Reward processing is pending reconciliation.' : ''),
+      );
+      await load();
+    } catch (reason) { handleError(reason); } finally { setBusy(false); }
+  }
+
   async function submitEpin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedSeason || !epinProof) return setError('Select a session and attach the payment screenshot');
@@ -246,13 +278,100 @@ export function MemberPayments() {
         {notice ? <div className="mm-success" role="status">{notice}</div> : null}
 
         <section className="mm-portal-grid">
-          <article className="mm-card"><div className="mm-card-head"><h2>QR / UPI payment</h2><span className="mm-chip">{rail?.enabled ? 'Available' : 'Unavailable'}</span></div><div className="mm-card-body">{rail?.enabled ? <div className="mm-list">{rail.qrImageDataUrl ? <img src={rail.qrImageDataUrl} alt="MegaGoldenClub payment QR" style={{ maxWidth: 280, width: '100%', height: 'auto', borderRadius: 12 }} /> : null}<div><strong>UPI ID</strong><br />{rail.upiId || '—'}</div><div><strong>Payee</strong><br />{rail.payeeName || '—'}</div>{rail.instructions ? <div><strong>Instructions</strong><br />{rail.instructions}</div> : null}</div> : <p>QR / UPI payment is not currently enabled.</p>}</div></article>
-          <article className="mm-card"><div className="mm-card-head"><h2>Installment status</h2><span className="mm-chip">{installment?.seasonCode ?? 'No enrollment'}</span></div><div className="mm-card-body">{installment ? <div className="mm-list"><div><strong>{installment.seasonName}</strong><br />Paid {installment.paidInstallmentCount} of {installment.installmentCount} installments</div><div>Remaining: <strong>{installment.remainingInstallmentCount}</strong> • Next unpaid: <strong>{installment.nextUnpaidSequence ?? 'Complete'}</strong></div><div>Per installment: <strong>{money(installment.installmentAmount, installment.currencyCode)}</strong></div></div> : <p>No active session enrollment was found.</p>}</div></article>
+          <article className="mm-card">
+            <div className="mm-card-head"><h2>QR / UPI payment</h2><span className="mm-chip">{upiReady ? 'Ready' : 'Setup incomplete'}</span></div>
+            <div className="mm-card-body mm-list">
+              {config?.paymentRail?.qrImageDataUrl ? (
+                <img src={config.paymentRail.qrImageDataUrl} alt="Configured MegaGoldenClub payment QR" className="mm-payment-qr" />
+              ) : <div className="mm-payment-qr-missing">QR image has not been configured. Super Admin must upload the official receiving QR in Member Payment Verification before UPI submissions can be accepted.</div>}
+              <div><strong>UPI ID</strong><p>{config?.paymentRail?.upiId || 'Not configured'}</p></div>
+              <div><strong>Payee</strong><p>{config?.paymentRail?.payeeName || '—'}</p></div>
+              {config?.paymentRail?.instructions ? <div><strong>Instructions</strong><p>{config.paymentRail.instructions}</p></div> : null}
+              {config && !config.paymentRail.enabled ? <p>UPI payment rail is disabled by Super Admin.</p> : null}
+            </div>
+          </article>
+          <article className="mm-card">
+            <div className="mm-card-head"><h2>Session installment status</h2><span className="mm-chip">{installment?.seasonCode ?? 'No enrollment'}</span></div>
+            <div className="mm-card-body mm-list">
+              {installment ? (
+                <>
+                  <div><strong>{installment.seasonName}</strong><p>{installment.seasonCode} · Paid {installment.paidInstallmentCount} of {installment.installmentCount} installments</p></div>
+                  <div><strong>Remaining installments:</strong> {installment.remainingInstallmentCount}</div>
+                  {installment.fullyPaid ? <div className="mm-success">All installments are paid.</div> : (
+                    <div className="mm-payment-due">
+                      <strong>Next unpaid installment: #{installment.nextUnpaidSequence}</strong>
+                      <span>Due: {unpaidInstallments[0]?.dueDate ?? '—'}</span>
+                      <strong>{money(unpaidInstallments[0]?.amount ?? installment.installmentAmount, installment.currencyCode)}</strong>
+                    </div>
+                  )}
+                  <div>Per installment: <strong>{money(installment.installmentAmount, installment.currencyCode)}</strong></div>
+                </>
+              ) : <p>No active session enrollment was found.</p>}
+            </div>
+          </article>
         </section>
 
-        <section className="mm-portal-grid">
-          <article className="mm-card"><div className="mm-card-head"><h2>Pay installment</h2><span className="mm-chip">No partial EMI</span></div><div className="mm-card-body"><form method="post" onSubmit={submitInstallment}><div className="mm-field"><label htmlFor="installmentCount">Installment count</label><input id="installmentCount" className="mm-input" type="number" min="1" max={Math.max(1, installment?.remainingInstallmentCount ?? 1)} value={installmentCount} disabled={!rail?.enabled || !installment || installment.fullyPaid || busy} onChange={(event) => setInstallmentCount(Math.max(1, Number(event.target.value) || 1))} /></div><div className="mm-field"><label>Amount</label><input className="mm-input" value={money(installmentTotal, installment?.currencyCode)} readOnly /></div><div className="mm-field"><label htmlFor="installmentUtr">UTR / reference</label><input id="installmentUtr" name="utr" className="mm-input" minLength={4} maxLength={191} required disabled={busy} /></div><div className="mm-field"><label htmlFor="installmentProof">Payment screenshot</label><input id="installmentProof" className="mm-input" type="file" accept="image/*" required={!installmentProof} disabled={busy} onChange={(event) => void setProof(event.target.files?.[0], setInstallmentProof)} /></div><button className="mm-button blue" disabled={busy || !rail?.enabled || !installment || installment.fullyPaid || !installmentProof}>{busy ? 'Submitting…' : 'Submit installment payment'}</button></form></div></article>
-          <article className="mm-card"><div className="mm-card-head"><h2>Buy E-PINs</h2><span className="mm-chip">Session-bound</span></div><div className="mm-card-body"><form method="post" onSubmit={submitEpin}><div className="mm-field"><label htmlFor="seasonId">Session</label><select id="seasonId" className="mm-input" value={seasonId} required disabled={busy} onChange={(event) => setSeasonId(event.target.value)}><option value="">Select session</option>{config?.seasons.map((season) => <option key={season.id} value={season.id}>{season.name} ({season.code})</option>)}</select></div><div className="mm-field"><label htmlFor="epinType">E-PIN type</label><select id="epinType" className="mm-input" value={epinType} disabled={busy} onChange={(event) => setEpinType(event.target.value as 'ACTIVATION' | 'INSTALLMENT')}><option value="ACTIVATION">Activation — registration + installment #1</option><option value="INSTALLMENT">Installment — one monthly installment</option></select></div><div className="mm-field"><label htmlFor="epinQuantity">Quantity</label><input id="epinQuantity" className="mm-input" type="number" min="1" max="100" value={epinQuantity} disabled={busy} onChange={(event) => setEpinQuantity(Math.max(1, Math.min(100, Number(event.target.value) || 1)))} /></div><div className="mm-field"><label>Amount</label><input className="mm-input" value={money(epinTotal, selectedSeason?.currencyCode)} readOnly /></div><div className="mm-field"><label htmlFor="epinUtr">UTR / reference</label><input id="epinUtr" name="utr" className="mm-input" minLength={4} maxLength={191} required disabled={busy} /></div><div className="mm-field"><label htmlFor="epinProof">Payment screenshot</label><input id="epinProof" className="mm-input" type="file" accept="image/*" required={!epinProof} disabled={busy} onChange={(event) => void setProof(event.target.files?.[0], setEpinProof)} /></div><button className="mm-button blue" disabled={busy || !rail?.enabled || !selectedSeason || !epinProof}>{busy ? 'Submitting…' : 'Submit E-PIN purchase'}</button></form></div></article>
+        <section className="mm-card">
+          <div className="mm-card-head"><h2>Pay session installment</h2><span className="mm-chip">Next unpaid · no partial EMI</span></div>
+          <div className="mm-card-body">
+            {installment && !installment.fullyPaid ? (
+              <>
+                <p className="mm-payment-context">
+                  <strong>{installment.seasonName}</strong> — installment #{installment.nextUnpaidSequence},
+                  due {unpaidInstallments[0]?.dueDate ?? '—'} · {money(installment.installmentAmount, installment.currencyCode)}
+                </p>
+                {pendingInstallment ? <div className="mm-payment-pending">A UPI installment is pending Super Admin verification. Do not pay the same installment again. E-PIN redemption is paused until review.</div> : null}
+                <div className="mm-payment-tabs" role="group" aria-label="Installment payment method">
+                  <button type="button" className={paymentMethod === 'UPI' ? 'mm-payment-tab active' : 'mm-payment-tab'} aria-pressed={paymentMethod === 'UPI'} onClick={() => setPaymentMethod('UPI')}>UPI / QR</button>
+                  <button type="button" className={paymentMethod === 'EPIN' ? 'mm-payment-tab active' : 'mm-payment-tab'} aria-pressed={paymentMethod === 'EPIN'} onClick={() => setPaymentMethod('EPIN')}>Use E-PIN</button>
+                </div>
+                {paymentMethod === 'UPI' ? (
+                  <form method="post" className="mm-payment-form" onSubmit={submitInstallment}>
+                    <p>Pay using the official QR / UPI ID above, then attach the transfer proof. The installment remains pending until Super Admin confirms.</p>
+                    <div className="mm-field"><label htmlFor="installmentCount">Installments to pay (from next unpaid)</label><input id="installmentCount" className="mm-input" type="number" min="1" max={Math.max(1, installment.remainingInstallmentCount)} value={installmentCount} disabled={!upiReady || busy || pendingInstallment} onChange={(event) => setInstallmentCount(Math.max(1, Math.min(installment.remainingInstallmentCount, Number(event.target.value) || 1)))} /></div>
+                    <p className="mm-payment-context">Covers: {dueSelection.map((item) => '#' + item.sequence).join(', ')} {dueSelection.length ? '· first due ' + dueSelection[0].dueDate : ''}</p>
+                    <div className="mm-field"><label htmlFor="installmentTotal">Total payment</label><input id="installmentTotal" className="mm-input" value={money(installmentTotal, installment.currencyCode)} readOnly /></div>
+                    <div className="mm-field"><label htmlFor="installmentUtr">UTR / reference</label><input id="installmentUtr" name="utr" className="mm-input" minLength={4} maxLength={191} required disabled={!upiReady || busy || pendingInstallment} /></div>
+                    <div className="mm-field"><label htmlFor="installmentProof">Payment screenshot</label><input id="installmentProof" className="mm-input" type="file" accept="image/*" required={!installmentProof} disabled={!upiReady || busy || pendingInstallment} onChange={(event) => void setProof(event.target.files?.[0], setInstallmentProof)} /></div>
+                    <button className="mm-button blue" disabled={busy || !upiReady || pendingInstallment || !installmentProof}>{busy ? 'Submitting…' : 'Submit UPI payment for verification'}</button>
+                    {!upiReady ? <p className="mm-payment-note">UPI submissions are unavailable until Super Admin enables the rail and configures both receiving UPI ID and QR image.</p> : null}
+                  </form>
+                ) : (
+                  <form method="post" className="mm-payment-form" onSubmit={redeemInstallmentEpin}>
+                    <p>Use an eligible, already-paid INSTALLMENT E-PIN assigned to your account for this same session. It covers one next-unpaid installment and can only be used once.</p>
+                    <div className="mm-field">
+                      <label htmlFor="redeemEpin">Available session E-PIN</label>
+                      <select id="redeemEpin" className="mm-input" value={chosenEpinId} onChange={(event) => setSelectedEpinId(event.target.value)} disabled={busy || pendingInstallment || !assignedInstallmentEpins.length}>
+                        {assignedInstallmentEpins.length ? assignedInstallmentEpins.map((item) => (
+                          <option key={item.id} value={item.id}>INSTALLMENT E-PIN ending {item.displaySuffix} · expires {dateTime(item.expiresAt)}</option>
+                        )) : <option value="">No eligible E-PIN for this session</option>}
+                      </select>
+                    </div>
+                    <button className="mm-button blue" disabled={busy || pendingInstallment || !chosenEpinId}>{busy ? 'Applying…' : 'Apply E-PIN to installment #' + installment.nextUnpaidSequence}</button>
+                    {!assignedInstallmentEpins.length ? <p className="mm-payment-note">No unused INSTALLMENT E-PIN assigned to this session. You can purchase one below using UPI; it becomes available only after Super Admin verification.</p> : null}
+                  </form>
+                )}
+              </>
+            ) : <p>{installment?.fullyPaid ? 'Your session installment schedule is fully paid.' : 'An active session enrollment is required before paying an installment.'}</p>}
+          </div>
+        </section>
+
+        <section className="mm-card">
+          <div className="mm-card-head"><h2>Purchase E-PINs via UPI</h2><span className="mm-chip">Separate purchase · verified by Super Admin</span></div>
+          <div className="mm-card-body">
+            <p className="mm-payment-context">Purchased E-PINs are inventory, not automatic installment payments. Select <strong>Use E-PIN</strong> above to apply an assigned INSTALLMENT pin to your dues.</p>
+            <form method="post" onSubmit={submitEpin}>
+              <div className="mm-portal-grid">
+                <div className="mm-field"><label htmlFor="seasonId">Session</label><select id="seasonId" className="mm-input" value={seasonId} required disabled={busy} onChange={(event) => setSeasonId(event.target.value)}><option value="">Select session</option>{config?.seasons.map((season) => <option key={season.id} value={season.id}>{season.name} ({season.code})</option>)}</select></div>
+                <div className="mm-field"><label htmlFor="epinType">E-PIN type</label><select id="epinType" className="mm-input" value={epinType} disabled={busy} onChange={(event) => setEpinType(event.target.value as 'ACTIVATION' | 'INSTALLMENT')}><option value="INSTALLMENT">Installment — one monthly EMI</option><option value="ACTIVATION">Activation — registration + installment #1</option></select></div>
+                <div className="mm-field"><label htmlFor="epinQuantity">Quantity</label><input id="epinQuantity" className="mm-input" type="number" min="1" max="100" value={epinQuantity} disabled={busy} onChange={(event) => setEpinQuantity(Math.max(1, Math.min(100, Number(event.target.value) || 1)))} /></div>
+                <div className="mm-field"><label htmlFor="epinAmount">Amount</label><input id="epinAmount" className="mm-input" value={money(epinTotal, selectedSeason?.currencyCode)} readOnly /></div>
+                <div className="mm-field"><label htmlFor="epinUtr">UTR / reference</label><input id="epinUtr" name="utr" className="mm-input" minLength={4} maxLength={191} required disabled={!upiReady || busy} /></div>
+                <div className="mm-field"><label htmlFor="epinProof">Payment screenshot</label><input id="epinProof" className="mm-input" type="file" accept="image/*" required={!epinProof} disabled={!upiReady || busy} onChange={(event) => void setProof(event.target.files?.[0], setEpinProof)} /></div>
+              </div>
+              <button className="mm-button blue" disabled={busy || !upiReady || !selectedSeason || !epinProof}>{busy ? 'Submitting…' : 'Submit E-PIN purchase for verification'}</button>
+            </form>
+          </div>
         </section>
 
         {latestReceipt ? <section className="mm-card"><div className="mm-card-head"><h2>Provisional receipt</h2><span className="mm-chip">{statusLabel(latestReceipt.status)}</span></div><div className="mm-card-body"><p><strong>{latestReceipt.receiptNumber}</strong> • {latestReceipt.purpose.replace('_', ' ')} • {money(latestReceipt.amount, latestReceipt.currencyCode)}</p><p>UTR: {latestReceipt.providerReference} • Submitted: {dateTime(latestReceipt.submittedAt)}</p>{latestReceipt.receiptUrl ? <Link className="mm-button blue" href={latestReceipt.receiptUrl} target="_blank">Open public receipt</Link> : null}</div></section> : null}
