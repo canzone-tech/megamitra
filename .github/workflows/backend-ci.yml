@@ -71,6 +71,9 @@ jobs:
           docker compose -f ../docker-compose.yml up -d --wait --wait-timeout 120
           docker compose -f ../docker-compose.yml ps
 
+      - name: Probe patched MariaDB connector metadata
+        run: npm view mariadb@3.5.4 version dist.tarball dist.integrity
+
       - name: Install exact dependencies
         run: npm ci
 
