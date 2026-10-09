@@ -268,7 +268,6 @@ export function MemberPayments() {
     } catch (reason) { handleError(reason); } finally { setBusy(false); }
   }
 
-  const rail = config?.paymentRail;
   return (
     <div className="mm-member-shell">
       <MemberHeader />
