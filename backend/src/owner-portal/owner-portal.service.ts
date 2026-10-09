@@ -168,35 +168,176 @@ export class OwnerPortalService {
   ) {}
 
   async dashboard() {
-    const [members, pairs, activeSeason, openTickets, pendingNotifications] = await Promise.all([
-      this.rows<{ count: bigint | number | string }>('SELECT COUNT(*) AS count FROM `users`'),
-      this.rows<{ count: bigint | number | string }>(
-        'SELECT COUNT(*) AS count FROM `binary_pair_matches` WHERE `payable` = TRUE',
+    const now = new Date();
+    const activeSeason = await this.rows<SeasonRow>(
+      `SELECT s.*, bpv.pairPayoutAmount, bpv.dailyPairCap, bpv.currencyCode, bpv.settlementTimezone
+       FROM owner_seasons s
+       LEFT JOIN binary_plan_versions bpv ON bpv.id = s.binaryPlanVersionId
+       WHERE s.status IN ('ACTIVE','PAUSED')
+       ORDER BY s.startDate DESC LIMIT 1`,
+    );
+    const season = activeSeason[0] ?? null;
+
+    const [
+      memberStats,
+      placementStats,
+      enrollmentStats,
+      pairStats,
+      financeStats,
+      walletStats,
+      kycStats,
+      inventoryStats,
+      drawStats,
+      achievementStats,
+      supportStats,
+      recentMembers,
+      recentPayments,
+    ] = await Promise.all([
+      this.rows<Record<string, unknown>>(
+        `SELECT COUNT(*) AS memberCount,
+                COALESCE(SUM(CASE WHEN u.status='ACTIVE' THEN 1 ELSE 0 END), 0) AS activeMemberCount
+         FROM users u
+         WHERE EXISTS (
+           SELECT 1
+           FROM user_roles ur
+           INNER JOIN roles r ON r.id=ur.roleId
+           WHERE ur.userId=u.id AND r.name='MEMBER'
+         )`,
       ),
-      this.rows<SeasonRow>(
-        `SELECT s.*, bpv.pairPayoutAmount, bpv.dailyPairCap, bpv.currencyCode, bpv.settlementTimezone
-         FROM owner_seasons s
-         LEFT JOIN binary_plan_versions bpv ON bpv.id = s.binaryPlanVersionId
-         WHERE s.status IN ('ACTIVE','PAUSED')
-         ORDER BY s.startDate DESC LIMIT 1`,
+      this.rows<Record<string, unknown>>(
+        `SELECT COUNT(DISTINCT memberUserId) AS placedMemberCount
+         FROM binary_placements`,
       ),
-      this.rows<{ count: bigint | number | string }>(
-        "SELECT COUNT(*) AS count FROM owner_support_tickets WHERE status IN ('OPEN','IN_PROGRESS')",
+      this.rows<Record<string, unknown>>(
+        `SELECT COUNT(*) AS activeEnrollmentCount
+         FROM program_enrollments
+         WHERE status='ACTIVE'`,
       ),
-      this.rows<{ count: bigint | number | string }>(
-        "SELECT COUNT(*) AS count FROM owner_notifications WHERE status IN ('DRAFT','SCHEDULED','QUEUED')",
+      this.rows<Record<string, unknown>>(
+        `SELECT COUNT(*) AS totalPairs,
+                COALESCE(SUM(CASE WHEN payable=TRUE THEN 1 ELSE 0 END), 0) AS qualifiedPairs,
+                COALESCE(SUM(CASE WHEN payable=TRUE THEN payoutAmount ELSE 0 END), 0) AS pairPayoutTotal
+         FROM binary_pair_matches`,
+      ),
+      this.rows<Record<string, unknown>>(
+        `SELECT
+           (SELECT COUNT(*) FROM program_payment_records) AS paymentCount,
+           (SELECT COALESCE(SUM(amount),0) FROM program_payment_records) AS grossCollections,
+           (SELECT COUNT(*) FROM program_refund_records) AS refundCount,
+           (SELECT COALESCE(SUM(amount),0) FROM program_refund_records) AS totalRefunds`,
+      ),
+      this.rows<Record<string, unknown>>(
+        `SELECT
+           COALESCE(SUM(CASE WHEN le.direction='CREDIT' THEN le.amount ELSE 0 END),0) AS walletCredits,
+           COALESCE(SUM(CASE WHEN le.direction='DEBIT' THEN le.amount ELSE 0 END),0) AS walletDebits,
+           COALESCE(SUM(CASE WHEN le.direction='CREDIT' THEN le.amount ELSE -le.amount END),0) AS walletBalance
+         FROM ledger_accounts la
+         LEFT JOIN ledger_entries le ON le.accountId=la.id
+         WHERE la.kind='USER_WALLET'`,
+      ),
+      this.rows<Record<string, unknown>>(
+        `SELECT
+           COALESCE(SUM(CASE WHEN status IN ('SUBMITTED','UNDER_REVIEW','RESUBMISSION_REQUIRED') THEN 1 ELSE 0 END),0) AS pendingKyc,
+           COALESCE(SUM(CASE WHEN status='APPROVED' THEN 1 ELSE 0 END),0) AS approvedKyc
+         FROM kyc_profiles`,
+      ),
+      this.rows<Record<string, unknown>>(
+        `SELECT
+           (SELECT COUNT(*) FROM owner_epins WHERE status='ACTIVE' AND expiresAt>?) AS activeEpins,
+           (SELECT COUNT(*) FROM owner_epins WHERE status='ACTIVE' AND usedByUserId IS NULL AND expiresAt>?) AS unusedEpins,
+           (SELECT COUNT(*) FROM owner_epins WHERE status='USED') AS usedEpins,
+           (SELECT COUNT(*) FROM owner_auth_codes WHERE status='ACTIVE' AND expiresAt>?) AS activeAuthCodes`,
+        [now, now, now],
+      ),
+      this.rows<Record<string, unknown>>(
+        `SELECT
+           (SELECT COUNT(*) FROM lucky_draw_instances WHERE status IN ('SCHEDULED','SNAPSHOTTED')) AS openDraws,
+           (SELECT COUNT(*) FROM lucky_draw_winners) AS totalWinners,
+           (SELECT COUNT(*) FROM lucky_draw_prize_claims WHERE status IN ('PENDING','CLAIMED')) AS openPrizeClaims`,
+      ),
+      this.rows<Record<string, unknown>>(
+        `SELECT COUNT(*) AS rankAchievementCount,
+                COALESCE(SUM(cashAmount),0) AS rankCashAwarded
+         FROM rank_achievements`,
+      ),
+      this.rows<Record<string, unknown>>(
+        `SELECT
+           (SELECT COUNT(*) FROM owner_support_tickets WHERE status IN ('OPEN','IN_PROGRESS')) AS openTickets,
+           (SELECT COUNT(*) FROM owner_notifications WHERE status IN ('DRAFT','SCHEDULED','QUEUED')) AS pendingNotifications`,
+      ),
+      this.rows<Record<string, unknown>>(
+        `SELECT u.id, u.username, u.firstName, u.lastName, u.status, u.createdAt
+         FROM users u
+         WHERE EXISTS (
+           SELECT 1
+           FROM user_roles ur
+           INNER JOIN roles r ON r.id=ur.roleId
+           WHERE ur.userId=u.id AND r.name='MEMBER'
+         )
+         ORDER BY u.createdAt DESC, u.id DESC
+         LIMIT 5`,
+      ),
+      this.rows<Record<string, unknown>>(
+        `SELECT pr.id, pr.amount, pr.currencyCode, pr.occurredAt,
+                u.username, u.firstName, u.lastName
+         FROM program_payment_records pr
+         INNER JOIN program_enrollments pe ON pe.id=pr.enrollmentId
+         INNER JOIN users u ON u.id=pe.userId
+         ORDER BY pr.occurredAt DESC, pr.createdAt DESC
+         LIMIT 5`,
       ),
     ]);
-    const season = activeSeason[0] ?? null;
+
+    const member = memberStats[0] ?? {};
+    const placement = placementStats[0] ?? {};
+    const enrollment = enrollmentStats[0] ?? {};
+    const pair = pairStats[0] ?? {};
+    const finance = financeStats[0] ?? {};
+    const wallet = walletStats[0] ?? {};
+    const kyc = kycStats[0] ?? {};
+    const inventory = inventoryStats[0] ?? {};
+    const draw = drawStats[0] ?? {};
+    const achievement = achievementStats[0] ?? {};
+    const support = supportStats[0] ?? {};
     const pairValue = Number(season?.pairPayoutAmount ?? 0);
     const pairCap = Number(season?.dailyPairCap ?? 0);
+    const grossCollections = Number(finance.grossCollections ?? 0);
+    const totalRefunds = Number(finance.totalRefunds ?? 0);
+
     return {
       activeSeason: season,
-      memberCount: Number(members[0]?.count ?? 0),
-      qualifiedPairs: Number(pairs[0]?.count ?? 0),
+      memberCount: Number(member.memberCount ?? 0),
+      activeMemberCount: Number(member.activeMemberCount ?? 0),
+      placedMemberCount: Number(placement.placedMemberCount ?? 0),
+      activeEnrollmentCount: Number(enrollment.activeEnrollmentCount ?? 0),
+      qualifiedPairs: Number(pair.qualifiedPairs ?? 0),
+      totalPairs: Number(pair.totalPairs ?? 0),
+      pairPayoutTotal: Number(pair.pairPayoutTotal ?? 0),
       dailyCap: pairValue * pairCap,
-      openTickets: Number(openTickets[0]?.count ?? 0),
-      pendingNotifications: Number(pendingNotifications[0]?.count ?? 0),
+      paymentCount: Number(finance.paymentCount ?? 0),
+      grossCollections,
+      refundCount: Number(finance.refundCount ?? 0),
+      totalRefunds,
+      netCollections: grossCollections - totalRefunds,
+      walletCredits: Number(wallet.walletCredits ?? 0),
+      walletDebits: Number(wallet.walletDebits ?? 0),
+      walletBalance: Number(wallet.walletBalance ?? 0),
+      pendingKyc: Number(kyc.pendingKyc ?? 0),
+      approvedKyc: Number(kyc.approvedKyc ?? 0),
+      activeEpins: Number(inventory.activeEpins ?? 0),
+      unusedEpins: Number(inventory.unusedEpins ?? 0),
+      usedEpins: Number(inventory.usedEpins ?? 0),
+      activeAuthCodes: Number(inventory.activeAuthCodes ?? 0),
+      openDraws: Number(draw.openDraws ?? 0),
+      totalWinners: Number(draw.totalWinners ?? 0),
+      openPrizeClaims: Number(draw.openPrizeClaims ?? 0),
+      rankAchievementCount: Number(achievement.rankAchievementCount ?? 0),
+      rankCashAwarded: Number(achievement.rankCashAwarded ?? 0),
+      openTickets: Number(support.openTickets ?? 0),
+      pendingNotifications: Number(support.pendingNotifications ?? 0),
+      recentMembers,
+      recentPayments,
+      generatedAt: now,
     };
   }
 
