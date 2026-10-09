@@ -166,6 +166,8 @@ smoke_frontends() {
   expect_status 200 "http://127.0.0.1:3101/request-email-verification"
 
   expect_status 307 "http://127.0.0.1:3102/member"
+  expect_status 307 "http://127.0.0.1:3102/member/payments"
+  expect_status 307 "http://127.0.0.1:3102/member/change-password"
   expect_status 307 "http://127.0.0.1:3102/member/kyc"
   expect_status 307 "http://127.0.0.1:3102/member/withdrawals"
   expect_status 307 "http://127.0.0.1:3102/member/entitlements"

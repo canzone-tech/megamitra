@@ -262,6 +262,7 @@ async function runScenario(debugPort, scenario) {
   const consoleErrors = [];
   const pageExceptions = [];
   const serverErrors = [];
+  const memberApiErrors = [];
 
   try {
     await Promise.all([
@@ -287,6 +288,9 @@ async function runScenario(debugPort, scenario) {
       const url = String(params.response?.url ?? '');
       if (status >= 500 && (url.startsWith(adminBaseUrl) || url.startsWith(memberBaseUrl))) {
         serverErrors.push(`${status} ${url}`);
+      }
+      if (status >= 400 && url.startsWith(`${memberBaseUrl}/api/backend/`)) {
+        memberApiErrors.push(`${status} ${url}`);
       }
     });
 
@@ -322,6 +326,14 @@ async function runScenario(debugPort, scenario) {
         client,
         `document.body && document.body.innerText.includes(${escapeJs(expected)})`,
         `${scenario.name} text: ${expected}`,
+      );
+    }
+
+    if (scenario.waitForRefresh) {
+      await waitForExpression(
+        client,
+        '[...document.querySelectorAll(".mm-member-hero button")].some((button) => button.textContent?.trim() === "Refresh")',
+        `${scenario.name} member data fetch completed`,
       );
     }
 
@@ -454,6 +466,12 @@ async function runScenario(debugPort, scenario) {
       const missing = required.filter((label) => !metrics.memberNavLabels.includes(label));
       if (missing.length) {
         throw new Error(`${scenario.name} hides member mobile navigation actions: ${missing.join(', ')}`);
+      }
+    }
+    if (scenario.requireMemberApi) {
+      const alert = await evaluate(client, 'document.querySelector(".mm-error[role=alert]")?.textContent?.trim() ?? ""');
+      if (alert || memberApiErrors.length) {
+        throw new Error(`${scenario.name} member data failed: ${JSON.stringify({ alert, memberApiErrors })}`);
       }
     }
     if (consoleErrors.length || pageExceptions.length || serverErrors.length) {
@@ -600,6 +618,36 @@ async function main() {
       requireMemberMobileNav: true,
     },
   ];
+
+  // Authenticate each member read-side screen at desktop and mobile widths.
+  // Tests use an isolated MEMBER account and do not mutate financial state.
+  const memberPages = [
+    { slug: 'payments', heading: 'Installments & E-PINs', readyText: 'Payment receipts', waitForRefresh: true },
+    { slug: 'withdrawals', heading: 'Withdrawals', readyText: 'Wallet balance' },
+    { slug: 'kyc', heading: 'KYC', readyText: 'Verification status' },
+    { slug: 'entitlements', heading: 'My product benefits', readyText: 'Benefit history' },
+    { slug: 'security', heading: 'Identity & email', readyText: 'uat-verify-member-' },
+  ];
+  for (const page of memberPages) {
+    for (const viewport of [
+      { label: 'desktop', width: 1440, height: 1000, mobile: false },
+      { label: 'mobile', width: 390, height: 844, mobile: true },
+    ]) {
+      scenarios.push({
+        name: `member-${page.slug}-${viewport.label}`,
+        baseUrl: memberBaseUrl,
+        path: `/member/${page.slug}`,
+        cookieName: 'megagoldenclub_member_access',
+        token: memberToken,
+        width: viewport.width,
+        height: viewport.height,
+        mobile: viewport.mobile,
+        expectedTexts: [page.heading, page.readyText],
+        waitForRefresh: page.waitForRefresh,
+        requireMemberApi: true,
+      });
+    }
+  }
 
   for (const scenario of scenarios) await runScenario(debugPort, scenario);
 
