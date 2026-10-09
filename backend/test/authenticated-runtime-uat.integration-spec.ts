@@ -346,6 +346,12 @@ describe('MegaGoldenClub authenticated runtime UAT', () => {
       );
       expect(retiredDeploymentImport.status).toBe(404);
 
+      const dashboardBeforeStaff = await request(
+        '/admin/owner-portal/dashboard',
+        { headers: ownerHeaders },
+      );
+      expect(dashboardBeforeStaff.status).toBe(200);
+
       const adminUsername = `uat_admin_${suffix}`;
       const agentUsername = `uat_agent_${suffix}`;
       const adminInitialPassword = 'Uat-Admin-Initial-123!';
@@ -394,6 +400,41 @@ describe('MegaGoldenClub authenticated runtime UAT', () => {
       });
       expect(staffRoles.find((item) => item.userId === adminUserId)?.role.name).toBe('ADMIN');
       expect(staffRoles.find((item) => item.userId === agentUserId)?.role.name).toBe('AGENT');
+
+      const dashboardAfterStaff = await request(
+        '/admin/owner-portal/dashboard',
+        { headers: ownerHeaders },
+      );
+      expect(dashboardAfterStaff.status).toBe(200);
+      expect(dashboardAfterStaff.body.memberCount).toBe(
+        dashboardBeforeStaff.body.memberCount,
+      );
+      expect(dashboardAfterStaff.body).toEqual(
+        expect.objectContaining({
+          activeMemberCount: expect.any(Number),
+          placedMemberCount: expect.any(Number),
+          activeEnrollmentCount: expect.any(Number),
+          qualifiedPairs: expect.any(Number),
+          grossCollections: expect.any(Number),
+          totalRefunds: expect.any(Number),
+          netCollections: expect.any(Number),
+          walletCredits: expect.any(Number),
+          walletDebits: expect.any(Number),
+          walletBalance: expect.any(Number),
+          pendingKyc: expect.any(Number),
+          approvedKyc: expect.any(Number),
+          activeEpins: expect.any(Number),
+          unusedEpins: expect.any(Number),
+          usedEpins: expect.any(Number),
+          activeAuthCodes: expect.any(Number),
+          openDraws: expect.any(Number),
+          totalWinners: expect.any(Number),
+          openPrizeClaims: expect.any(Number),
+          rankAchievementCount: expect.any(Number),
+          recentMembers: expect.any(Array),
+          recentPayments: expect.any(Array),
+        }),
+      );
 
       const adminPassword = 'Uat-Admin-Changed-456!';
       const agentPassword = 'Uat-Agent-Changed-456!';
