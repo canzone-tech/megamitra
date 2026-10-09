@@ -53,6 +53,9 @@ npm ls deepmerge-ts mariadb mongodb mysql2
 echo "==> Auditing production dependencies"
 npm audit --omit=dev --audit-level=high
 
+echo "==> Auditing full dependency tree for high/critical findings"
+npm audit --audit-level=high
+
 echo "==> Validating and generating Prisma client"
 npm run prisma:validate
 npm run prisma:generate
