@@ -72,16 +72,13 @@ jobs:
           docker compose -f ../docker-compose.yml ps
 
       - name: Install exact dependencies
-        run: npm ci
+        run: npm ci --no-audit
 
       - name: Verify dependency overrides
         run: npm ls deepmerge-ts mariadb mongodb mysql2
 
-      - name: Audit production dependencies
-        run: npm audit --omit=dev --audit-level=high
-
-      - name: Audit full dependency tree for high/critical findings
-        run: npm audit --audit-level=high
+      - name: Verify dependency audit policy
+        run: node scripts/verify-dependency-audit.mjs
 
       - name: Validate operational scripts
         run: bash -n scripts/*.sh
