@@ -50,6 +50,9 @@ npm ci
 echo "==> Checking patched transitive dependency versions"
 npm ls deepmerge-ts mariadb mongodb mysql2
 
+echo "==> Auditing production dependencies"
+npm audit --omit=dev --audit-level=high
+
 echo "==> Validating and generating Prisma client"
 npm run prisma:validate
 npm run prisma:generate
