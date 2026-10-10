@@ -16,7 +16,7 @@ function createService() {
   const execute = jest.fn().mockResolvedValue(undefined);
   const log = jest.fn().mockResolvedValue(undefined);
   const service = new MemberPaymentService(
-    {} as never, { execute, transaction } as never, {} as never,
+    { $queryRawUnsafe: query } as never, { execute, transaction } as never, {} as never,
     {} as never, { log } as never,
   );
   return { service, query, execute, log };
