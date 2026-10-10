@@ -1,5 +1,6 @@
 import { ValidationPipe } from '@nestjs/common';
 import type { INestApplication } from '@nestjs/common';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { ConfigService } from '@nestjs/config';
 import { HttpAdapterHost } from '@nestjs/core';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
@@ -26,7 +27,7 @@ export function configureApp(app: INestApplication): void {
 
   // QR/UPI settings accept a bounded Base64 image (max 320KB text).
   // The default Nest/Express JSON limit of 100KB rejects even ~111KB JPEG QR files.
-  app.useBodyParser('json', { limit: '512kb' });
+  (app as NestExpressApplication).useBodyParser('json', { limit: '512kb' });
 
   app.use(
     createRequestHardeningMiddleware({
