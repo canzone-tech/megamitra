@@ -417,3 +417,8 @@
   .mm-installment-summary { grid-template-columns: minmax(0,1fr); }
   .mm-member-shell .mm-installment-row { padding: 12px; }
 }
+
+/* Keep the program progress title, history action and count inside narrow screens. */
+.mm-member-shell .mm-program-progress-head { flex-wrap: wrap; gap: 9px; min-width: 0; }
+.mm-member-shell .mm-program-progress-head .mm-portal-actions { margin-left: auto; align-items: center; min-width: 0; flex-wrap: wrap; }
+@media (max-width: 430px) { .mm-member-shell .mm-program-progress-head .mm-portal-actions { margin-left: 0; width: 100%; } }
