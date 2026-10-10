@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ApiClientError, apiJson } from '@/lib/client-api';
 import { MemberHeader } from '@/components/member-header';
+import { MemberReferralCard } from '@/components/member-referral-card';
 
 type Row = Record<string, unknown>;
 type Page<T> = { items: T[]; page: number; limit: number; total: number; totalPages: number };
@@ -191,6 +192,7 @@ export function MemberDashboard() {
 
         {data ? (
           <>
+            <MemberReferralCard username={data.dashboard.user.username} />
             <section className="mm-dashboard-grid" aria-label="Member summary">
               <article className="mm-card mm-stat">
                 <div className="mm-stat-label">Wallet balance</div>

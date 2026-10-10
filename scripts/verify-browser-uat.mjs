@@ -340,6 +340,41 @@ async function runScenario(debugPort, scenario) {
       }
     }
 
+    if (scenario.verifyReferralCard) {
+      await waitForExpression(
+        client,
+        'Boolean(document.querySelector("[data-referral-code]")?.textContent?.trim() && document.querySelector("[data-referral-link]")?.value)',
+        'authenticated referral card ready',
+      );
+      const referral = await evaluate(client, `(() => {
+        const code = document.querySelector('[data-referral-code]')?.textContent?.trim() ?? '';
+        const link = document.querySelector('[data-referral-link]')?.value ?? '';
+        const copy = document.querySelector('[data-referral-copy]');
+        const whatsapp = document.querySelector('[data-referral-whatsapp]');
+        if (!link || !code || !copy || !whatsapp) return { valid: false };
+        const signup = new URL(link);
+        const share = new URL(whatsapp.href);
+        const message = share.searchParams.get('text') ?? '';
+        return {
+          valid: signup.origin === location.origin
+            && signup.pathname === '/signup'
+            && signup.searchParams.get('sponsor') === code
+            && share.hostname === 'wa.me'
+            && message.includes(link)
+            && message.includes(code)
+            && !copy.disabled,
+        };
+      })()`);
+      if (!referral.valid) throw new Error(`${scenario.name} referral link / WhatsApp contract failed`);
+    }
+    if (scenario.verifyPrefilledSponsor) {
+      await waitForExpression(
+        client,
+        `document.querySelector('#sponsorReference')?.value === ${escapeJs(scenario.verifyPrefilledSponsor)}`,
+        'signup prefilled sponsor reference',
+      );
+    }
+
     if (scenario.waitForRefresh) {
       await waitForExpression(
         client,
@@ -635,6 +670,7 @@ async function main() {
       mobile: false,
       expectedTexts: ['MegaGoldenClub', 'Hello, UAT Member', 'Binary performance'],
       requireMemberDesktopNav: true,
+      verifyReferralCard: true,
     },
     {
       name: 'member-dashboard-mobile-nav',
@@ -647,6 +683,27 @@ async function main() {
       mobile: true,
       expectedTexts: ['MegaGoldenClub', 'Hello, UAT Member'],
       requireMemberMobileNav: true,
+      verifyReferralCard: true,
+    },
+    {
+      name: 'public-signup-referral-desktop',
+      baseUrl: memberBaseUrl,
+      path: '/signup?sponsor=MGC123456',
+      width: 1440,
+      height: 1000,
+      mobile: false,
+      expectedTexts: ['Join with your valid E-PIN.', 'Create your account'],
+      verifyPrefilledSponsor: 'MGC123456',
+    },
+    {
+      name: 'public-signup-referral-mobile',
+      baseUrl: memberBaseUrl,
+      path: '/signup?sponsor=MGC123456',
+      width: 390,
+      height: 844,
+      mobile: true,
+      expectedTexts: ['Join with your valid E-PIN.', 'Create your account'],
+      verifyPrefilledSponsor: 'MGC123456',
     },
   ];
 

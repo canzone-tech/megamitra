@@ -109,6 +109,18 @@ export function SignupForm() {
     setSponsorState(reference.length >= 3 ? 'checking' : 'idle');
   }
 
+  // Invites prefill the public sponsor ID, but the existing backend lookup
+  // must still verify the sponsor before registration can proceed.
+  useEffect(() => {
+    const reference = new URLSearchParams(window.location.search).get('sponsor')?.trim() ?? '';
+    if (reference.length < 3 || reference.length > 191) return;
+    const timer = window.setTimeout(() => {
+      setSponsorReference(reference);
+      setSponsorState('checking');
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     void (async () => {
