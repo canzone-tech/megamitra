@@ -30,6 +30,12 @@ function money(value: unknown, currency: unknown): string {
   }
 }
 
+function dbFlag(value: unknown) { return value === true || value === 1 || value === '1'; }
+function displayInstant(value: unknown) {
+  const parsed = new Date(String(value));
+  return Number.isFinite(parsed.getTime()) ? parsed.toLocaleString('en-IN') : String(value ?? '—');
+}
+
 function tone(status: unknown) {
   const value = text(status).toUpperCase();
   if (/PAID|CONFIRMED|PUBLISHED/.test(value)) return 'success';
@@ -66,7 +72,8 @@ export function WithdrawalsAdmin({ embedded = false }: { embedded?: boolean } = 
   const [maxPending, setMaxPending] = useState('1');
   const [allowedTypes, setAllowedTypes] = useState('UPI,BANK_REFERENCE,OTHER');
   const [effectiveFrom, setEffectiveFrom] = useState(() => {
-    const value = new Date(Date.now() + 60_000);
+    // Default to an already-effective instant; future schedules remain opt-in.
+    const value = new Date(Date.now() - 60_000);
     return new Date(value.getTime() - value.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
   });
 
@@ -248,7 +255,48 @@ export function WithdrawalsAdmin({ embedded = false }: { embedded?: boolean } = 
             <div className="mm-card-head"><h2>Policies</h2><span className="mm-chip">Versioned configuration</span></div>
             <div className="mm-card-body">
               <form method="post" onSubmit={createPolicy} style={{ marginBottom: 20 }}><div className="mm-field"><label htmlFor="policy-code">Code</label><input className="mm-input" id="policy-code" value={policyCode} onChange={(event) => setPolicyCode(event.target.value)} required /></div><div className="mm-field"><label htmlFor="policy-name">Name</label><input className="mm-input" id="policy-name" value={policyName} onChange={(event) => setPolicyName(event.target.value)} required /></div><div className="mm-field"><label htmlFor="policy-currency">Currency</label><input className="mm-input" id="policy-currency" maxLength={3} value={policyCurrency} onChange={(event) => setPolicyCurrency(event.target.value.toUpperCase())} required /></div><button className="mm-button" type="submit" disabled={busy}>Create policy</button></form>
-              <div className="mm-list">{policies.map((policy) => <div className="mm-list-row" key={policy.id}><div><strong>{policy.name}</strong><br /><span>{policy.code} · {policy.currencyCode}</span></div><div style={{ textAlign: 'right' }}>{policy.versions.map((version) => <div key={text(version.id)} style={{ marginBottom: 6 }}><span className={`mm-chip ${tone(version.lifecycle)}`}>v{text(version.version)} {text(version.lifecycle)}</span><small style={{ display: 'block' }}>Service: {text(version.feeMode)} {text(version.feeValue)} · TDS: {text(version.tdsRatePercent ?? 0)}%</small>{version.lifecycle === 'DRAFT' ? <button className="mm-button secondary" style={{ marginLeft: 6 }} type="button" disabled={busy} onClick={() => void mutate(`/api/backend/admin/withdrawals/policy-versions/${text(version.id)}/publish`, 'POST')}>Publish</button> : null}{version.lifecycle === 'PUBLISHED' ? <button className="mm-button secondary" style={{ marginLeft: 6 }} type="button" disabled={busy} onClick={() => void mutate(`/api/backend/admin/withdrawals/policy-versions/${text(version.id)}/retire`, 'POST')}>Retire</button> : null}</div>)}</div></div>)}</div>
+              {policies.length > 0 && !policies.some((p) => dbFlag(p.isDefault) && p.versions.some((v) => v.activationStatus === 'ACTIVE')) ?
+                <div className="mm-error" role="status">No ACTIVE default withdrawal policy is configured. PUBLISHED means approved, not necessarily effective; check Effective from and Default status below.</div> : null}
+              <div className="mm-list">{policies.map((policy) =>
+                <div className="mm-list-row" key={policy.id}>
+                  <div style={{ minWidth: 0 }}>
+                    <strong>{policy.name}</strong>
+                    <div>{policy.code} · {policy.currencyCode}</div>
+                    <span className={`mm-chip ${dbFlag(policy.isDefault) ? 'success' : 'warning'}`}>
+                      {dbFlag(policy.isDefault) ? 'DEFAULT' : 'NOT DEFAULT'}
+                    </span>
+                    {!dbFlag(policy.isDefault) && policy.versions.some((v) => v.lifecycle === 'PUBLISHED') ?
+                      <button className="mm-button secondary" type="button" disabled={busy}
+                        onClick={() => void mutate(`/api/backend/admin/withdrawals/policies/${policy.id}/make-default`, 'POST')}>
+                        Set as default
+                      </button> : null}
+                  </div>
+                  <div style={{ textAlign: 'right', minWidth: 0 }}>
+                    {policy.versions.map((version) =>
+                      <div key={text(version.id)} style={{ marginBottom: 12 }}>
+                        <span className={`mm-chip ${tone(version.activationStatus)} ${version.activationStatus === 'ACTIVE' ? 'success' : ''}`}>
+                          v{text(version.version)} {text(version.lifecycle)} · {text(version.activationStatus)}
+                        </span>
+                        <small style={{ display: 'block' }}>Effective from: {displayInstant(version.effectiveFrom)}</small>
+                        <small style={{ display: 'block' }}>Service: {text(version.feeMode)} {text(version.feeValue)} · TDS: {text(version.tdsRatePercent ?? 0)}%</small>
+                        {version.lifecycle === 'DRAFT' ?
+                          <button className="mm-button secondary" type="button" disabled={busy}
+                            onClick={() => void mutate(`/api/backend/admin/withdrawals/policy-versions/${text(version.id)}/publish`, 'POST')}>Publish</button> : null}
+                        {version.activationStatus === 'SCHEDULED' && dbFlag(policy.isDefault) ?
+                          <button className="mm-button secondary" type="button" disabled={busy}
+                            onClick={() => void mutate(`/api/backend/admin/withdrawals/policy-versions/${text(version.id)}/activate-now`, 'POST')}>Activate now</button> : null}
+                        {version.lifecycle === 'PUBLISHED' ?
+                          <button className="mm-button secondary" type="button" disabled={busy}
+                            onClick={() => {
+                              if (window.confirm('Retire this version? Without another ACTIVE version, member withdrawals will stop.')) {
+                                void mutate(`/api/backend/admin/withdrawals/policy-versions/${text(version.id)}/retire`, 'POST');
+                              }
+                            }}>Retire</button> : null}
+                      </div>,
+                    )}
+                  </div>
+                </div>,
+              )}</div>
             </div>
           </section>
 

@@ -51,6 +51,7 @@ type Overview = {
   currencyCode: string;
   kycStatus: string;
   policy: Policy | null;
+  policyAvailability?: { status: string; effectiveFrom: string | null };
   wallet: {
     accountId: string | null;
     balance: string | number;
@@ -252,14 +253,14 @@ export function MemberWithdrawals() {
                     <div className="mm-list-row"><span>Service charge</span><strong>{data.policy.feeMode === 'PERCENTAGE' ? `${data.policy.feeValue}%` : money(data.policy.feeValue, data.currencyCode)}</strong></div><div className="mm-list-row"><span>TDS withholding</span><strong>{Number(data.policy.tdsRatePercent ?? 0)}% of gross</strong></div>
                     <div className="mm-list-row"><span>KYC required</span><strong>{Boolean(data.policy.kycRequired) ? 'Yes' : 'No'}</strong></div>
                     <div className="mm-list-row"><span>Pending requests allowed</span><strong>{data.policy.maxPendingRequests}</strong></div>
-                  </div> : <div className="mm-empty">No active default withdrawal policy is available for {data.currencyCode}.</div>}
+                  </div> : <div className="mm-empty">{data.policyAvailability?.status === 'SCHEDULED' && data.policyAvailability.effectiveFrom ? `The published ${data.currencyCode} withdrawal policy is scheduled to start on ${new Date(data.policyAvailability.effectiveFrom).toLocaleString('en-IN')}.` : `No ACTIVE default withdrawal policy is configured for ${data.currencyCode}. Super Admin must activate the published policy.`}</div>}
                 </div>
               </section>
 
               <section className="mm-card">
                 <div className="mm-card-head"><h2>Request withdrawal</h2><span className="mm-chip">Held while processing</span></div>
                 <div className="mm-card-body">
-                  {!data.policy ? <div className="mm-empty">Withdrawals are not available for this currency right now.</div> : !kycReady ? <div className="mm-empty">This policy requires approved KYC. Complete KYC before requesting a withdrawal.</div> : !activeDestinations.length ? <div className="mm-empty">Add an active payout destination first.</div> : (
+                  {!data.policy ? <div className="mm-empty">{data.policyAvailability?.status === 'SCHEDULED' && data.policyAvailability.effectiveFrom ? `Withdrawals are scheduled to become available on ${new Date(data.policyAvailability.effectiveFrom).toLocaleString('en-IN')}.` : 'Withdrawals are waiting for an ACTIVE default policy. Super Admin can check Policy → Effective from / Set as default.'}</div> : !kycReady ? <div className="mm-empty">This policy requires approved KYC. Complete KYC before requesting a withdrawal.</div> : !activeDestinations.length ? <div className="mm-empty">Add an active payout destination first.</div> : (
                     <form method="post" onSubmit={createRequest}>
                       <div className="mm-field"><label htmlFor="withdrawal-destination">Destination</label><select className="mm-input" id="withdrawal-destination" value={selectedDestination} onChange={(event) => setSelectedDestination(event.target.value)} required>{activeDestinations.map((destination) => <option key={destination.id} value={destination.id}>{destination.label} · {destination.type.replaceAll('_', ' ')}</option>)}</select></div>
                       <div className="mm-field"><label htmlFor="withdrawal-amount">Amount ({data.currencyCode})</label><input className="mm-input" id="withdrawal-amount" type="number" min={Number(data.policy.minAmount)} max={Number(data.policy.maxAmount)} step="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} required /></div>{Number(amount) > 0 && (() => { const gross = Number(amount); const rawFee = data.policy.feeMode === 'PERCENTAGE' ? gross * Number(data.policy.feeValue) / 100 : Number(data.policy.feeValue); const service = Math.round(Math.min(data.policy.maximumFee === null ? Infinity : Number(data.policy.maximumFee), Math.max(data.policy.minimumFee === null ? 0 : Number(data.policy.minimumFee), Math.round(rawFee * 100) / 100)) * 100) / 100; const tax = Math.round(gross * Number(data.policy.tdsRatePercent ?? 0)) / 100; return <div className="mm-list" aria-label="Estimated withdrawal deductions"><div className="mm-list-row"><span>Gross withdrawal</span><strong>{money(gross, data.currencyCode)}</strong></div><div className="mm-list-row"><span>Service charge</span><strong>{money(service, data.currencyCode)}</strong></div><div className="mm-list-row"><span>Estimated TDS</span><strong>{money(tax, data.currencyCode)}</strong></div><div className="mm-list-row"><span>Estimated net payout</span><strong>{money(Math.max(0, gross - service - tax), data.currencyCode)}</strong></div><small>Estimate only. Server-calculated amounts are fixed when the request is submitted.</small></div>; })()}

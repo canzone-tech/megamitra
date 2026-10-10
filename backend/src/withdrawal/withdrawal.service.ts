@@ -116,7 +116,10 @@ export class WithdrawalService {
     ]);
 
     const reserved = await this.getReservedAmount(userId, currencyCode);
+    const policyAvailability = policy ? { status: 'ACTIVE' as const, effectiveFrom: null } :
+      await this.findPolicyAvailability(currencyCode);
     return {
+      policyAvailability,
       currencyCode,
       kycStatus: kycRows[0]?.status ?? 'NOT_STARTED',
       policy,
@@ -725,7 +728,16 @@ export class WithdrawalService {
       `SELECT * FROM withdrawal_policies ORDER BY currencyCode ASC, isDefault DESC, createdAt ASC`,
     );
     const versions = await this.prisma.$queryRawUnsafe<Row[]>(
-      `SELECT * FROM withdrawal_policy_versions ORDER BY policyId ASC, version DESC`,
+      `SELECT v.*,
+              CASE WHEN v.lifecycle = 'DRAFT' THEN 'DRAFT'
+                   WHEN v.lifecycle = 'RETIRED' THEN 'RETIRED'
+                   WHEN p.isDefault = FALSE THEN 'NOT_DEFAULT'
+                   WHEN v.effectiveFrom > CURRENT_TIMESTAMP(3) THEN 'SCHEDULED'
+                   WHEN v.effectiveTo IS NOT NULL AND v.effectiveTo <= CURRENT_TIMESTAMP(3) THEN 'EXPIRED'
+                   ELSE 'ACTIVE' END AS activationStatus
+       FROM withdrawal_policy_versions v
+       JOIN withdrawal_policies p ON p.id = v.policyId
+       ORDER BY v.policyId ASC, v.version DESC`,
     );
     return policies.map((policy) => ({
       ...this.normalizeRow(policy),
@@ -735,6 +747,89 @@ export class WithdrawalService {
     }));
   }
 
+  /** Explicit Super Admin/authorized policy choice. Never silently change policy ownership. */
+  async makeDefaultPolicy(policyId: string, actorUserId: string) {
+    return this.financialDb.transaction(async (connection) => {
+      const rows = (await connection.query(
+        'SELECT id, currencyCode, isDefault FROM withdrawal_policies WHERE id=? LIMIT 1', [policyId],
+      )) as Array<{ id: string; currencyCode: string; isDefault: number | boolean }>;
+      const policy = rows[0];
+      if (!policy) throw new NotFoundException('Withdrawal policy not found');
+      // Serialize default changes within the currency on the financial connection.
+      await connection.query(
+        'SELECT id FROM withdrawal_policies WHERE currencyCode=? ORDER BY id FOR UPDATE', [policy.currencyCode],
+      );
+      const published = (await connection.query(
+        "SELECT id FROM withdrawal_policy_versions WHERE policyId=? AND lifecycle='PUBLISHED' LIMIT 1", [policyId],
+      )) as Row[];
+      if (!published.length) throw new ConflictException('Publish a withdrawal policy version before setting the default');
+      if (!this.toBoolean(policy.isDefault)) {
+        await connection.query(
+          'UPDATE withdrawal_policies SET isDefault=(id=?), updatedAt=CURRENT_TIMESTAMP(3) WHERE currencyCode=?',
+          [policyId, policy.currencyCode],
+        );
+        await this.insertAudit(connection, { actorUserId, action: 'UPDATE',
+          entityType: 'WithdrawalPolicy', entityId: policyId,
+          description: 'Withdrawal default policy selected', metadata: { currencyCode: policy.currencyCode },
+        });
+      }
+      const updated = (await connection.query(
+        'SELECT * FROM withdrawal_policies WHERE id=? LIMIT 1', [policyId],
+      )) as Row[];
+      return this.normalizeRow(updated[0]);
+    });
+  }
+
+  /** Accelerate only a future published version; its amounts and charges remain immutable. */
+  async activatePolicyVersionNow(versionId: string, actorUserId: string) {
+    return this.financialDb.transaction(async (connection) => {
+      const rows = (await connection.query(
+        `SELECT v.*, p.isDefault, p.currencyCode FROM withdrawal_policy_versions v
+         JOIN withdrawal_policies p ON p.id=v.policyId WHERE v.id=? LIMIT 1 FOR UPDATE`,
+        [versionId],
+      )) as Row[];
+      const version = rows[0];
+      if (!version) throw new NotFoundException('Withdrawal policy version not found');
+      if (String(version.lifecycle) !== 'PUBLISHED') {
+        throw new ConflictException('Only published policy versions can be activated');
+      }
+      if (!this.toBoolean(version.isDefault)) {
+        throw new ConflictException('Set this withdrawal policy as the default first');
+      }
+      const timing = (await connection.query(
+        `SELECT CASE WHEN effectiveFrom > CURRENT_TIMESTAMP(3) THEN 'SCHEDULED'
+                     WHEN effectiveTo IS NOT NULL AND effectiveTo <= CURRENT_TIMESTAMP(3) THEN 'EXPIRED'
+                     ELSE 'ACTIVE' END AS status
+         FROM withdrawal_policy_versions WHERE id=? LIMIT 1`, [versionId],
+      )) as Array<{ status: string }>;
+      if (timing[0]?.status === 'ACTIVE') return this.normalizeRow(version);
+      if (timing[0]?.status !== 'SCHEDULED') {
+        throw new ConflictException('An expired policy version cannot be reactivated; publish a new version');
+      }
+      const conflicts = (await connection.query(
+        `SELECT id FROM withdrawal_policy_versions
+         WHERE policyId=? AND lifecycle='PUBLISHED' AND id<>?
+           AND (effectiveTo IS NULL OR effectiveTo > CURRENT_TIMESTAMP(3)) LIMIT 1`,
+        [version.policyId, versionId],
+      )) as Row[];
+      if (conflicts.length) {
+        throw new ConflictException('Another published window overlaps activation now; retire or reschedule it first');
+      }
+      await connection.query(
+        `UPDATE withdrawal_policy_versions
+         SET effectiveFrom=CURRENT_TIMESTAMP(3), updatedAt=CURRENT_TIMESTAMP(3)
+         WHERE id=? AND effectiveFrom > CURRENT_TIMESTAMP(3)`, [versionId],
+      );
+      await this.insertAudit(connection, { actorUserId, action: 'UPDATE',
+        entityType: 'WithdrawalPolicyVersion', entityId: versionId,
+        description: 'Published withdrawal policy scheduling explicitly activated now',
+      });
+      const updated = (await connection.query(
+        'SELECT * FROM withdrawal_policy_versions WHERE id=? LIMIT 1', [versionId],
+      )) as Row[];
+      return this.normalizeRow(updated[0]);
+    });
+  }
   async createPolicy(actorUserId: string, dto: CreateWithdrawalPolicyDto) {
     const id = randomUUID();
     const currencyCode = dto.currencyCode.trim().toUpperCase();
@@ -955,6 +1050,24 @@ export class WithdrawalService {
     });
   }
 
+  /** Member-safe availability explanation based on the database clock. */
+  private async findPolicyAvailability(currencyCode: string) {
+    const candidates = await this.prisma.$queryRawUnsafe<Array<{ status: string; effectiveFrom: Date | string }>>(
+      `SELECT CASE
+                WHEN p.isDefault=FALSE THEN 'NOT_DEFAULT'
+                WHEN v.effectiveFrom > CURRENT_TIMESTAMP(3) THEN 'SCHEDULED'
+                WHEN v.effectiveTo IS NOT NULL AND v.effectiveTo <= CURRENT_TIMESTAMP(3) THEN 'EXPIRED'
+                ELSE 'ACTIVE'
+              END AS status, v.effectiveFrom
+       FROM withdrawal_policy_versions v
+       JOIN withdrawal_policies p ON p.id=v.policyId
+       WHERE p.currencyCode=? AND v.lifecycle='PUBLISHED'
+       ORDER BY p.isDefault DESC, v.effectiveFrom DESC LIMIT 1`,
+      currencyCode,
+    );
+    return candidates[0] ? { status: candidates[0].status, effectiveFrom: candidates[0].effectiveFrom } :
+      { status: 'NOT_CONFIGURED', effectiveFrom: null };
+  }
   private async findActivePolicy(currencyCode: string) {
     const rows = await this.prisma.$queryRawUnsafe<PolicyRow[]>(
       `SELECT v.*, p.code AS policyCode, p.name AS policyName, p.currencyCode

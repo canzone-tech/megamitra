@@ -114,6 +114,18 @@ export class WithdrawalAdminController {
   }
 
   @Permissions('withdrawal.manage')
+  @Post('policies/:id/make-default')
+  makeDefaultPolicy(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.withdrawals.makeDefaultPolicy(id, user.id);
+  }
+
+  @Permissions('withdrawal.manage')
+  @Post('policy-versions/:id/activate-now')
+  activatePolicyVersionNow(@Param('id') id: string, @CurrentUser() user: AuthUser) {
+    return this.withdrawals.activatePolicyVersionNow(id, user.id);
+  }
+
+  @Permissions('withdrawal.manage')
   @Post('policy-versions/:id/retire')
   retirePolicyVersion(@Param('id') id: string, @CurrentUser() user: AuthUser) {
     return this.withdrawals.retirePolicyVersion(id, user.id);

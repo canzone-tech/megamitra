@@ -462,7 +462,7 @@ describe('MegaGoldenClub withdrawal foundation integration', () => {
       {
         method: 'POST',
         body: JSON.stringify({
-          effectiveFrom: new Date(Date.now() + 60_000).toISOString(),
+          effectiveFrom: new Date(Date.now() + 3_600_000).toISOString(),
           minAmount: 10,
           maxAmount: 5000,
           feeMode: 'PERCENTAGE',
@@ -491,6 +491,49 @@ describe('MegaGoldenClub withdrawal foundation integration', () => {
     );
     expect(published.status).toBe(201);
     expect(published.body.lifecycle).toBe('PUBLISHED');
+
+    // PUBLISHED alone must not enable a future, non-default member policy.
+    const before = await request('/withdrawals/me?currencyCode=USD', {}, memberToken);
+    expect(before.status).toBe(200);
+    expect(before.body.policy).toBeNull();
+    expect(before.body.policyAvailability.status).toBe('NOT_DEFAULT');
+    const premature = await request(
+      `/admin/withdrawals/policy-versions/${version.body.id}/activate-now`,
+      { method: 'POST' }, adminToken,
+    );
+    expect(premature.status).toBe(409);
+
+    // Make this policy the default without changing charges or creating a new version.
+    const selected = await request(
+      `/admin/withdrawals/policies/${testPolicyId}/make-default`,
+      { method: 'POST' }, adminToken,
+    );
+    expect(selected.status).toBe(201);
+    expect(Boolean(selected.body.isDefault)).toBe(true);
+    const waiting = await request('/withdrawals/me?currencyCode=USD', {}, memberToken);
+    expect(waiting.body.policy).toBeNull();
+    expect(waiting.body.policyAvailability.status).toBe('SCHEDULED');
+    const policies = await request('/admin/withdrawals/policies', {}, adminToken);
+    const current = policies.body.find((p: { id: string }) => p.id === testPolicyId);
+    expect(current.versions[0].activationStatus).toBe('SCHEDULED');
+
+    // Explicit operator activation advances only the future effective date.
+    const activated = await request(
+      `/admin/withdrawals/policy-versions/${version.body.id}/activate-now`,
+      { method: 'POST' }, adminToken,
+    );
+    expect(activated.status).toBe(201);
+    const again = await request(
+      `/admin/withdrawals/policy-versions/${version.body.id}/activate-now`,
+      { method: 'POST' }, adminToken,
+    );
+    expect(again.status).toBe(201);
+    const available = await request('/withdrawals/me?currencyCode=USD', {}, memberToken);
+    expect(available.status).toBe(200);
+    expect(available.body.policy.policyCode).toBe(policy.body.code);
+    expect(Number(available.body.policy.tdsRatePercent)).toBe(5.5);
+    const activePolicies = await request('/admin/withdrawals/policies', {}, adminToken);
+    expect(activePolicies.body.find((p: { id: string }) => p.id === testPolicyId).versions[0].activationStatus).toBe('ACTIVE');
 
     const retired = await request(
       `/admin/withdrawals/policy-versions/${version.body.id}/retire`,
