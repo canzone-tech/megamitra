@@ -25,6 +25,7 @@ const expectedOwnerNav = new Map(Object.entries({
   payments: '💳',
   'member-payments': '✅',
   wallet: '📒',
+  withdrawals: '💸',
   epins: '🔑',
   'auth-codes': '🔐',
   staff: '🧑‍💼',
