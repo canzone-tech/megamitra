@@ -203,6 +203,13 @@ export class CreateWithdrawalPolicyVersionDto {
   @Min(0)
   maximumFee?: number;
 
+  /** Configured withholding percentage of gross withdrawal (default 0: disabled). */
+  @IsOptional()
+  @IsNumber({ maxDecimalPlaces: 4 })
+  @Min(0)
+  @Max(100)
+  tdsRatePercent?: number;
+
   @IsBoolean()
   kycRequired!: boolean;
 

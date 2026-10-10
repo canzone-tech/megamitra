@@ -10,6 +10,7 @@ import type { PoolConnection } from 'mariadb';
 import { Prisma } from '../generated/prisma/client';
 import { FinancialDbService } from '../database/financial-db.service';
 import { PrismaService } from '../database/prisma.service';
+import { calculateWithdrawalDeductions } from './withdrawal-pricing';
 import type {
   ConfirmWithdrawalPayoutDto,
   CreateWithdrawalDestinationDto,
@@ -42,6 +43,7 @@ type PolicyRow = Row & {
   feeValue: string | number;
   minimumFee: string | number | null;
   maximumFee: string | number | null;
+  tdsRatePercent: string | number;
   kycRequired: number | boolean;
   maxPendingRequests: number | bigint;
   dailyAmountLimit: string | number | null;
@@ -59,6 +61,7 @@ type RequestRow = Row & {
   status: string;
   amount: string | number;
   feeAmount: string | number;
+  tdsAmount: string | number;
   netAmount: string | number;
   currencyCode: string;
   ledgerTransactionId: string | null;
@@ -271,20 +274,16 @@ export class WithdrawalService {
 
       await this.enforcePeriodLimits(connection, userId, currencyCode, amount, policy);
 
-      const fee = this.calculateFee(amount, policy);
-      const net = amount.minus(fee);
-      if (net.lessThanOrEqualTo(0)) {
-        throw new BadRequestException('Withdrawal fee must be lower than the withdrawal amount');
-      }
+      const { serviceCharge: fee, tdsAmount: tds, netAmount: net } = calculateWithdrawalDeductions(amount, policy);
 
       const requestId = randomUUID();
       await connection.query(
         `INSERT INTO withdrawal_requests (
            id, sourceKey, requestFingerprint, userId, destinationId, policyVersionId, status,
-           amount, feeAmount, netAmount, currencyCode, kycStatusSnapshot, balanceSnapshot,
+           amount, feeAmount, tdsAmount, netAmount, currencyCode, kycStatusSnapshot, balanceSnapshot,
            reservedBeforeSnapshot, requestedAt, metadata, createdAt, updatedAt
          ) VALUES (
-           ?, ?, ?, ?, ?, ?, 'REQUESTED', ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP(3), ?, CURRENT_TIMESTAMP(3), CURRENT_TIMESTAMP(3)
+           ?, ?, ?, ?, ?, ?, 'REQUESTED', ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP(3), ?, CURRENT_TIMESTAMP(3), CURRENT_TIMESTAMP(3)
          )`,
         [
           requestId,
@@ -295,6 +294,7 @@ export class WithdrawalService {
           policy.id,
           amount.toFixed(2),
           fee.toFixed(2),
+          tds.toFixed(2),
           net.toFixed(2),
           currencyCode,
           kycStatus,
@@ -312,6 +312,7 @@ export class WithdrawalService {
         metadata: {
           amount: amount.toFixed(2),
           feeAmount: fee.toFixed(2),
+          tdsAmount: tds.toFixed(2),
           netAmount: net.toFixed(2),
           currencyCode,
           policyVersionId: policy.id,
@@ -606,6 +607,7 @@ export class WithdrawalService {
       );
       const amount = new Prisma.Decimal(request.amount);
       const fee = new Prisma.Decimal(request.feeAmount);
+      const tds = new Prisma.Decimal(request.tdsAmount);
       const net = new Prisma.Decimal(request.netAmount);
       if (balance.lessThan(amount)) {
         throw new ConflictException('Wallet balance is no longer sufficient to settle withdrawal');
@@ -633,6 +635,13 @@ export class WithdrawalService {
         'WITHDRAWAL_FEE_REVENUE',
         String(request.currencyCode),
       );
+      const tdsPayableId = tds.greaterThan(0) ? await this.ensureSystemLedgerAccount(
+        connection,
+        `SYS:WITHDRAWAL_TDS_PAYABLE:${request.currencyCode}`,
+        `Withdrawal TDS withheld ${request.currencyCode}`,
+        'WITHDRAWAL_TDS_PAYABLE',
+        String(request.currencyCode),
+      ) : null;
       const ledgerTransactionId = randomUUID();
       await connection.query(
         `INSERT INTO ledger_transactions
@@ -669,6 +678,14 @@ export class WithdrawalService {
              (id, transactionId, accountId, direction, amount, currencyCode, createdAt)
            VALUES (?, ?, ?, 'CREDIT', ?, ?, CURRENT_TIMESTAMP(3))`,
           [randomUUID(), ledgerTransactionId, feeRevenueId, fee.toFixed(2), request.currencyCode],
+        );
+      }
+      if (tdsPayableId) {
+        await connection.query(
+          `INSERT INTO ledger_entries
+             (id, transactionId, accountId, direction, amount, currencyCode, createdAt)
+           VALUES (?, ?, ?, 'CREDIT', ?, ?, CURRENT_TIMESTAMP(3))`,
+          [randomUUID(), ledgerTransactionId, tdsPayableId, tds.toFixed(2), request.currencyCode],
         );
       }
 
@@ -781,10 +798,10 @@ export class WithdrawalService {
       await connection.query(
         `INSERT INTO withdrawal_policy_versions (
            id, policyId, version, lifecycle, effectiveFrom, effectiveTo, minAmount, maxAmount,
-           feeMode, feeValue, minimumFee, maximumFee, kycRequired, maxPendingRequests,
+           feeMode, feeValue, minimumFee, maximumFee, tdsRatePercent, kycRequired, maxPendingRequests,
            dailyAmountLimit, monthlyAmountLimit, allowedDestinationTypes, reviewRules,
            createdByUserId, createdAt, updatedAt
-         ) VALUES (?, ?, ?, 'DRAFT', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP(3), CURRENT_TIMESTAMP(3))`,
+         ) VALUES (?, ?, ?, 'DRAFT', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP(3), CURRENT_TIMESTAMP(3))`,
         [
           id,
           policyId,
@@ -797,6 +814,7 @@ export class WithdrawalService {
           new Prisma.Decimal(dto.feeValue).toFixed(4),
           dto.minimumFee === undefined ? null : new Prisma.Decimal(dto.minimumFee).toFixed(2),
           dto.maximumFee === undefined ? null : new Prisma.Decimal(dto.maximumFee).toFixed(2),
+          new Prisma.Decimal(dto.tdsRatePercent ?? 0).toFixed(4),
           dto.kycRequired,
           dto.maxPendingRequests,
           dto.dailyAmountLimit === undefined ? null : new Prisma.Decimal(dto.dailyAmountLimit).toFixed(2),
@@ -1046,16 +1064,6 @@ export class WithdrawalService {
         throw new BadRequestException('Monthly withdrawal amount limit exceeded');
       }
     }
-  }
-
-  private calculateFee(amount: Prisma.Decimal, policy: PolicyRow) {
-    let fee = String(policy.feeMode) === 'PERCENTAGE'
-      ? amount.mul(new Prisma.Decimal(policy.feeValue)).div(100)
-      : new Prisma.Decimal(policy.feeValue);
-    fee = fee.toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
-    if (policy.minimumFee !== null) fee = Prisma.Decimal.max(fee, new Prisma.Decimal(policy.minimumFee));
-    if (policy.maximumFee !== null) fee = Prisma.Decimal.min(fee, new Prisma.Decimal(policy.maximumFee));
-    return fee.toDecimalPlaces(2, Prisma.Decimal.ROUND_HALF_UP);
   }
 
   private validatePolicyVersion(dto: CreateWithdrawalPolicyVersionDto) {

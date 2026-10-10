@@ -19,6 +19,7 @@ type WithdrawalRequest = {
   status: string;
   amount: string | number;
   feeAmount: string | number;
+  tdsAmount: string | number;
   netAmount: string | number;
   currencyCode: string;
   requestedAt: string;
@@ -38,6 +39,7 @@ type Policy = {
   feeValue: string | number;
   minimumFee: string | number | null;
   maximumFee: string | number | null;
+  tdsRatePercent: string | number;
   kycRequired: boolean | number;
   maxPendingRequests: number;
   dailyAmountLimit: string | number | null;
@@ -247,7 +249,7 @@ export function MemberWithdrawals() {
                 <div className="mm-card-body">
                   {data.policy ? <div className="mm-list">
                     <div className="mm-list-row"><span>Amount range</span><strong>{money(data.policy.minAmount, data.currencyCode)} – {money(data.policy.maxAmount, data.currencyCode)}</strong></div>
-                    <div className="mm-list-row"><span>Fee</span><strong>{data.policy.feeMode === 'PERCENTAGE' ? `${data.policy.feeValue}%` : money(data.policy.feeValue, data.currencyCode)}</strong></div>
+                    <div className="mm-list-row"><span>Service charge</span><strong>{data.policy.feeMode === 'PERCENTAGE' ? `${data.policy.feeValue}%` : money(data.policy.feeValue, data.currencyCode)}</strong></div><div className="mm-list-row"><span>TDS withholding</span><strong>{Number(data.policy.tdsRatePercent ?? 0)}% of gross</strong></div>
                     <div className="mm-list-row"><span>KYC required</span><strong>{Boolean(data.policy.kycRequired) ? 'Yes' : 'No'}</strong></div>
                     <div className="mm-list-row"><span>Pending requests allowed</span><strong>{data.policy.maxPendingRequests}</strong></div>
                   </div> : <div className="mm-empty">No active default withdrawal policy is available for {data.currencyCode}.</div>}
@@ -260,7 +262,7 @@ export function MemberWithdrawals() {
                   {!data.policy ? <div className="mm-empty">Withdrawals are not available for this currency right now.</div> : !kycReady ? <div className="mm-empty">This policy requires approved KYC. Complete KYC before requesting a withdrawal.</div> : !activeDestinations.length ? <div className="mm-empty">Add an active payout destination first.</div> : (
                     <form method="post" onSubmit={createRequest}>
                       <div className="mm-field"><label htmlFor="withdrawal-destination">Destination</label><select className="mm-input" id="withdrawal-destination" value={selectedDestination} onChange={(event) => setSelectedDestination(event.target.value)} required>{activeDestinations.map((destination) => <option key={destination.id} value={destination.id}>{destination.label} · {destination.type.replaceAll('_', ' ')}</option>)}</select></div>
-                      <div className="mm-field"><label htmlFor="withdrawal-amount">Amount ({data.currencyCode})</label><input className="mm-input" id="withdrawal-amount" type="number" min={Number(data.policy.minAmount)} max={Number(data.policy.maxAmount)} step="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} required /></div>
+                      <div className="mm-field"><label htmlFor="withdrawal-amount">Amount ({data.currencyCode})</label><input className="mm-input" id="withdrawal-amount" type="number" min={Number(data.policy.minAmount)} max={Number(data.policy.maxAmount)} step="0.01" value={amount} onChange={(event) => setAmount(event.target.value)} required /></div>{Number(amount) > 0 && (() => { const gross = Number(amount); const rawFee = data.policy.feeMode === 'PERCENTAGE' ? gross * Number(data.policy.feeValue) / 100 : Number(data.policy.feeValue); const service = Math.round(Math.min(data.policy.maximumFee === null ? Infinity : Number(data.policy.maximumFee), Math.max(data.policy.minimumFee === null ? 0 : Number(data.policy.minimumFee), Math.round(rawFee * 100) / 100)) * 100) / 100; const tax = Math.round(gross * Number(data.policy.tdsRatePercent ?? 0)) / 100; return <div className="mm-list" aria-label="Estimated withdrawal deductions"><div className="mm-list-row"><span>Gross withdrawal</span><strong>{money(gross, data.currencyCode)}</strong></div><div className="mm-list-row"><span>Service charge</span><strong>{money(service, data.currencyCode)}</strong></div><div className="mm-list-row"><span>Estimated TDS</span><strong>{money(tax, data.currencyCode)}</strong></div><div className="mm-list-row"><span>Estimated net payout</span><strong>{money(Math.max(0, gross - service - tax), data.currencyCode)}</strong></div><small>Estimate only. Server-calculated amounts are fixed when the request is submitted.</small></div>; })()}
                       <button className="mm-button blue" type="submit" disabled={busy}>{busy ? 'Submitting…' : 'Submit withdrawal'}</button>
                     </form>
                   )}
@@ -285,7 +287,7 @@ export function MemberWithdrawals() {
               <section className="mm-card">
                 <div className="mm-card-head"><h2>Request history</h2><span className="mm-chip">{data.requests.length} recent</span></div>
                 <div className="mm-card-body">
-                  {data.requests.length ? <div className="mm-list">{data.requests.map((request) => <div className="mm-list-row" key={request.id}><div><strong>{money(request.amount, request.currencyCode)}</strong><br /><span>{request.destinationLabel} · Net {money(request.netAmount, request.currencyCode)} · Fee {money(request.feeAmount, request.currencyCode)}</span><br /><span>{new Date(request.requestedAt).toLocaleString()}</span>{request.rejectionReason || request.failureReason || request.cancellationReason ? <><br /><span>{request.rejectionReason ?? request.failureReason ?? request.cancellationReason}</span></> : null}</div><div style={{ textAlign: 'right' }}><span className={`mm-chip ${statusTone(request.status)}`}>{request.status.replaceAll('_', ' ')}</span>{request.status === 'REQUESTED' ? <button className="mm-button light" style={{ marginLeft: 8 }} type="button" disabled={busy} onClick={() => void cancelRequest(request.id)}>Cancel</button> : null}</div></div>)}</div> : <div className="mm-empty">No withdrawal requests yet.</div>}
+                  {data.requests.length ? <div className="mm-list">{data.requests.map((request) => <div className="mm-list-row" key={request.id}><div><strong>{money(request.amount, request.currencyCode)}</strong><br /><span>{request.destinationLabel} · Net {money(request.netAmount, request.currencyCode)} · Service {money(request.feeAmount, request.currencyCode)} · TDS {money(request.tdsAmount ?? 0, request.currencyCode)}</span><br /><span>{new Date(request.requestedAt).toLocaleString()}</span>{request.rejectionReason || request.failureReason || request.cancellationReason ? <><br /><span>{request.rejectionReason ?? request.failureReason ?? request.cancellationReason}</span></> : null}</div><div style={{ textAlign: 'right' }}><span className={`mm-chip ${statusTone(request.status)}`}>{request.status.replaceAll('_', ' ')}</span>{request.status === 'REQUESTED' ? <button className="mm-button light" style={{ marginLeft: 8 }} type="button" disabled={busy} onClick={() => void cancelRequest(request.id)}>Cancel</button> : null}</div></div>)}</div> : <div className="mm-empty">No withdrawal requests yet.</div>}
                 </div>
               </section>
             </div>

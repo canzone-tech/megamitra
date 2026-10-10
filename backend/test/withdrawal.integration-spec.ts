@@ -269,6 +269,9 @@ describe('MegaGoldenClub withdrawal foundation integration', () => {
     expect(created.status).toBe(201);
     expect(created.body.status).toBe('REQUESTED');
     expect(String(created.body.amount)).toBe('300.00');
+    expect(String(created.body.tdsAmount)).toBe('0.00');
+    expect(String(created.body.feeAmount)).toBe('0.00');
+    expect(String(created.body.netAmount)).toBe('300.00');
     const requestId = String(created.body.id);
 
     const replay = await request(
@@ -367,6 +370,7 @@ describe('MegaGoldenClub withdrawal foundation integration', () => {
     );
     expect(ledger.status).toBe(200);
     expect(ledger.body.balanced).toBe(true);
+    expect(String(finalRequest.body.tdsAmount)).toBe('0.00');
     expect(ledger.body.type).toBe('WITHDRAWAL_PAYOUT');
   });
 
@@ -398,6 +402,7 @@ describe('MegaGoldenClub withdrawal foundation integration', () => {
           maxAmount: 5000,
           feeMode: 'PERCENTAGE',
           feeValue: 1.25,
+          tdsRatePercent: 5.5,
           minimumFee: 1,
           maximumFee: 25,
           kycRequired: true,
@@ -412,6 +417,7 @@ describe('MegaGoldenClub withdrawal foundation integration', () => {
     );
     expect(version.status).toBe(201);
     expect(version.body.lifecycle).toBe('DRAFT');
+    expect(String(version.body.tdsRatePercent)).toBe('5.5000');
 
     const published = await request(
       `/admin/withdrawals/policy-versions/${version.body.id}/publish`,
