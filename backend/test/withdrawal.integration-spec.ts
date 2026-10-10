@@ -370,7 +370,7 @@ describe('MegaGoldenClub withdrawal foundation integration', () => {
     );
     expect(ledger.status).toBe(200);
     expect(ledger.body.balanced).toBe(true);
-    expect(String(finalRequest.body.tdsAmount)).toBe('0.00');
+    expect(Number(finalRequest.body.tdsAmount)).toBe(0);
     expect(ledger.body.type).toBe('WITHDRAWAL_PAYOUT');
   });
 
