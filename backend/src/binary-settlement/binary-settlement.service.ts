@@ -538,6 +538,7 @@ export class BinarySettlementService {
     );
     await applyInstallmentReserveOnEarning(connection, {
       userId: dto.memberUserId, currencyCode, amount: payoutAmount, earningTransactionId: transactionId,
+      now: settledAt,
     });
     return transactionId;
   }

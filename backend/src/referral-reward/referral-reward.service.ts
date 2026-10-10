@@ -452,6 +452,7 @@ export class ReferralRewardService {
     );
     await applyInstallmentReserveOnEarning(connection, {
       userId: sponsorUserId, currencyCode, amount: rewardAmount, earningTransactionId: transactionId,
+      now: occurredAt,
     });
     return transactionId;
   }

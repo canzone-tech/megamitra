@@ -83,7 +83,7 @@ export function OwnerSeasonAdvancedPanel({ embedded = false }: { embedded?: bool
 
   const applyRecoverySnapshot = useCallback((next: RecoveryPolicy) => {
     setRecovery(next);
-    setRecoveryEnabled(Boolean(next.current?.enabled));
+    setRecoveryEnabled(next.current ? Boolean(next.current.enabled) : true);
     setRecoveryPercent(String(next.current?.reservePercent ?? 50));
   }, []);
 

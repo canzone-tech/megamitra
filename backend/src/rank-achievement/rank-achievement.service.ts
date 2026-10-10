@@ -506,6 +506,7 @@ export class RankAchievementService {
     );
     await applyInstallmentReserveOnEarning(connection, {
       userId, currencyCode: currency, amount, earningTransactionId: id,
+      now: at,
     });
     return id;
   }

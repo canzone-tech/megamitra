@@ -64,6 +64,7 @@ async function selectTarget(c:PoolConnection,user:string,currency:string,now:Dat
     JOIN owner_draw_runs r ON r.seasonId=s.id JOIN lucky_draw_instances d ON d.id=r.drawId
     WHERE e.userId=? AND e.currencyCode=? AND e.status IN ('ACTIVE','COMPLETED')
     AND s.status IN ('ACTIVE','CLOSED') AND r.status NOT IN ('VOIDED','CANCELLED')
+    AND d.status <> 'VOIDED'
     ORDER BY d.drawAt DESC,r.monthNumber DESC`,[user,currency]);
   const latest=new Map<string,DrawRow>();
   for(const row of rows){
