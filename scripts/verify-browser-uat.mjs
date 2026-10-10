@@ -340,6 +340,56 @@ async function runScenario(debugPort, scenario) {
       }
     }
 
+    if (scenario.verifyQrUpload) {
+      await waitForExpression(client,
+        'Boolean(document.querySelector("input[type=file][accept*=image]") && document.querySelector("input[name=upiId]"))',
+        'payment QR settings inputs ready',
+      );
+      const upload = async (dimension, type, quality) => evaluate(client, `
+        (async () => {
+          const canvas = document.createElement('canvas');
+          canvas.width = ${dimension};
+          canvas.height = ${dimension};
+          const ctx = canvas.getContext('2d');
+          const image = ctx.createImageData(canvas.width, canvas.height);
+          const random = new Uint8Array(image.data.length);
+          for (let offset = 0; offset < random.length; offset += 65536) {
+            crypto.getRandomValues(random.subarray(offset, Math.min(random.length, offset + 65536)));
+          }
+          for (let i = 0; i < image.data.length; i += 4) {
+            image.data[i] = random[i];
+            image.data[i+1] = random[i+1];
+            image.data[i+2] = random[i+2];
+            image.data[i+3] = 255;
+          }
+          ctx.putImageData(image, 0, 0);
+          const blob = await new Promise((resolve) => canvas.toBlob(resolve, ${escapeJs(type)}, ${quality}));
+          const file = new File([blob], 'qr-uat.' + (blob.type === 'image/png' ? 'png' : 'jpg'), {type:blob.type});
+          const input = document.querySelector('input[type=file][accept*=image]');
+          const transfer = new DataTransfer(); transfer.items.add(file); input.files = transfer.files;
+          input.dispatchEvent(new Event('change', {bubbles:true}));
+          return {sourceBytes:blob.size};
+        })()
+      `, true);
+      const normal = await upload(520, 'image/jpeg', 0.82);
+      if (normal.sourceBytes < 90_000 || normal.sourceBytes > 230_000) {
+        throw new Error('QR UAT JPEG source size unexpectedly outside realistic upload range');
+      }
+      await waitForExpression(client,
+        'Array.from(document.images).find((image) => image.alt === "Configured payment QR")?.src.length > 120000 && Array.from(document.images).find((image) => image.alt === "Configured payment QR")?.src.length <= 320000',
+        '111KB-class JPEG QR accepted and previewed',
+      );
+      const large = await upload(1000, 'image/png', 1);
+      if (large.sourceBytes < 320_000 || large.sourceBytes > 8 * 1024 * 1024) {
+        throw new Error('QR UAT large PNG source size unexpected');
+      }
+      await waitForExpression(client,
+        'document.body.innerText.includes("QR image optimized to fit safely") && Array.from(document.images).find((image) => image.alt === "Configured payment QR")?.src.length <= 320000',
+        'large QR PNG optimized to supported bound',
+        30_000,
+      );
+    }
+
     if (scenario.verifyReferralCard) {
       await waitForExpression(
         client,
@@ -646,6 +696,18 @@ async function main() {
       height: 1000,
       mobile: false,
       expectedTexts: ['Settings & Governance', 'Portal Appearance'],
+    },
+    {
+      name: 'admin-member-payment-qr-desktop',
+      baseUrl: adminBaseUrl,
+      path: '/portal/member-payments',
+      cookieName: 'megagoldenclub_admin_access',
+      token: adminToken,
+      width: 1440,
+      height: 1000,
+      mobile: false,
+      expectedTexts: ['Member Payment Verification', 'QR / UPI Settings'],
+      verifyQrUpload: true,
     },
     {
       name: 'admin-dashboard-mobile-nav',

@@ -24,6 +24,10 @@ export function configureApp(app: INestApplication): void {
     platform.set?.('trust proxy', trustProxyHops);
   }
 
+  // QR/UPI settings accept a bounded Base64 image (max 320KB text).
+  // The default Nest/Express JSON limit of 100KB rejects even ~111KB JPEG QR files.
+  app.useBodyParser('json', { limit: '512kb' });
+
   app.use(
     createRequestHardeningMiddleware({
       hstsEnabled: config.get<boolean>('SECURITY_HSTS_ENABLED') === true,

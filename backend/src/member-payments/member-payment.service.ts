@@ -184,7 +184,7 @@ export class MemberPaymentService {
   }
 
   async updatePaymentSettings(dto: UpdatePaymentSettingsDto, actorUserId: string) {
-    this.validatePaymentProof(dto.qrImageDataUrl, true);
+    this.validateQrImage(dto.qrImageDataUrl);
     await this.db.execute(
       `UPDATE owner_payment_settings
        SET upiId=?, payeeName=?, qrImageDataUrl=?, instructions=?, enabled=?, updatedByUserId=?
@@ -1219,6 +1219,18 @@ export class MemberPaymentService {
       ]).toString('utf8');
     } catch {
       throw new ConflictException('E-PIN secret cannot be decrypted with the current server key');
+    }
+  }
+
+  private validateQrImage(value?: string) {
+    const qr = value?.trim();
+    if (!qr) return;
+    if (qr.length > 320_000) {
+      throw new BadRequestException('Payment QR image is too large after optimization (maximum 320,000 characters)');
+    }
+    if (!/^data:image\/(?:png|jpeg|webp);base64,[a-z0-9+/=]+$/i.test(qr) &&
+        !qr.startsWith('https://')) {
+      throw new BadRequestException('Payment QR image must be a PNG, JPEG, WebP data URL or HTTPS URL');
     }
   }
 

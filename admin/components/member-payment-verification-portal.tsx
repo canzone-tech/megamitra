@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ApiClientError, apiJson } from '@/lib/client-api';
+import { preparePaymentQrImage } from '@/lib/payment-qr-image';
 import { OwnerManagementShell } from './owner-management-shell';
 import styles from './owner-portal.module.css';
 
@@ -67,18 +68,6 @@ function detailsObject(value: Submission['details']): Record<string, unknown> {
     return {};
   }
 }
-async function fileToDataUrl(file: File): Promise<string> {
-  if (!file.type.startsWith('image/')) throw new Error('QR image must be an image');
-  const result = await new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(String(reader.result ?? ''));
-    reader.onerror = () => reject(new Error('Unable to read QR image'));
-    reader.readAsDataURL(file);
-  });
-  if (result.length > 120_000) throw new Error('QR image is too large. Please use a smaller image.');
-  return result;
-}
-
 export function MemberPaymentVerificationPortal() {
   const router = useRouter();
   const [settings, setSettings] = useState<PaymentSettings | null>(null);
@@ -143,6 +132,20 @@ export function MemberPaymentVerificationPortal() {
     } catch (reason) { handleError(reason); } finally { setBusyId(''); }
   }
 
+  async function handleQrFile(file: File) {
+    setError('');
+    setNotice('');
+    try {
+      const prepared = await preparePaymentQrImage(file);
+      setQrImageDataUrl(prepared.dataUrl);
+      setNotice(prepared.optimized
+        ? 'QR image optimized to fit safely. Preview it below, then save payment settings.'
+        : 'QR image ready. Preview it below, then save payment settings.');
+    } catch (reason) {
+      handleError(reason);
+    }
+  }
+
   async function saveSettings(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -175,7 +178,7 @@ export function MemberPaymentVerificationPortal() {
           <div className={styles.fields}>
             <div className={styles.field}><label>UPI ID</label><input className={styles.input} name="upiId" defaultValue={settings.upiId ?? ''} /></div>
             <div className={styles.field}><label>Payee name</label><input className={styles.input} name="payeeName" defaultValue={settings.payeeName ?? ''} /></div>
-            <div className={styles.field}><label>QR image</label><input className={styles.input} type="file" accept="image/*" onChange={(event) => { const file = event.target.files?.[0]; if (file) void fileToDataUrl(file).then(setQrImageDataUrl).catch(handleError); }} /></div>
+            <div className={styles.field}><label>QR image</label><input className={styles.input} type="file" accept="image/png,image/jpeg,image/webp" aria-describedby="payment-qr-upload-help" onChange={(event) => { const file = event.target.files?.[0]; if (file) void handleQrFile(file); }} /><small id="payment-qr-upload-help">PNG, JPEG or WebP up to 8 MB; oversized images are optimized automatically. Verify the QR preview is scannable before saving.</small></div>
             <div className={styles.field}><label>Enabled</label><input name="enabled" type="checkbox" defaultChecked={Boolean(settings.enabled)} /></div>
             <div className={classNames(styles.field, styles.full)}><label>Member instructions</label><textarea className={styles.input} name="instructions" defaultValue={settings.instructions ?? ''} rows={3} /></div>
           </div>

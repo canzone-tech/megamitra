@@ -15,7 +15,7 @@ import {
 export class UpdatePaymentSettingsDto {
   @IsOptional() @IsString() @MaxLength(191) upiId?: string;
   @IsOptional() @IsString() @MaxLength(160) payeeName?: string;
-  @IsOptional() @IsString() @MaxLength(120_000) qrImageDataUrl?: string;
+  @IsOptional() @IsString() @MaxLength(320_000) qrImageDataUrl?: string;
   @IsOptional() @IsString() @MaxLength(1000) instructions?: string;
   @IsBoolean() enabled!: boolean;
 }
