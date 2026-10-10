@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { EmailChangeRequestForm } from '@/components/auth-recovery-forms';
 import { ApiClientError, apiJson } from '@/lib/client-api';
 import { MemberHeader } from '@/components/member-header';
 
@@ -59,7 +58,7 @@ export function MemberSecurity() {
       <MemberHeader />
       <main className="mm-member-main">
         <div className="mm-member-hero">
-          <div><p className="mm-eyebrow">Account security</p><h1 className="mm-title">Identity & email</h1><p className="mm-subtitle">To change your email, enter your current password and confirm the new address. For your security, you will be signed out after the change.</p></div>
+          <div><p className="mm-eyebrow">Account security</p><h1 className="mm-title">Identity & email</h1><p className="mm-subtitle">Review your registered account details and verify your existing email address.</p></div>
         </div>
         {error ? <div className="mm-error" role="alert">{error}</div> : null}
         <div className="mm-wide-grid mm-security-identity-grid">
@@ -71,10 +70,6 @@ export function MemberSecurity() {
               <div className="mm-list-row"><span>Email status</span><strong>{!me ? 'Loading…' : me.emailVerifiedAt ? 'Verified' : 'Verification pending'}</strong></div>
               {me?.email && !me.emailVerifiedAt ? <div className="mm-member-verify-email"><p>Verify your current email address to complete your profile.</p><button className="mm-button light" type="button" disabled={requestingVerification} onClick={() => void requestVerification()}>{requestingVerification ? 'Sending…' : 'Resend verification link'}</button>{verificationNotice ? <div className="mm-success" role="status">{verificationNotice}</div> : null}</div> : null}
             </div>
-          </section>
-          <section className="mm-card">
-            <div className="mm-card-head"><h2>Change email</h2><span className="mm-chip">Re-verification required</span></div>
-            <div className="mm-card-body"><EmailChangeRequestForm /></div>
           </section>
         </div>
       </main>
