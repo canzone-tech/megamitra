@@ -62,7 +62,7 @@ export function MemberSecurity() {
           <div><p className="mm-eyebrow">Account security</p><h1 className="mm-title">Identity & email</h1><p className="mm-subtitle">To change your email, enter your current password and confirm the new address. For your security, you will be signed out after the change.</p></div>
         </div>
         {error ? <div className="mm-error" role="alert">{error}</div> : null}
-        <div className="mm-wide-grid">
+        <div className="mm-wide-grid mm-security-identity-grid">
           <section className="mm-card">
             <div className="mm-card-head"><h2>Current identity</h2><span className="mm-chip">{!me ? 'Loading' : me.emailVerifiedAt ? 'Verified' : 'Unverified'}</span></div>
             <div className="mm-card-body mm-list">

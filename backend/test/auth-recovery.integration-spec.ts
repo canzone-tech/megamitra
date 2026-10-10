@@ -182,9 +182,32 @@ describe('MegaGoldenClub auth recovery and email verification integration', () =
     });
     expect(loginAfterReset.status).toBe(200);
 
+    // Members cannot change their registered email, even if email changes are
+    // globally enabled and they know their current password.
+    const memberRequest = await request('/auth/email-change/request', {
+      method: 'POST',
+      headers: { authorization: `Bearer ${loginAfterReset.body.accessToken}` },
+      body: JSON.stringify({
+        newEmail: `blocked_${randomUUID().replaceAll('-', '').slice(0, 10)}@example.test`,
+        currentPassword: 'Recovery-New-456!',
+      }),
+    });
+    expect(memberRequest.status).toBe(403);
+
     const newEmail = `changed_${randomUUID().replaceAll('-', '').slice(0, 16)}@example.test`;
     const changeToken = `change_${randomUUID()}_${randomUUID()}`;
     await insertToken('EMAIL_CHANGE', changeToken, newEmail);
+    // Historical member-issued tokens must also fail the public confirmation
+    // endpoint. A role upgrade is explicit and needed before confirmation.
+    const memberConfirm = await request('/auth/email-change/confirm', {
+      method: 'POST',
+      body: JSON.stringify({ token: changeToken }),
+    });
+    expect(memberConfirm.status).toBe(403);
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: userId } })).email).toBe(originalEmail);
+
+    const superAdminRole = await prisma.role.findUniqueOrThrow({ where: { name: 'SUPER_ADMIN' } });
+    await prisma.userRole.create({ data: { userId, roleId: superAdminRole.id } });
     const changed = await request('/auth/email-change/confirm', {
       method: 'POST',
       body: JSON.stringify({ token: changeToken }),
@@ -192,6 +215,12 @@ describe('MegaGoldenClub auth recovery and email verification integration', () =
     expect(changed.status).toBe(200);
     expect(changed.body.emailChanged).toBe(true);
     expect(changed.body.sessionsRevoked).toBe(true);
+
+    // The confirmation token is consumed only once, even for SUPER_ADMIN.
+    const replayChange = await request('/auth/email-change/confirm', {
+      method: 'POST', body: JSON.stringify({ token: changeToken }),
+    });
+    expect(replayChange.status).toBe(400);
 
     const changedUser = await prisma.user.findUniqueOrThrow({ where: { id: userId } });
     expect(changedUser.email).toBe(newEmail);

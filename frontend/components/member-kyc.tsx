@@ -195,7 +195,7 @@ export function MemberKyc() {
                     {requiredFields.map((field) => (
                       <div className="mm-field" key={field}>
                         <label htmlFor={`kyc-field-${field}`}>{label(field)}</label>
-                        <input className="mm-input" id={`kyc-field-${field}`} value={fields[field] ?? ''} onChange={(event) => setFields((current) => ({ ...current, [field]: event.target.value }))} required />
+                        <input className="mm-input" id={`kyc-field-${field}`} type={/(?:^|\.)(?:dateOfBirth|birthDate|dob)$/i.test(field) ? 'date' : 'text'} value={fields[field] ?? ''} onChange={(event) => setFields((current) => ({ ...current, [field]: event.target.value }))} required />
                       </div>
                     ))}
                     {requiredDocuments.map((type) => (

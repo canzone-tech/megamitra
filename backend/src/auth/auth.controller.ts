@@ -19,6 +19,7 @@ import {
 } from './auth-recovery.dto';
 import { AuthRecoveryService } from './auth-recovery.service';
 import { MemberRegistrationService } from './member-registration.service';
+import { Roles } from '../rbac/roles.decorator';
 import { AllowPasswordChangeRequired } from './password-change-required.decorator';
 import { Public } from './public.decorator';
 
@@ -103,6 +104,7 @@ export class AuthController {
     return this.recovery.confirmEmailVerification(dto);
   }
 
+  @Roles('SUPER_ADMIN')
   @AllowPasswordChangeRequired()
   @HttpCode(HttpStatus.OK)
   @Post('email-change/request')

@@ -35,3 +35,9 @@ Updated: 2026-10-10. Branch: `dev/local-foundation`.
 - Prize catalogue entries are potential monthly prizes; entitlements exist only after business-policy grants. Both remain separate from member wallet earnings.
 - Draw date is shown only when an actual authoritative draw instance exists; otherwise "Not scheduled".
 - Human stateful UAT of member-specific publication, actual rewards and mobile touch interactions remains necessary after CI and local `npm run verify`.
+
+## Identity and KYC controls (2026-10-10)
+- A policy-defined `dateOfBirth`/`birthDate`/`dob` KYC field renders a native date input/calendar and submits the same `YYYY-MM-DD` value in its existing policy field. Other KYC inputs remain policy-driven and unchanged.
+- The Member Security page displays username, email and verification state; existing email verification remains available. It no longer provides an email-change form.
+- `POST /auth/email-change/request` is `SUPER_ADMIN`-role restricted, with a service-side persisted-role check. Public `POST /auth/email-change/confirm` also validates the subject still has `SUPER_ADMIN` during transactional consumption, so historical member tokens cannot bypass the new restriction.
+- Password recovery and verification of the existing email are **not** disabled. No schema migration.

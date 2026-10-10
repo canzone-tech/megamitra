@@ -476,3 +476,6 @@
 .mm-member-quick-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 var(--portal-gap); }
 .mm-member-quick-actions .mm-button { min-width: 0; max-width: 100%; white-space: normal; text-align: center; }
 @media (max-width: 430px) { .mm-member-quick-actions { display: grid; grid-template-columns: minmax(0,1fr); } .mm-member-quick-actions .mm-button { width: 100%; } }
+
+/* Email is Super Admin-managed. The member security view has a single read-only identity card. */
+.mm-member-shell .mm-security-identity-grid { grid-template-columns: minmax(0, 1fr); }

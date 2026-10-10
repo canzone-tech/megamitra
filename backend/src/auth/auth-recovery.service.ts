@@ -307,6 +307,14 @@ export class AuthRecoveryService {
   }
 
   async requestEmailChange(user: AuthUser, dto: RequestEmailChangeDto) {
+    if (!user.roles.includes('SUPER_ADMIN')) {
+      throw new ForbiddenException('Only Super Admin may change an account email');
+    }
+    const eligible = await this.prisma.userRole.findFirst({
+      where: { userId: user.id, role: { name: 'SUPER_ADMIN' } },
+      select: { userId: true },
+    });
+    if (!eligible) throw new ForbiddenException('Only Super Admin may change an account email');
     const config = await this.getExtensionConfig();
     if (!config.emailChangeEnabled) throw new ForbiddenException('Email change is disabled');
     if (!this.mail.isConfigured()) throw new ServiceUnavailableException('SMTP delivery is not configured');
@@ -353,6 +361,11 @@ export class AuthRecoveryService {
     const now = new Date();
 
     await this.prisma.$transaction(async (tx) => {
+      const actor = await tx.userRole.findFirst({
+        where: { userId: token.userId, role: { name: 'SUPER_ADMIN' } },
+        select: { userId: true },
+      });
+      if (!actor) throw new ForbiddenException('Only Super Admin may change an account email');
       const consumed = await tx.$executeRawUnsafe(
         `UPDATE auth_action_tokens
          SET consumedAt = ?

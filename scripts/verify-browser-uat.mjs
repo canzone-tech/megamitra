@@ -390,6 +390,23 @@ async function runScenario(debugPort, scenario) {
       );
     }
 
+    if (scenario.checkMemberSecurity) {
+      const prohibited = await evaluate(client, `(() => ({
+        form: Boolean(document.querySelector('#email-change-password, #email-change-new-email')),
+        heading: [...document.querySelectorAll('h2')].some((heading) => heading.textContent?.trim() === 'Change email'),
+        instructions: document.body.innerText.includes('To change your email, enter your current password'),
+      }))()`);
+      if (prohibited.form || prohibited.heading || prohibited.instructions) {
+        throw new Error('Member Security exposed Super Admin-only email change controls');
+      }
+    }
+    if (scenario.checkKycBirthDate) {
+      const invalid = await evaluate(client, `(() => [
+        ...document.querySelectorAll('input[id^="kyc-field-"]')
+      ].filter((input) => /(?:^|\\.)(?:dateOfBirth|birthDate|dob)$/i.test(input.id.slice('kyc-field-'.length)))
+        .some((input) => input.type !== 'date'))()`);
+      if (invalid) throw new Error('KYC date of birth is missing the native date picker');
+    }
     if (scenario.verifyReferralCard) {
       await waitForExpression(
         client,
@@ -798,9 +815,9 @@ async function main() {
     { slug: 'rewards', heading: 'Rewards & Lucky Draw', readyText: 'My Lucky Draw wins & claims' },
     { slug: 'installments', heading: 'Monthwise installments', readyText: 'No session enrollment or installment schedule yet.' },
     { slug: 'withdrawals', heading: 'Withdrawals', readyText: 'Withdrawal limits & fees' },
-    { slug: 'kyc', heading: 'KYC', readyText: 'Verification status' },
+    { slug: 'kyc', heading: 'KYC', readyText: 'Verification status', checkKycBirthDate: true },
     { slug: 'entitlements', heading: 'My product benefits', readyText: 'Benefit history' },
-    { slug: 'security', heading: 'Identity & email', readyText: 'uat-verify-member-' },
+    { slug: 'security', heading: 'Identity & email', readyText: 'uat-verify-member-', checkMemberSecurity: true },
   ];
   for (const page of memberPages) {
     for (const viewport of [
@@ -819,6 +836,8 @@ async function main() {
         expectedTexts: [page.heading, page.readyText],
         waitForRefresh: page.waitForRefresh,
         requireMemberApi: true,
+        checkKycBirthDate: page.checkKycBirthDate,
+        checkMemberSecurity: page.checkMemberSecurity,
         requireMemberMobileNav: viewport.mobile,
         requireMemberDesktopNav: !viewport.mobile,
       });
