@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { ApiClientError, apiJson } from '@/lib/client-api';
 import { MemberHeader } from '@/components/member-header';
 
@@ -99,6 +100,8 @@ export function MemberEntitlements() {
 
         {error ? <div className="mm-error" role="alert">{error}</div> : null}
         {message ? <div className="mm-success" role="status">{message}</div> : null}
+
+        <section className="mm-card" style={{ marginTop: 14 }}><div className="mm-card-body"><strong>Looking for achievement targets or monthly Lucky Draw prizes?</strong><p>This page shows only product benefits already granted to your account. Draw prizes and rank goals have their own member guide.</p><Link className="mm-button blue" href="/member/rewards">View rewards & Lucky Draw</Link></div></section>
 
         {data ? (
           <>

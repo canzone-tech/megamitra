@@ -422,3 +422,57 @@
 .mm-member-shell .mm-program-progress-head { flex-wrap: wrap; gap: 9px; min-width: 0; }
 .mm-member-shell .mm-program-progress-head .mm-portal-actions { margin-left: auto; align-items: center; min-width: 0; flex-wrap: wrap; }
 @media (max-width: 430px) { .mm-member-shell .mm-program-progress-head .mm-portal-actions { margin-left: 0; width: 100%; } }
+
+
+/* Mobile More is portalled to the theme root to avoid sticky-header clipping and stacking. */
+.mm-runtime-theme > .mm-member-more-layer { position: fixed; inset: 0; z-index: 1000; }
+.mm-member-more-scrim { position: absolute; inset: 0; width: 100%; border: 0; background: rgba(19,17,43,.38); }
+.mm-runtime-theme > .mm-member-more-layer .mm-member-more-menu {
+  position: absolute; inset: auto 12px 78px; display: grid; gap: 3px;
+  max-height: min(70dvh, 520px); overflow-y: auto; padding: 12px;
+  border: 1px solid var(--portal-border); border-radius: var(--portal-radius);
+  background: var(--portal-card); color: var(--portal-text);
+  box-shadow: 0 20px 70px rgba(19,17,43,.32);
+}
+.mm-runtime-theme > .mm-member-more-layer .mm-member-more-menu a,
+.mm-runtime-theme > .mm-member-more-layer .mm-member-more-menu button {
+  display: flex; align-items: center; gap: 12px; padding: 11px 12px;
+  min-height: 45px; border: 0; border-radius: 9px;
+  background: transparent; color: var(--portal-text);
+  font: inherit; font-size: 14px; text-decoration: none; text-align: left;
+}
+.mm-runtime-theme > .mm-member-more-layer .mm-member-more-menu strong { padding: 8px 12px; }
+.mm-runtime-theme > .mm-member-more-layer .mm-member-more-menu a:hover,
+.mm-runtime-theme > .mm-member-more-layer .mm-member-more-menu a:focus-visible,
+.mm-runtime-theme > .mm-member-more-layer .mm-member-more-menu button:hover,
+.mm-runtime-theme > .mm-member-more-layer .mm-member-more-menu button:focus-visible {
+  background: color-mix(in srgb, var(--portal-primary) 12%, var(--portal-card));
+}
+.mm-runtime-theme > .mm-member-more-layer .mm-member-more-menu [aria-current='page'] {
+  color: var(--portal-primary); font-weight: 900;
+}
+.mm-runtime-theme[data-mobile-navigation='DRAWER'] > .mm-member-more-layer .mm-member-more-menu {
+  inset: 112px 12px auto; max-height: calc(100dvh - 130px);
+}
+
+/* Member-facing published rank targets and official monthly prize calendar. */
+.mm-member-shell .mm-reward-guide-card { margin-bottom: var(--portal-gap); }
+.mm-member-shell .mm-reward-guide-card .mm-card-head { flex-wrap: wrap; gap: 10px; }
+.mm-member-shell .mm-reward-guide-card .mm-card-body { min-width: 0; }
+.mm-reward-guide-grid { display: grid; gap: 12px; grid-template-columns: repeat(2,minmax(0,1fr)); }
+.mm-reward-guide-item { min-width: 0; padding: 15px; border: 1px solid var(--portal-border); border-radius: 12px; }
+.mm-reward-guide-item h3 { margin: 0 0 9px; font-size: 15px; }
+.mm-reward-guide-item p { margin: 5px 0; font-size: 13px; line-height: 1.55; overflow-wrap: anywhere; }
+.mm-reward-guide-item small,.mm-reward-disclaimer { color: var(--portal-muted); font-size: 12px; line-height: 1.55; }
+.mm-reward-prizes { display: grid; gap: 7px; margin-top: 9px; }
+.mm-reward-prizes > div { padding: 9px 11px; border-radius: 9px; background: color-mix(in srgb,var(--portal-primary) 5%,var(--portal-card)); font-size: 13px; }
+.mm-reward-disclaimer { margin: 12px 0 0; }
+.mm-reward-guide-card .mm-portal-actions { flex-wrap: wrap; }
+@media (max-width: 680px) {
+  .mm-reward-guide-grid { grid-template-columns: minmax(0,1fr); }
+  .mm-reward-guide-item { padding: 12px; }
+}
+
+.mm-member-quick-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 var(--portal-gap); }
+.mm-member-quick-actions .mm-button { min-width: 0; max-width: 100%; white-space: normal; text-align: center; }
+@media (max-width: 430px) { .mm-member-quick-actions { display: grid; grid-template-columns: minmax(0,1fr); } .mm-member-quick-actions .mm-button { width: 100%; } }

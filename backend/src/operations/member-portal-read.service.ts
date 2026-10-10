@@ -154,6 +154,102 @@ export class MemberPortalReadService {
     };
   }
 
+  /**
+   * Member-safe, season-scoped incentives and draw calendar. Never expose
+   * draft/unpublished financial rank policies, other member histories or
+   * privileged draw execution inputs. Targets are policy snapshots, not promises.
+   */
+  async rewardGuide(userId: string) {
+    type Season = { id: string; enrollmentId: string; programVersionId: string; code: string; name: string; status: string; enrolledAt: Date | string; currencyCode: string };
+    type Prize = { seasonId: string; monthNumber: number; prizeCode: string; category: string; name: string; description: string | null; winnerCount: number; nominalValue: string | null; currencyCode: string };
+    type Draw = { seasonId: string; monthNumber: number; status: string; drawAt: Date | string };
+    type Token = { seasonId: string; installmentSequence: number; token: string; status: string };
+    const [seasons, prizes, draws, tokens, awards, memberDraws] = await Promise.all([
+      this.prisma.$queryRawUnsafe<Season[]>(
+        "SELECT DISTINCT s.id, e.id AS enrollmentId, e.programVersionId, s.code, s.name, s.status, e.enrolledAt, e.currencyCode " +
+        "FROM program_enrollments e JOIN owner_seasons s ON s.programVersionId=e.programVersionId " +
+        "WHERE e.userId=? AND s.status IN ('ACTIVE','CLOSED') " +
+        "ORDER BY e.enrolledAt DESC, s.id DESC", userId,
+      ),
+      this.prisma.$queryRawUnsafe<Prize[]>(
+        "SELECT p.seasonId, p.monthNumber, p.prizeCode, p.category, p.name, p.description, " +
+        "p.winnerCount, p.nominalValue, p.currencyCode " +
+        "FROM owner_season_prizes p JOIN owner_seasons s ON s.id=p.seasonId " +
+        "JOIN program_enrollments e ON e.programVersionId=s.programVersionId " +
+        "WHERE e.userId=? AND s.status IN ('ACTIVE','CLOSED') AND p.status='ACTIVE' " +
+        "ORDER BY p.monthNumber ASC, p.prizeCode ASC", userId,
+      ),
+      this.prisma.$queryRawUnsafe<Draw[]>(
+        "SELECT r.seasonId, r.monthNumber, d.status, d.drawAt " +
+        "FROM owner_draw_runs r JOIN lucky_draw_instances d ON d.id=r.drawId " +
+        "JOIN owner_seasons s ON s.id=r.seasonId " +
+        "JOIN program_enrollments e ON e.programVersionId=s.programVersionId " +
+        "WHERE e.userId=? AND s.status IN ('ACTIVE','CLOSED') " +
+        "ORDER BY r.monthNumber ASC", userId,
+      ),
+      this.prisma.$queryRawUnsafe<Token[]>(
+        "SELECT t.seasonId, t.installmentSequence, t.token, t.status " +
+        "FROM lucky_draw_tokens t WHERE t.userId=? AND t.sourceType='INSTALLMENT' " +
+        "ORDER BY t.installmentSequence ASC", userId,
+      ),
+      this.prisma.rankAchievement.findMany({
+        where: { userId }, orderBy: { achievedAt: 'desc' },
+        include: { monthlyPayouts: { select: { sequence: true, amount: true }, orderBy: { sequence: 'asc' } } },
+      }),
+      this.reads.memberRewards(userId, { page: '1', limit: '100' }),
+    ]);
+    const versionIds = [...new Set(seasons.map((row) => row.programVersionId))];
+    const published = versionIds.length ? await this.prisma.rankRewardPolicyVersion.findMany({
+      where: { programVersionId: { in: versionIds }, lifecycle: 'PUBLISHED' },
+      orderBy: [{ publishedAt: 'desc' }, { version: 'desc' }],
+      select: { programVersionId: true, version: true, tiers: true },
+    }) : [];
+    const policiesByProgram = new Map<string, typeof published[number]>();
+    for (const policy of published) {
+      if (!policiesByProgram.has(policy.programVersionId)) policiesByProgram.set(policy.programVersionId, policy);
+    }
+    const toDate = (value: Date | string) => value instanceof Date ? value.toISOString() : String(value);
+    return {
+      wins: memberDraws.wins.items.map((winner) => ({
+        winnerId: winner.winnerId, drawId: winner.drawId,
+        prizeTierName: winner.prizeTierName, prizeKind: winner.prizeKind,
+        claimStatus: winner.claimStatus, claimDeadline: winner.claimDeadline,
+        wonAt: winner.wonAt,
+      })),
+      seasons: seasons.map((season) => ({
+        id: season.id, code: season.code, name: season.name, status: season.status,
+        currencyCode: season.currencyCode, enrolledAt: toDate(season.enrolledAt),
+        rankPolicy: (() => {
+          const policy = policiesByProgram.get(season.programVersionId);
+          const tiers: unknown = policy?.tiers;
+          return policy ? {
+            version: policy.version,
+            tiers: Array.isArray(tiers) ? tiers : typeof tiers === 'string' ? JSON.parse(tiers) as unknown : [],
+          } : null;
+        })(),
+        achievements: awards.filter((award) => award.enrollmentId === season.enrollmentId).map((award) => ({
+          tierCode: award.tierCode, tierName: award.tierName,
+          achievedAt: award.achievedAt, cashAmount: award.cashAmount.toString(),
+          monthlyAmount: award.monthlyAmount.toString(), monthlyMonths: award.monthlyMonths,
+          paidMonths: award.monthlyPayouts.length,
+          tripDescription: award.tripDescription, tripStatus: award.tripStatus,
+        })),
+        prizes: prizes.filter((p) => p.seasonId === season.id).map((p) => ({
+          monthNumber: Number(p.monthNumber), prizeCode: p.prizeCode, category: p.category,
+          name: p.name, description: p.description, winnerCount: Number(p.winnerCount),
+          nominalValue: p.nominalValue === null ? null : String(p.nominalValue),
+          currencyCode: p.currencyCode,
+        })),
+        draws: draws.filter((d) => d.seasonId === season.id).map((d) => ({
+          monthNumber: Number(d.monthNumber), status: d.status, drawAt: toDate(d.drawAt),
+        })),
+        tokens: tokens.filter((t) => t.seasonId === season.id).map((t) => ({
+          monthNumber: Number(t.installmentSequence), token: t.token, status: t.status,
+        })),
+      })),
+    };
+  }
+
   async overview(userId: string) {
     const query = { page: '1', limit: '10' };
     const [

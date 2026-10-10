@@ -69,6 +69,7 @@ export function PresentationRuntimeProvider({ children }: { children: ReactNode 
     '/member/payments': ['Payments & E-PINs', 'Installments, payment receipts and E-PIN inventory'],
     '/member/installments': ['Monthwise installments', 'Paid and unpaid EMIs, receipts and draw tokens'],
     '/member/entitlements': ['My product benefits', 'Benefits, claims and fulfilment'],
+    '/member/rewards': ['Rewards & Lucky Draw', 'Rank goals, earned bonuses and official monthly prizes'],
     '/member/withdrawals': ['Withdrawals', 'Wallet payouts, destinations and requests'],
     '/member/kyc': ['KYC verification', 'Identity verification and review status'],
     '/member/security': ['Account security', 'Email verification and account details'],

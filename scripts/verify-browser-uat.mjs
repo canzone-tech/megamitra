@@ -469,18 +469,40 @@ async function runScenario(debugPort, scenario) {
     }
 
     if (scenario.requireMemberMobileNav) {
-      const opened = await evaluate(client, `(() => {
+      // Real pointer input catches stacking/clipping and untappable mobile items.
+      const point = await evaluate(client, `(() => {
         const button = document.querySelector('nav[aria-label="Member navigation"] button[data-member-label="More"]');
-        if (!button) return false;
-        button.click();
-        return true;
+        if (!button) return null;
+        const r = button.getBoundingClientRect();
+        return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
       })()`);
-      if (!opened) throw new Error('Member mobile More navigation button was not found');
+      if (!point || point.x < 0 || point.y < 0 || point.y > scenario.height) {
+        throw new Error('Member mobile More button is absent or outside the viewport');
+      }
+      await client.send('Input.dispatchMouseEvent', {
+        type: 'mousePressed', x: point.x, y: point.y, button: 'left', clickCount: 1,
+      });
+      await client.send('Input.dispatchMouseEvent', {
+        type: 'mouseReleased', x: point.x, y: point.y, button: 'left', clickCount: 1,
+      });
       await waitForExpression(
         client,
-        'document.querySelector("#member-more-menu:not([hidden])")?.textContent?.includes("Sign out")',
+        'document.querySelector("#member-more-menu")?.textContent?.includes("Sign out")',
         'member mobile More menu',
       );
+      const hit = await evaluate(client, `(() => {
+        const menu = document.querySelector('#member-more-menu');
+        const item = menu?.querySelector('a[data-member-label="Rewards & Lucky Draw"]');
+        if (!menu || !item) return { visible: false, hittable: false };
+        const menuRect = menu.getBoundingClientRect();
+        const r = item.getBoundingClientRect();
+        const x = r.left + r.width / 2, y = r.top + r.height / 2;
+        return {
+          visible: menuRect.width > 0 && menuRect.height > 0 && y >= 0 && y < innerHeight,
+          hittable: Boolean(document.elementFromPoint(x, y)?.closest('#member-more-menu')),
+        };
+      })()`);
+      if (!hit.visible || !hit.hittable) throw new Error('Mobile More menu opened in DOM but is visually blocked or untappable');
     }
 
     if (scenario.action === 'open-admin-mobile-more') {
@@ -574,9 +596,9 @@ async function runScenario(debugPort, scenario) {
       }
     }
     if (scenario.requireMemberMobileNav || scenario.requireMemberDesktopNav) {
-      const primary = ['Dashboard', 'Payments & E-PINs', 'Products'];
+      const primary = ['Dashboard', 'Payments & E-PINs', 'Benefits'];
       const missingPrimary = primary.filter((label) => !metrics.memberNavLabels.includes(label));
-      const secondary = ['Withdrawals', 'KYC', 'Security', 'Public site', 'Sign out'];
+      const secondary = ['Rewards & Lucky Draw', 'Installment history', 'Withdrawals', 'KYC', 'Security', 'Public site', 'Sign out'];
       const availableSecondary = scenario.requireMemberMobileNav ? metrics.memberMoreLabels : metrics.memberNavLabels;
       const missingSecondary = secondary.filter((label) => !availableSecondary.includes(label));
       if (missingPrimary.length || missingSecondary.length || (scenario.requireMemberMobileNav && !metrics.memberNavLabels.includes('More'))) {
@@ -773,6 +795,7 @@ async function main() {
   // Tests use an isolated MEMBER account and do not mutate financial state.
   const memberPages = [
     { slug: 'payments', heading: 'Installments & E-PINs', readyText: 'Payment receipts', waitForRefresh: true },
+    { slug: 'rewards', heading: 'Rewards & Lucky Draw', readyText: 'My Lucky Draw wins & claims' },
     { slug: 'installments', heading: 'Monthwise installments', readyText: 'No session enrollment or installment schedule yet.' },
     { slug: 'withdrawals', heading: 'Withdrawals', readyText: 'Withdrawal limits & fees' },
     { slug: 'kyc', heading: 'KYC', readyText: 'Verification status' },

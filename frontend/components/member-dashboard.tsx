@@ -193,6 +193,7 @@ export function MemberDashboard() {
         {data ? (
           <>
             <MemberReferralCard username={data.dashboard.user.username} />
+            <div className="mm-member-quick-actions"><Link className="mm-button blue" href="/member/rewards">🏆 Explore rank goals & Lucky Draw prizes</Link><Link className="mm-button light" href="/member/installments">My monthly installments</Link></div>
             <section className="mm-dashboard-grid" aria-label="Member summary">
               <article className="mm-card mm-stat">
                 <div className="mm-stat-label">Wallet balance</div>
@@ -284,7 +285,7 @@ export function MemberDashboard() {
               </section>
 
               <section className="mm-card">
-                <div className="mm-card-head"><h2>Draws & product benefits</h2><div className="mm-portal-actions"><Link className="mm-button light" href="/member/entitlements">Products</Link></div></div>
+                <div className="mm-card-head"><h2>Draws & product benefits</h2><div className="mm-portal-actions"><Link className="mm-button light" href="/member/rewards">Prize schedule</Link><Link className="mm-button light" href="/member/entitlements">My benefits</Link></div></div>
                 <div className="mm-card-body">
                   <div className="mm-portal-metrics" style={{ marginBottom: 14 }}>
                     <div className="mm-portal-metric"><span>Draw entries</span><strong>{text(drawSummary.entrantCount ?? 0)}</strong><small>{text(drawSummary.eligibleHookCount ?? 0)} eligible hooks</small></div>

@@ -2,13 +2,15 @@
 
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { ApiClientError, apiJson } from '@/lib/client-api';
 
 const destinations = [
   { href: '/member', label: 'Dashboard', compact: 'Home', icon: '🏠' },
   { href: '/member/payments', label: 'Payments & E-PINs', compact: 'Payments', icon: '💳' },
-  { href: '/member/entitlements', label: 'Products', compact: 'Products', icon: '🎁' },
+  { href: '/member/entitlements', label: 'Benefits', compact: 'Benefits', icon: '🎁' },
+  { href: '/member/rewards', label: 'Rewards & Lucky Draw', compact: 'Rewards', icon: '🏆' },
   { href: '/member/installments', label: 'Installment history', compact: 'Installments', icon: '📅' },
   { href: '/member/withdrawals', label: 'Withdrawals', compact: 'Withdrawals', icon: '💸' },
   { href: '/member/kyc', label: 'KYC', compact: 'KYC', icon: '✅' },
@@ -19,6 +21,11 @@ export function MemberHeader() {
   const pathname = usePathname();
   const router = useRouter();
   const [moreOpen, setMoreOpen] = useState(false);
+  const [portalHost, setPortalHost] = useState<Element | null>(null);
+  useEffect(() => {
+    const timer = window.setTimeout(() => setPortalHost(document.querySelector('.mm-runtime-theme')), 0);
+    return () => window.clearTimeout(timer);
+  }, []);
   const [signingOut, setSigningOut] = useState(false);
   const [error, setError] = useState('');
 
@@ -73,11 +80,13 @@ export function MemberHeader() {
           <span className="mm-member-nav-icon" aria-hidden="true">☰</span><span>More</span>
         </button>
       </nav>
-      <div
+      {moreOpen && portalHost ? createPortal(
+        <div className="mm-member-more-layer">
+          <button className="mm-member-more-scrim" type="button" aria-label="Close member navigation" onClick={() => setMoreOpen(false)} />
+        <div
         id="member-more-menu"
         className="mm-member-more-menu"
         aria-label="More member tools"
-        hidden={!moreOpen}
         onKeyDown={(event) => { if (event.key === 'Escape') setMoreOpen(false); }}
       >
         <strong>More member tools</strong>
@@ -90,7 +99,10 @@ export function MemberHeader() {
         <button type="button" data-member-label="Sign out" disabled={signingOut} onClick={() => void signOut()}>
           <span aria-hidden="true">🚪</span>{signingOut ? 'Signing out…' : 'Sign out'}
         </button>
-      </div>
+        </div>
+        </div>,
+        portalHost,
+      ) : null}
       {error ? <div className="mm-member-nav-error" role="alert">{error}</div> : null}
     </header>
   );
