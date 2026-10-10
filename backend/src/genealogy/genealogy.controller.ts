@@ -1,4 +1,5 @@
-import { Body, Controller, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, Query } from '@nestjs/common';
+import { Roles } from '../rbac/roles.decorator';
 import type { AuthUser } from '../auth/auth-user';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { Permissions } from '../rbac/permissions.decorator';
@@ -25,5 +26,20 @@ export class GenealogyController {
   @Get('members/:userId')
   getMember(@Param('userId') userId: string) {
     return this.genealogy.getMember(userId);
+  }
+}
+
+/** Member-only genealogy; navigation roots are constrained in the service. */
+@Controller('member/genealogy')
+@Roles('MEMBER')
+export class MemberGenealogyController {
+  constructor(private readonly genealogy: GenealogyService) {}
+
+  @Get()
+  ownTree(
+    @CurrentUser() member: AuthUser,
+    @Query('rootUserId', new ParseUUIDPipe({ optional: true })) rootUserId?: string,
+  ) {
+    return this.genealogy.memberSubtree(member.id, rootUserId);
   }
 }

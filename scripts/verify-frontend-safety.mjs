@@ -82,7 +82,7 @@ for (const file of files) {
 const navPath = 'admin/components/owner-management-nav.ts';
 const navSource = fs.readFileSync(path.join(repoRoot, navPath), 'utf8');
 for (const required of [
-  "label: 'Binary 1:4'",
+  "label: 'Genealogy'",
   "label: 'Admins & Agents'",
   "label: 'Roles & Permissions'",
 ]) {

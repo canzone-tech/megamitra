@@ -85,6 +85,14 @@ describe('MegaGoldenClub portal access integration', () => {
       if (createdUserIds.length) {
         const placeholders = createdUserIds.map(() => '?').join(',');
         await prisma.$executeRawUnsafe(
+          `DELETE FROM binary_ancestry WHERE ancestorUserId IN (${placeholders}) OR descendantUserId IN (${placeholders})`,
+          ...createdUserIds, ...createdUserIds,
+        );
+        await prisma.$executeRawUnsafe(
+          `DELETE FROM binary_placements WHERE memberUserId IN (${placeholders}) OR parentUserId IN (${placeholders})`,
+          ...createdUserIds, ...createdUserIds,
+        );
+        await prisma.$executeRawUnsafe(
           `DELETE FROM member_profiles WHERE userId IN (${placeholders})`,
           ...createdUserIds,
         );
@@ -138,5 +146,72 @@ describe('MegaGoldenClub portal access integration', () => {
     });
     expect(adminMemberDenied.status).toBe(403);
     expect(adminMemberDenied.body.code).toBe('FORBIDDEN');
+  });
+
+  it('shows only a logged-in member placement subtree and denies unrelated roots', async () => {
+    const root = await createUserWithRole('MEMBER', 'genealogy_root');
+    const child = await createUserWithRole('MEMBER', 'genealogy_child');
+    const outsider = await createUserWithRole('MEMBER', 'genealogy_other');
+    const admin = await createUserWithRole('SUPER_ADMIN', 'genealogy_admin');
+
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO binary_placements (id,memberUserId,parentUserId,side,slot)
+       VALUES (?,?,?,'LEFT','A')`,
+      randomUUID(), child.user.id, root.user.id,
+    );
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO binary_ancestry (ancestorUserId,descendantUserId,depth,firstLegSide,firstLegSlot)
+       VALUES (?,?,1,'LEFT','A')`,
+      root.user.id, child.user.id,
+    );
+    const rootLogin = await request('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ identifier: root.user.username, password: root.password }),
+    });
+    expect(rootLogin.status).toBe(200);
+    const memberAuth = { authorization: `Bearer ${rootLogin.body.accessToken}` };
+
+    const own = await request('/member/genealogy', { headers: memberAuth });
+    expect(own.status).toBe(200);
+    expect(own.body.homeRootUserId).toBe(root.user.id);
+    expect(own.body.root).toMatchObject({ id: root.user.id, directChildCount: 1 });
+    expect(own.body.members).toEqual([expect.objectContaining({
+      id: child.user.id, parentUserId: root.user.id,
+      slot: 'A', side: 'LEFT', depth: 1, firstLegSlot: 'A',
+    })]);
+    expect(own.body.visibleMemberCount).toBe(1);
+    expect(JSON.stringify(own.body)).not.toContain(outsider.user.username);
+
+    const drilled = await request(
+      `/member/genealogy?rootUserId=${child.user.id}`, { headers: memberAuth },
+    );
+    expect(drilled.status).toBe(200);
+    expect(drilled.body.root.id).toBe(child.user.id);
+    expect(drilled.body.visibleMemberCount).toBe(0);
+    expect(drilled.body.canGoToParent).toBe(true);
+
+    const outside = await request(
+      `/member/genealogy?rootUserId=${outsider.user.id}`, { headers: memberAuth },
+    );
+    expect(outside.status).toBe(404);
+    const invalid = await request(
+      '/member/genealogy?rootUserId=not-a-uuid', { headers: memberAuth },
+    );
+    expect(invalid.status).toBe(400);
+    const adminTreeDenied = await request('/admin/owner-portal/core/genealogy', {
+      headers: memberAuth,
+    });
+    expect(adminTreeDenied.status).toBe(403);
+    const adminLogin = await request('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ identifier: admin.user.username, password: admin.password }),
+    });
+    expect(adminLogin.status).toBe(200);
+    const memberTreeDenied = await request('/member/genealogy', {
+      headers: { authorization: `Bearer ${adminLogin.body.accessToken}` },
+    });
+    expect(memberTreeDenied.status).toBe(403);
+    const anonymous = await request('/member/genealogy');
+    expect(anonymous.status).toBe(401);
   });
 });

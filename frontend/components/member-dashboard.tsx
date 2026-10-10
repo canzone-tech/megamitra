@@ -193,7 +193,7 @@ export function MemberDashboard() {
         {data ? (
           <>
             <MemberReferralCard username={data.dashboard.user.username} />
-            <div className="mm-member-quick-actions"><Link className="mm-button blue" href="/member/rewards">🏆 Explore rank goals & Lucky Draw prizes</Link><Link className="mm-button light" href="/member/installments">My monthly installments</Link></div>
+            <div className="mm-member-quick-actions"><Link className="mm-button blue" href="/member/rewards">🏆 Explore rank goals & Lucky Draw prizes</Link><Link className="mm-button light" href="/member/installments">My monthly installments</Link><Link className="mm-button light" href="/member/genealogy">🌳 My Genealogy</Link></div>
             <section className="mm-dashboard-grid" aria-label="Member summary">
               <article className="mm-card mm-stat">
                 <div className="mm-stat-label">Wallet balance</div>

@@ -28,7 +28,7 @@ const TITLES: Record<OwnerCoreV14Section, string> = {
   dashboard: 'Dashboard',
   income: '9 Income Types',
   members: 'Members',
-  binary: 'Binary 1:4',
+  binary: 'Genealogy',
   placement: 'Placement / Pairing',
 };
 
@@ -447,8 +447,8 @@ export function OwnerCoreV14Portal({ section, extension }: { section: OwnerCoreV
     ];
 
     return <>
-      <Hero title="Binary 1:4" subtitle="Four direct slots: A/B on Left and C/D on Right. Pair lanes are fixed." pill="A:C + B:D ONLY" />
-      <WorkspaceTabs ariaLabel="Binary 1:4 workspace" tabs={tabs}>
+      <Hero title="Genealogy" subtitle="Explore A/B/C/D placements and the fixed Binary 1:4 pair ledger." pill="A:C + B:D ONLY" />
+      <WorkspaceTabs ariaLabel="Genealogy workspace" tabs={tabs}>
         {(activeTab) => <>
           {activeTab === 'binary-genealogy' ? <div className={styles.card}>
             <SectionHead

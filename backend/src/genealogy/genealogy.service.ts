@@ -274,6 +274,68 @@ export class GenealogyService {
     };
   }
 
+
+  /** Read-only view of a member's own placement subtree. */
+  async memberSubtree(memberUserId: string, requestedRootUserId?: string) {
+    const rootUserId = requestedRootUserId ?? memberUserId;
+    if (rootUserId !== memberUserId) {
+      const permitted = await this.prisma.binaryAncestry.findUnique({
+        where: {
+          ancestorUserId_descendantUserId: {
+            ancestorUserId: memberUserId,
+            descendantUserId: rootUserId,
+          },
+        },
+        select: { descendantUserId: true },
+      });
+      if (!permitted) throw new NotFoundException('Member is not in your placement genealogy');
+    }
+
+    type MemberRoot = {
+      id: string; username: string; firstName: string | null; lastName: string | null;
+      status: string; placementParentUserId: string | null;
+      placementParentUsername: string | null; directChildCount: number | bigint;
+    };
+    type Descendant = {
+      id: string; username: string; firstName: string | null; lastName: string | null;
+      status: string; parentUserId: string; parentUsername: string;
+      slot: BinaryPlacementSlot; side: BinaryPlacementSide;
+      depth: number; firstLegSlot: BinaryPlacementSlot; firstLegSide: BinaryPlacementSide;
+    };
+    const roots = await this.prisma.$queryRawUnsafe<MemberRoot[]>(
+      `SELECT u.id, u.username, u.firstName, u.lastName, u.status,
+              bp.parentUserId AS placementParentUserId,
+              parent.username AS placementParentUsername,
+              (SELECT COUNT(*) FROM binary_placements child WHERE child.parentUserId=u.id) AS directChildCount
+       FROM users u
+       LEFT JOIN binary_placements bp ON bp.memberUserId=u.id
+       LEFT JOIN users parent ON parent.id=bp.parentUserId
+       WHERE u.id=? LIMIT 1`,
+      rootUserId,
+    );
+    if (!roots[0]) throw new NotFoundException('Genealogy root not found');
+    const members = await this.prisma.$queryRawUnsafe<Descendant[]>(
+      `SELECT u.id, u.username, u.firstName, u.lastName, u.status,
+              bp.parentUserId, parent.username AS parentUsername, bp.slot, bp.side,
+              ba.depth, ba.firstLegSlot, ba.firstLegSide
+       FROM binary_ancestry ba
+       JOIN users u ON u.id=ba.descendantUserId
+       JOIN binary_placements bp ON bp.memberUserId=u.id
+       JOIN users parent ON parent.id=bp.parentUserId
+       WHERE ba.ancestorUserId=?
+       ORDER BY ba.depth ASC, FIELD(ba.firstLegSlot,'A','B','C','D'),
+                FIELD(bp.slot,'A','B','C','D'), bp.createdAt ASC, u.username ASC`,
+      rootUserId,
+    );
+    return {
+      homeRootUserId: memberUserId,
+      root: { ...roots[0], directChildCount: Number(roots[0].directChildCount) },
+      members,
+      visibleMemberCount: members.length,
+      canGoToParent: rootUserId !== memberUserId && Boolean(roots[0].placementParentUserId),
+    };
+  }
+
   private resolveSlot(dto: AssignPlacementDto): BinaryPlacementSlot {
     if (dto.slot) return dto.slot;
     if (dto.side === BinaryPlacementSide.LEFT) return 'A';

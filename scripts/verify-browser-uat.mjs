@@ -611,7 +611,7 @@ async function runScenario(debugPort, scenario) {
         Dashboard: '🏠',
         '9 Income Types': '📈',
         Members: '👥',
-        'Binary 1:4': '🌳',
+        'Genealogy': '🌳',
         'Season Management': '📅',
         'Monthly Draw': '🎲',
         Winners: '🏆',
@@ -638,7 +638,7 @@ async function runScenario(debugPort, scenario) {
     if (scenario.requireMemberMobileNav || scenario.requireMemberDesktopNav) {
       const primary = ['Dashboard', 'Payments & E-PINs', 'Benefits'];
       const missingPrimary = primary.filter((label) => !metrics.memberNavLabels.includes(label));
-      const secondary = ['Rewards & Lucky Draw', 'Installment history', 'Withdrawals', 'KYC', 'Security', 'Public site', 'Sign out'];
+      const secondary = ['Rewards & Lucky Draw', 'My Genealogy', 'Installment history', 'Withdrawals', 'KYC', 'Security', 'Public site', 'Sign out'];
       const availableSecondary = scenario.requireMemberMobileNav ? metrics.memberMoreLabels : metrics.memberNavLabels;
       const missingSecondary = secondary.filter((label) => !availableSecondary.includes(label));
       if (missingPrimary.length || missingSecondary.length || (scenario.requireMemberMobileNav && !metrics.memberNavLabels.includes('More'))) {
@@ -856,6 +856,7 @@ async function main() {
   const memberPages = [
     { slug: 'payments', heading: 'Installments & E-PINs', readyText: 'Payment receipts', waitForRefresh: true },
     { slug: 'rewards', heading: 'Rewards & Lucky Draw', readyText: 'My Lucky Draw wins & claims' },
+    { slug: 'genealogy', heading: 'My Genealogy', readyText: 'Four direct placement slots' },
     { slug: 'installments', heading: 'Monthwise installments', readyText: 'No session enrollment or installment schedule yet.' },
     { slug: 'withdrawals', heading: 'Withdrawals', readyText: 'INSTALLMENT RESERVE' },
     { slug: 'kyc', heading: 'KYC', readyText: 'Verification status', checkKycBirthDate: true },

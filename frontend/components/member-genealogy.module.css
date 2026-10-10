@@ -1,0 +1,33 @@
+.toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.toolbar p { margin: 0; color: var(--portal-muted); font-size: 12px; }
+.root { width: min(260px, 100%); margin: 0 auto 18px; padding: 18px; border-radius: var(--portal-radius);
+  background: linear-gradient(135deg, var(--portal-gradient-from), var(--portal-gradient-via) 62%, var(--portal-gradient-to));
+  color: #fff; text-align: center; display: grid; gap: 5px; box-shadow: var(--portal-shadow); }
+.root small { font-size: 10px; font-weight: 800; letter-spacing: .08em; }
+.root strong { font-size: 17px; overflow-wrap: anywhere; }
+.root span { font-size: 12px; }
+.slotGrid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 20px; }
+.filled, .empty { min-width: 0; border: 1px solid var(--portal-border); border-radius: var(--portal-radius);
+  background: var(--portal-card); color: var(--portal-text); padding: 14px; display: grid; align-content: start;
+  gap: 7px; text-align: left; overflow-wrap: anywhere; }
+.filled { cursor: pointer; }
+.filled:hover, .filled:focus-visible { border-color: var(--portal-primary); outline-offset: 2px; }
+.filled:disabled { cursor: wait; }
+.filled strong, .empty strong { font-size: 13px; }
+.filled span, .empty span { font-size: 12px; }
+.filled small, .empty small { font-size: 11px; color: var(--portal-muted); }
+.slotTop { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-bottom: 6px; }
+.slotTop b { border-radius: 8px; background: color-mix(in srgb, var(--portal-primary) 12%, var(--portal-card));
+  padding: 7px 9px; color: var(--portal-primary); }
+.slotTop small { text-align: right; font-size: 10px; }
+.empty { background: color-mix(in srgb, var(--portal-page) 60%, var(--portal-card)); border-style: dashed; }
+.listTitle { margin: 16px 0 10px; font-size: 15px; }
+.tableWrap { width: 100%; max-width: 100%; overflow-x: auto; border: 1px solid var(--portal-border); border-radius: var(--portal-radius); }
+.table { width: 100%; min-width: 770px; border-collapse: collapse; font-size: 12px; text-align: left; }
+.table th { padding: 12px; background: #17152f; color: #fff; white-space: nowrap; }
+.table td { padding: 12px; border-bottom: 1px solid var(--portal-border); }
+.memberLink { border: 0; background: none; color: var(--portal-primary); cursor: pointer; font: inherit; font-weight: 800; text-align: left; }
+.memberLink:hover { text-decoration: underline; }
+.memberLink:disabled { cursor: wait; }
+@media(max-width: 1000px) { .slotGrid { grid-template-columns: repeat(2, minmax(0,1fr)); } }
+@media(max-width: 520px) { .slotGrid { grid-template-columns: 1fr; } }

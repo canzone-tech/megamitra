@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
-import { GenealogyController } from './genealogy.controller';
+import { GenealogyController, MemberGenealogyController } from './genealogy.controller';
 import { GenealogyService } from './genealogy.service';
 
 @Module({
-  controllers: [GenealogyController],
+  controllers: [GenealogyController, MemberGenealogyController],
   providers: [GenealogyService],
   exports: [GenealogyService],
 })

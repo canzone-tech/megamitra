@@ -11,6 +11,7 @@ const destinations = [
   { href: '/member/payments', label: 'Payments & E-PINs', compact: 'Payments', icon: '💳' },
   { href: '/member/entitlements', label: 'Benefits', compact: 'Benefits', icon: '🎁' },
   { href: '/member/rewards', label: 'Rewards & Lucky Draw', compact: 'Rewards', icon: '🏆' },
+  { href: '/member/genealogy', label: 'My Genealogy', compact: 'Genealogy', icon: '🌳' },
   { href: '/member/installments', label: 'Installment history', compact: 'Installments', icon: '📅' },
   { href: '/member/withdrawals', label: 'Withdrawals', compact: 'Withdrawals', icon: '💸' },
   { href: '/member/kyc', label: 'KYC', compact: 'KYC', icon: '✅' },
