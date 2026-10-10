@@ -3,6 +3,9 @@ import { FinancialDbService } from '../database/financial-db.service';
 import { Prisma } from '../generated/prisma/client';
 import { MemberPaymentService } from '../member-payments/member-payment.service';
 import { printedLuckyDrawTokenReference } from '../lucky-draw/lucky-draw-token.util';
+import { LuckyDrawTokenService } from '../lucky-draw/lucky-draw-token.service';
+import { AuditService } from '../audit/audit.service';
+import { AuditAction } from '../generated/prisma/enums';
 import { ProgramPaymentService } from '../program/program-payment.service';
 import type { RecordOwnerPaymentDto } from './owner-portal.dto';
 import { OwnerPortalService } from './owner-portal.service';
@@ -60,12 +63,44 @@ export class OwnerPortalFinanceService {
     private readonly portal: OwnerPortalService,
     private readonly programPayments: ProgramPaymentService,
     private readonly memberPayments: MemberPaymentService,
+    private readonly drawTokens: LuckyDrawTokenService,
+    private readonly audit: AuditService,
   ) {}
 
   async recordPayment(dto: RecordOwnerPaymentDto, actorUserId: string) {
     const result = await this.portal.recordPayment(dto, actorUserId);
-    const receipt = await this.paymentReceipt(result.payment.payment.id);
-    return { ...result, receipt };
+    const paymentRecordId = result.payment.payment.id;
+    let tokenReconciliationPending = false;
+    try {
+      await this.drawTokens.ensurePaymentRecordInstallmentTokens(paymentRecordId);
+    } catch {
+      // The payment is already committed. Preserve its receipt and surface a
+      // dedicated repair action instead of pretending the transfer rolled back.
+      tokenReconciliationPending = true;
+    }
+    const receipt = await this.paymentReceipt(paymentRecordId);
+    return { ...result, receipt, tokenReconciliationPending };
+  }
+
+  async reconcilePaymentDrawTokens(id: string, actorUserId: string) {
+    // Enforce recorded-payment existence and its installment allocations first.
+    const payment = await this.programPayments.getPayment(id);
+    const installmentAllocations = payment.allocations.filter((item: { allocationType: string }) =>
+      item.allocationType === 'INSTALLMENT',
+    );
+    if (!installmentAllocations.length) {
+      throw new BadRequestException('Only recorded installment payments qualify for draw tokens');
+    }
+    const tokens = await this.drawTokens.ensurePaymentRecordInstallmentTokens(id);
+    await this.audit.log({
+      actorUserId,
+      action: AuditAction.UPDATE,
+      entityType: 'ProgramPaymentRecord',
+      entityId: id,
+      description: 'Reconciled missing installment lucky draw tokens',
+      metadata: { tokenCount: tokens.length },
+    });
+    return this.paymentReceipt(id);
   }
 
   async listPayments(limit = 100) {

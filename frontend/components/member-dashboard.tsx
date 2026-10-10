@@ -235,7 +235,7 @@ export function MemberDashboard() {
               </section>
 
               <section className="mm-card">
-                <div className="mm-card-head"><h2>Program progress</h2><span className="mm-chip">{data.enrollments.total} enrollment{data.enrollments.total === 1 ? '' : 's'}</span></div>
+                <div className="mm-card-head"><h2>Program progress</h2><Link className="mm-button light" href="/member/installments">View monthwise history</Link><span className="mm-chip">{data.enrollments.total} enrollment{data.enrollments.total === 1 ? '' : 's'}</span></div>
                 <div className="mm-card-body">
                   {data.enrollments.items.length ? <div className="mm-list">{data.enrollments.items.map((row) => {
                     const progress = data.enrollmentProgress.find((item) => String(item.enrollmentId) === String(row.id)) ?? {};

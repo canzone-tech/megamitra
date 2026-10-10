@@ -372,3 +372,48 @@
   .mm-referral-actions { display: grid; grid-template-columns: minmax(0, 1fr); }
   .mm-referral-actions .mm-button { width: 100%; }
 }
+
+
+/* Monthwise schedule with member-scoped receipts and draw-token references. */
+.mm-member-shell .mm-installment-card { margin-bottom: var(--portal-gap); }
+.mm-installment-summary {
+  display: grid; grid-template-columns: repeat(3,minmax(0,1fr));
+  gap: 12px; margin-bottom: 20px;
+}
+.mm-installment-summary > div {
+  display: grid; gap: 7px; min-width: 0; padding: 14px;
+  border: 1px solid var(--portal-border); border-radius: 12px;
+}
+.mm-installment-summary span, .mm-installment-tokens span { color: var(--portal-muted); font-size: 12px; }
+.mm-installment-summary strong { color: var(--portal-primary); font-size: 17px; overflow-wrap: anywhere; }
+.mm-installment-list { display: grid; gap: 13px; margin-bottom: 20px; }
+.mm-installment-row {
+  min-width: 0; padding: 16px; border: 1px solid var(--portal-border);
+  border-radius: 14px; background: var(--portal-card);
+}
+.mm-installment-row-top {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  flex-wrap: wrap; gap: 12px;
+}
+.mm-installment-row-top > div { display: grid; gap: 5px; min-width: 0; }
+.mm-installment-row-top strong { color: var(--portal-text); font-size: 15px; }
+.mm-installment-row-top span:not(.mm-chip) { color: var(--portal-muted); font-size: 12px; }
+.mm-installment-amounts { display: flex; flex-wrap: wrap; gap: 8px 22px; margin: 12px 0; font-size: 13px; }
+.mm-installment-receipts, .mm-installment-tokens { display: grid; gap: 8px; }
+.mm-installment-receipts > div, .mm-installment-tokens > div {
+  display: grid; gap: 5px; padding: 10px 12px;
+  border-radius: 10px; background: color-mix(in srgb, var(--portal-primary) 5%, var(--portal-card));
+  overflow-wrap: anywhere;
+}
+.mm-installment-receipts strong, .mm-installment-tokens strong { font-size: 13px; }
+.mm-installment-receipts span, .mm-installment-receipts small, .mm-installment-tokens small {
+  color: var(--portal-muted); font-size: 12px; overflow-wrap: anywhere;
+}
+.mm-installment-tokens { margin-top: 10px; }
+.mm-installment-tokens strong { color: #098148; font-size: 24px; letter-spacing: .05em; }
+.mm-installment-token-missing { margin: 12px 0 0; color: #916209; font-size: 12px; line-height: 1.5; }
+.mm-installment-empty { margin: 10px 0 0; color: var(--portal-muted); font-size: 12px; }
+@media (max-width: 680px) {
+  .mm-installment-summary { grid-template-columns: minmax(0,1fr); }
+  .mm-member-shell .mm-installment-row { padding: 12px; }
+}

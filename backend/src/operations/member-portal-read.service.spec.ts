@@ -66,4 +66,45 @@ describe('MemberPortalReadService', () => {
       expect(method).toHaveBeenCalledWith('user-1', { page: '1', limit: '10' });
     }
   });
+
+  it('shows each member month with net payment, receipt mode, and stored token without minting any token', async () => {
+    const prisma = {
+      $queryRawUnsafe: jest.fn()
+        .mockResolvedValueOnce([{
+          id: 'enrollment-1', seasonId: 'season-1',
+          seasonCode: 'MGC_202610_3FC2', seasonName: 'MegaGoldenClub 2027',
+          status: 'ACTIVE', currencyCode: 'INR', installmentCountSnapshot: 2,
+          installmentAmountSnapshot: '1000.00', registrationFeeSnapshot: '1000.00',
+        }])
+        .mockResolvedValueOnce([
+          { id: 'emi-1', enrollmentId: 'enrollment-1', sequence: 1, dueDate: '2027-01-01', amount: '1000.00', applied: '1000.00', refunded: '0.00' },
+          { id: 'emi-2', enrollmentId: 'enrollment-1', sequence: 2, dueDate: '2027-02-01', amount: '1000.00', applied: '1000.00', refunded: '250.00' },
+        ])
+        .mockResolvedValueOnce([
+          { installmentId: 'emi-1', id: '2afb0b51-a56d-4f15-bf63-6c246a721234', allocatedAmount: '1000.00', refundedAmount: '0.00', occurredAt: '2026-10-09 05:00:00', mode: 'CASH', reference: 'cash-auth' },
+          { installmentId: 'emi-2', id: '2afb0b51-a56d-4f15-bf63-6c246a725678', allocatedAmount: '1000.00', refundedAmount: '250.00', occurredAt: '2026-10-09 05:10:00', mode: 'CASH', reference: 'cash-auth-2' },
+        ])
+        .mockResolvedValueOnce([
+          { installmentId: 'emi-1', token: '58321', installmentSequence: 1, status: 'AVAILABLE' },
+        ]),
+    };
+    const service = new MemberPortalReadService({} as OperationalReadService, prisma as unknown as PrismaService);
+    const result = await service.installmentHistory('member-1');
+    expect(result.enrollments).toHaveLength(1);
+    const months = result.enrollments[0].installments;
+    expect(months.map((m) => m.status)).toEqual(['PAID', 'PARTIAL']);
+    expect(months[0].payments[0].mode).toBe('CASH');
+    expect(months[0].payments[0].receiptNumber).toBe('MGC-20261009-6A721234');
+    expect(months[0].drawTokens).toEqual([
+      { token: '58321', status: 'AVAILABLE', printedReference: 'MGC_202610_3FC2-M01-58321' },
+    ]);
+    expect(months[1].netPaid).toBe('750.00');
+    expect(months[1].balance).toBe('250.00');
+    expect(result.enrollments[0].outstanding).toBe('250.00');
+    expect(prisma.$queryRawUnsafe).toHaveBeenCalledTimes(4);
+    for (const call of prisma.$queryRawUnsafe.mock.calls) {
+      expect(call[1]).toBe('member-1');
+    }
+  });
+
 });

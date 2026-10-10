@@ -11,6 +11,11 @@ import { OperationalJsonSafeInterceptor } from './operational-json-safe.intercep
 export class MemberPortalReadController {
   constructor(private readonly portal: MemberPortalReadService) {}
 
+  @Get('installments')
+  installments(@CurrentUser() user: AuthUser) {
+    return this.portal.installmentHistory(user.id);
+  }
+
   @Get('portal-overview')
   overview(@CurrentUser() user: AuthUser) {
     return this.portal.overview(user.id);

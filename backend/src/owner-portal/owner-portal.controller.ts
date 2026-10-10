@@ -396,6 +396,12 @@ export class OwnerPortalController {
   }
 
   @Permissions('program.payment.manage')
+  @Post('payments/:id/reconcile-tokens')
+  reconcilePaymentTokens(@Param('id') id: string, @CurrentUser() actor: AuthUser) {
+    return this.finance.reconcilePaymentDrawTokens(id, actor.id);
+  }
+
+  @Permissions('program.payment.manage')
   @Post('payments')
   recordPayment(@Body() dto: RecordOwnerPaymentDto, @CurrentUser() actor: AuthUser) {
     return this.finance.recordPayment(dto, actor.id);

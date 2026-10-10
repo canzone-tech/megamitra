@@ -67,6 +67,7 @@ export function PresentationRuntimeProvider({ children }: { children: ReactNode 
   const cms = runtime.cms.content;
   const activeSection = ({
     '/member/payments': ['Payments & E-PINs', 'Installments, payment receipts and E-PIN inventory'],
+    '/member/installments': ['Monthwise installments', 'Paid and unpaid EMIs, receipts and draw tokens'],
     '/member/entitlements': ['My product benefits', 'Benefits, claims and fulfilment'],
     '/member/withdrawals': ['Withdrawals', 'Wallet payouts, destinations and requests'],
     '/member/kyc': ['KYC verification', 'Identity verification and review status'],

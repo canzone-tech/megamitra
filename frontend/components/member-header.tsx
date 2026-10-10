@@ -9,6 +9,7 @@ const destinations = [
   { href: '/member', label: 'Dashboard', compact: 'Home', icon: '🏠' },
   { href: '/member/payments', label: 'Payments & E-PINs', compact: 'Payments', icon: '💳' },
   { href: '/member/entitlements', label: 'Products', compact: 'Products', icon: '🎁' },
+  { href: '/member/installments', label: 'Installment history', compact: 'Installments', icon: '📅' },
   { href: '/member/withdrawals', label: 'Withdrawals', compact: 'Withdrawals', icon: '💸' },
   { href: '/member/kyc', label: 'KYC', compact: 'KYC', icon: '✅' },
   { href: '/member/security', label: 'Security', compact: 'Security', icon: '🔒' },

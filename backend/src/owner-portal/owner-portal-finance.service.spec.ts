@@ -31,6 +31,8 @@ describe('OwnerPortalFinanceService', () => {
       {} as never,
       {} as never,
       {} as never,
+      {} as never,
+      {} as never,
     );
 
     const [payment] = await service.listPayments(10);
@@ -60,6 +62,8 @@ describe('OwnerPortalFinanceService', () => {
     const service = new OwnerPortalFinanceService(
       db as never,
       portal as never,
+      {} as never,
+      {} as never,
       {} as never,
     );
 
@@ -116,6 +120,8 @@ describe('OwnerPortalFinanceService', () => {
       {} as never,
       programPayments as never,
       {} as never,
+      {} as never,
+      {} as never,
     );
 
     const receipt = await service.paymentReceipt('payment-1');
@@ -136,6 +142,55 @@ describe('OwnerPortalFinanceService', () => {
     ]);
     expect(programPayments.getPayment).toHaveBeenCalledWith('payment-1');
     expect(query.mock.calls.filter(([sql]) => sql.includes('FROM lucky_draw_tokens'))).toHaveLength(1);
+  });
+
+
+  it('provisions installment draw tokens after cash/Auth Code payment and returns them on its receipt', async () => {
+    const record = { payment: { payment: { id: 'cash-payment-1' } } };
+    const receipt = { id: 'cash-payment-1', drawTokens: [{ token: '58321' }] };
+    const portal = { recordPayment: jest.fn().mockResolvedValue(record) };
+    const tokens = { ensurePaymentRecordInstallmentTokens: jest.fn().mockResolvedValue([{ token: '58321' }]) };
+    const service = new OwnerPortalFinanceService(
+      {} as never, portal as never, {} as never, {} as never, tokens as never, {} as never,
+    );
+    jest.spyOn(service, 'paymentReceipt').mockResolvedValue(receipt as never);
+    const result = await service.recordPayment({} as never, 'admin-1');
+    expect(tokens.ensurePaymentRecordInstallmentTokens).toHaveBeenCalledWith('cash-payment-1');
+    expect(result.receipt).toEqual(receipt);
+    expect(result.tokenReconciliationPending).toBe(false);
+  });
+
+  it('never claims a committed payment rolled back when token provisioning fails', async () => {
+    const portal = { recordPayment: jest.fn().mockResolvedValue({ payment: { payment: { id: 'cash-1' } } }) };
+    const tokens = { ensurePaymentRecordInstallmentTokens: jest.fn().mockRejectedValue(new Error('token collision exhausted')) };
+    const service = new OwnerPortalFinanceService(
+      {} as never, portal as never, {} as never, {} as never, tokens as never, {} as never,
+    );
+    jest.spyOn(service, 'paymentReceipt').mockResolvedValue({ id: 'cash-1', drawTokens: [] } as never);
+    const result = await service.recordPayment({} as never, 'admin-1');
+    expect(result.tokenReconciliationPending).toBe(true);
+  });
+
+  it('only reconciles confirmed installment allocations and logs the explicit repair action', async () => {
+    const program = { getPayment: jest.fn().mockResolvedValue({ allocations: [
+      { allocationType: 'INSTALLMENT', installmentId: 'emi-2' },
+    ] }) };
+    const tokens = { ensurePaymentRecordInstallmentTokens: jest.fn().mockResolvedValue([{ token: '58321' }]) };
+    const audit = { log: jest.fn().mockResolvedValue(undefined) };
+    const service = new OwnerPortalFinanceService(
+      {} as never, {} as never, program as never, {} as never, tokens as never, audit as never,
+    );
+    jest.spyOn(service, 'paymentReceipt').mockResolvedValue({ id: 'cash-1', drawTokens: [{ token: '58321' }] } as never);
+    await service.reconcilePaymentDrawTokens('cash-1', 'admin-1');
+    await service.reconcilePaymentDrawTokens('cash-1', 'admin-1');
+    expect(tokens.ensurePaymentRecordInstallmentTokens).toHaveBeenCalledTimes(2);
+    expect(tokens.ensurePaymentRecordInstallmentTokens).toHaveBeenCalledWith('cash-1');
+    expect(audit.log).toHaveBeenCalledTimes(2);
+    expect(audit.log.mock.calls[0][0].entityId).toBe('cash-1');
+    program.getPayment.mockResolvedValueOnce({ allocations: [] });
+    await expect(service.reconcilePaymentDrawTokens('registration-only', 'admin-1'))
+      .rejects.toThrow('Only recorded installment payments qualify');
+    expect(tokens.ensurePaymentRecordInstallmentTokens).toHaveBeenCalledTimes(2);
   });
 
 });
