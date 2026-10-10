@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { FinancialDbService } from '../database/financial-db.service';
 import { Prisma } from '../generated/prisma/client';
 import { MemberPaymentService } from '../member-payments/member-payment.service';
@@ -58,6 +58,8 @@ type EpinInventoryQuery = {
 
 @Injectable()
 export class OwnerPortalFinanceService {
+  private readonly logger = new Logger(OwnerPortalFinanceService.name);
+
   constructor(
     private readonly db: FinancialDbService,
     private readonly portal: OwnerPortalService,
@@ -126,6 +128,17 @@ export class OwnerPortalFinanceService {
 
   async paymentReceipt(id: string) {
     const payment = await this.programPayments.getPayment(id);
+    // A confirmed installment receipt must show its permanent token, including
+    // historical cash/Auth Code payments recorded before automatic issuance.
+    // Idempotent on repeated receipt opens; never posts another payment.
+    if (payment.allocations.some((item) => item.allocationType === 'INSTALLMENT')) {
+      try {
+        await this.drawTokens.ensurePaymentRecordInstallmentTokens(id);
+      } catch (reason) {
+        this.logger.warn('Receipt draw token self-repair needs retry: ' +
+          (reason instanceof Error ? reason.message : String(reason)));
+      }
+    }
     const rows = await this.rows<PaymentListRow>(
       `SELECT pr.id, pr.occurredAt, pr.amount, pr.currencyCode,
               pr.provider AS paymentMode, pr.providerReference AS transactionReference,

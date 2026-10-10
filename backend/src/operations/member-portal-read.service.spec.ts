@@ -40,6 +40,7 @@ describe('MemberPortalReadService', () => {
     const service = new MemberPortalReadService(
       reads as unknown as OperationalReadService,
       prisma as unknown as PrismaService,
+      { ensureMemberConfirmedInstallmentTokens: jest.fn().mockResolvedValue({ reconciledInstallments: 0 }) } as never,
     );
 
     const result = await service.overview('user-1');
@@ -67,7 +68,7 @@ describe('MemberPortalReadService', () => {
     }
   });
 
-  it('shows each member month with net payment, receipt mode, and stored token without minting any token', async () => {
+  it('automatically repairs confirmed months then returns net payment, receipt mode and stored token', async () => {
     const prisma = {
       $queryRawUnsafe: jest.fn()
         .mockResolvedValueOnce([{
@@ -88,8 +89,13 @@ describe('MemberPortalReadService', () => {
           { installmentId: 'emi-1', token: '58321', installmentSequence: 1, status: 'AVAILABLE' },
         ]),
     };
-    const service = new MemberPortalReadService({} as OperationalReadService, prisma as unknown as PrismaService);
+    const tokens = { ensureMemberConfirmedInstallmentTokens: jest.fn().mockResolvedValue({ reconciledInstallments: 1 }) };
+    const service = new MemberPortalReadService(
+      {} as OperationalReadService, prisma as unknown as PrismaService, tokens as never,
+    );
     const result = await service.installmentHistory('member-1');
+    expect(tokens.ensureMemberConfirmedInstallmentTokens).toHaveBeenCalledWith('member-1');
+    expect(result.tokenSyncPending).toBe(false);
     expect(result.enrollments).toHaveLength(1);
     const months = result.enrollments[0].installments;
     expect(months.map((m) => m.status)).toEqual(['PAID', 'PARTIAL']);

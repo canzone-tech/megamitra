@@ -122,6 +122,13 @@ export class LuckyDrawTokenService {
          JOIN owner_seasons s ON s.programVersionId=e.programVersionId
          WHERE a.paymentRecordId=? AND a.allocationType='INSTALLMENT'
            AND a.installmentId IS NOT NULL
+           AND (SELECT COALESCE(SUM(pa.amount), 0)
+                FROM program_payment_allocations pa
+                WHERE pa.installmentId=i.id AND pa.allocationType='INSTALLMENT')
+             - (SELECT COALESCE(SUM(ra.amount), 0)
+                FROM program_refund_allocations ra
+                JOIN program_payment_allocations pa ON pa.id=ra.paymentAllocationId
+                WHERE pa.installmentId=i.id AND pa.allocationType='INSTALLMENT') >= i.amount
          ORDER BY i.sequence ASC, a.createdAt ASC, a.id ASC`,
         [submission.programPaymentRecordId],
       );
@@ -149,6 +156,40 @@ export class LuckyDrawTokenService {
     return id ? this.tokensForSubmission(id) : [];
   }
 
+  /**
+   * Read-repair for historically confirmed monthly installments of ONE member.
+   * Allocations are never changed. Existing tokens are reused on retry;
+   * partial and refunded installments cannot receive a new token.
+   */
+  async ensureMemberConfirmedInstallmentTokens(userId: string) {
+    return this.db.transaction(async (connection) => {
+      const allocations = await connection.query<AllocationRow[]>(
+        `SELECT a.id AS paymentAllocationId, a.paymentRecordId, a.enrollmentId,
+                a.installmentId, i.sequence AS installmentSequence, e.userId, s.id AS seasonId
+         FROM program_payment_allocations a
+         JOIN program_installments i ON i.id=a.installmentId
+         JOIN program_enrollments e ON e.id=a.enrollmentId
+         JOIN owner_seasons s ON s.programVersionId=e.programVersionId
+         WHERE e.userId=? AND a.allocationType='INSTALLMENT' AND a.installmentId IS NOT NULL
+         AND NOT EXISTS (SELECT 1 FROM lucky_draw_tokens t WHERE t.enrollmentId=e.id
+                         AND t.installmentId=i.id AND t.sourceType='INSTALLMENT')
+         AND (SELECT COALESCE(SUM(pa.amount), 0) FROM program_payment_allocations pa
+              WHERE pa.installmentId=i.id AND pa.allocationType='INSTALLMENT')
+         - (SELECT COALESCE(SUM(ra.amount), 0) FROM program_refund_allocations ra
+            JOIN program_payment_allocations pa ON pa.id=ra.paymentAllocationId
+            WHERE pa.installmentId=i.id AND pa.allocationType='INSTALLMENT') >= i.amount
+         ORDER BY i.sequence ASC, a.createdAt DESC, a.id DESC FOR UPDATE`,
+        [userId],
+      );
+      const processed = new Set<string>();
+      for (const allocation of allocations) {
+        if (processed.has(allocation.installmentId)) continue;
+        processed.add(allocation.installmentId);
+        await this.ensureInstallmentToken(connection, allocation, null);
+      }
+      return { reconciledInstallments: processed.size };
+    });
+  }
   async ensurePaymentRecordInstallmentTokens(paymentRecordId: string) {
     return this.db.transaction(async (connection) => {
       const allocations = await connection.query<AllocationRow[]>(
@@ -161,6 +202,13 @@ export class LuckyDrawTokenService {
          JOIN owner_seasons s ON s.programVersionId=e.programVersionId
          WHERE a.paymentRecordId=? AND a.allocationType='INSTALLMENT'
            AND a.installmentId IS NOT NULL
+           AND (SELECT COALESCE(SUM(pa.amount), 0)
+                FROM program_payment_allocations pa
+                WHERE pa.installmentId=i.id AND pa.allocationType='INSTALLMENT')
+             - (SELECT COALESCE(SUM(ra.amount), 0)
+                FROM program_refund_allocations ra
+                JOIN program_payment_allocations pa ON pa.id=ra.paymentAllocationId
+                WHERE pa.installmentId=i.id AND pa.allocationType='INSTALLMENT') >= i.amount
          ORDER BY i.sequence ASC, a.createdAt ASC, a.id ASC`,
         [paymentRecordId],
       );

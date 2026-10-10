@@ -75,8 +75,8 @@ describe('OwnerPortalFinanceService', () => {
     expect(result.recentEntries.map((entry) => entry.runningBalance)).toEqual(['125.00', '100.00']);
   });
 
-  it('returns stored installment tokens and permanent season references without minting replacements', async () => {
-    const payment = { allocations: [], refunds: [], attempt: null };
+  it('returns stored installment tokens and permanent season references and automatically repairs any missing token', async () => {
+    const payment = { allocations: [{ allocationType: 'INSTALLMENT', installmentId: 'emi-1' }], refunds: [], attempt: null };
     const query = jest.fn(async (sql: string) => {
       if (sql.includes('FROM program_payment_records pr')) {
         return [{
@@ -115,12 +115,13 @@ describe('OwnerPortalFinanceService', () => {
       ),
     };
     const programPayments = { getPayment: jest.fn().mockResolvedValue(payment) };
+    const drawTokens = { ensurePaymentRecordInstallmentTokens: jest.fn().mockResolvedValue([{ token: '58321' }]) };
     const service = new OwnerPortalFinanceService(
       db as never,
       {} as never,
       programPayments as never,
       {} as never,
-      {} as never,
+      drawTokens as never,
       {} as never,
     );
 
@@ -141,6 +142,7 @@ describe('OwnerPortalFinanceService', () => {
       },
     ]);
     expect(programPayments.getPayment).toHaveBeenCalledWith('payment-1');
+    expect(drawTokens.ensurePaymentRecordInstallmentTokens).toHaveBeenCalledWith('payment-1');
     expect(query.mock.calls.filter(([sql]) => sql.includes('FROM lucky_draw_tokens'))).toHaveLength(1);
   });
 

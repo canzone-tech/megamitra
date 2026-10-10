@@ -134,7 +134,7 @@ export function MemberInstallments() {
                         ))}
                       </div>
                     ) : installment.status === 'PAID' ? (
-                      <p className="mm-installment-token-missing">Lucky Draw Token not yet linked. Please contact Super Admin for reconciliation.</p>
+                      <p className="mm-installment-token-missing">Lucky Draw Token is being linked automatically. Refresh this page to retry.</p>
                     ) : null}
                   </article>
                 ))}

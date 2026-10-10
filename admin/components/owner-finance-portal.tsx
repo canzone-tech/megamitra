@@ -344,7 +344,7 @@ export function OwnerFinancePortal({ section }: { section: OwnerFinanceSection }
       'Payment recorded and receipt generated',
     );
     if (result?.tokenReconciliationPending) {
-      setNotice('Payment recorded, but Lucky Draw Token generation needs reconciliation. Open its receipt and select RECONCILE MISSING DRAW TOKEN.');
+      setNotice('Payment recorded. Lucky Draw Token issuance is retrying automatically; the receipt will refresh its linkage when reopened.');
     }
     const nextReceipt = result?.receipt;
     if (nextReceipt && typeof nextReceipt === 'object') {
@@ -363,14 +363,6 @@ export function OwnerFinancePortal({ section }: { section: OwnerFinanceSection }
       setReceipt(row);
       showTab('payment-receipt');
     }
-  }
-
-  async function reconcileReceiptTokens(id: string) {
-    const updated = await run(
-      () => apiJson<Row>(`${API}/payments/${encodeURIComponent(id)}/reconcile-tokens`, { method: 'POST' }),
-      'Installment draw tokens reconciled; receipt refreshed',
-    );
-    if (updated) setReceipt(updated);
   }
 
   async function lookupWallet(event: FormEvent<HTMLFormElement>) {
@@ -488,7 +480,7 @@ export function OwnerFinancePortal({ section }: { section: OwnerFinanceSection }
         {(activeTab) => <>
           {activeTab === 'payment-record' ? <div className={styles.card}><SectionHead icon="💳" title="Record Payment" note="Purpose-bound authorization required" /><form method="post" onSubmit={submitPayment}><div className={styles.fields}><Field label="Member"><MemberSearchSelect name="memberReference" required /></Field><Field label={`Payment Amount (${currencyCode})`}><input name="amount" className={styles.input} inputMode="decimal" required defaultValue="1000" /></Field><Field label="Payment Type"><select name="paymentType" className={styles.select}><option value="MONTHLY_EMI">Monthly EMI</option><option value="REGISTRATION">Registration</option><option value="OTHER">Other</option></select></Field><Field label="Payment Mode"><select name="paymentMode" className={styles.select}><option value="CASH">Cash</option><option value="UPI_ONLINE">UPI / Online</option><option value="BANK_TRANSFER">Bank Transfer</option></select></Field><Field label="Transaction / Receipt Reference"><input name="transactionReference" className={styles.input} placeholder="Optional provider/reference number" /></Field><Field label="Admin / Agent Auth Code"><input name="authorizationCode" className={styles.input} required placeholder="Generate under Auth Codes" /></Field></div><div className={styles.buttonLine}><button className={styles.button} disabled={busy}>SUBMIT PAYMENT</button></div></form></div> : null}
           {activeTab === 'payment-register' ? <div className={styles.card}><SectionHead icon="🧾" title="Payment Register" note="Recorded payments with refund/reconciliation state" />{rows.length ? <div className={styles.tableBox}><table className={styles.table}><thead><tr><th>DATE</th><th>RECEIPT</th><th>MEMBER</th><th>TYPE</th><th>MODE</th><th>AMOUNT</th><th>REFUNDED</th><th>STATUS</th><th>ACTION</th></tr></thead><tbody>{rows.map((row) => <tr key={text(row.id)}><td>{dateTime(row.occurredAt, displayTimeZone)}</td><td>{text(row.receiptNumber)}</td><td><b>{text(row.username)}</b><br />{[text(row.firstName, ''), text(row.lastName, '')].filter(Boolean).join(' ') || '—'}</td><td>{text(row.paymentType)}</td><td>{text(row.paymentMode)}</td><td>{money(row.amount, text(row.currencyCode, currencyCode))}</td><td>{money(row.refundedAmount, text(row.currencyCode, currencyCode))}</td><td className={text(row.status) === 'RECORDED' ? styles.status : styles.statusOff}>{text(row.status)}</td><td><button type="button" className={classNames(styles.button, styles.outline)} onClick={() => void openReceipt(text(row.id))}>VIEW RECEIPT</button></td></tr>)}</tbody></table></div> : <Empty>No payments recorded yet.</Empty>}</div> : null}
-          {activeTab === 'payment-receipt' ? <div className={styles.card}><SectionHead icon="🧾" title="Receipt Preview" note="Authoritative payment record" />{receipt ? <><PaymentReceiptPreview receipt={receipt} settings={settings} defaultCurrencyCode={currencyCode} />{Array.isArray(receipt.allocations) && receipt.allocations.some((item) => item && typeof item === 'object' && (item as Row).allocationType === 'INSTALLMENT') && (!Array.isArray(receipt.drawTokens) || receipt.drawTokens.length === 0) ? <div className={styles.buttonLine}><button className={styles.button} type="button" disabled={busy} onClick={() => void reconcileReceiptTokens(text(receipt.id))}>RECONCILE MISSING DRAW TOKEN</button><span>Issue the missing permanent token for this recorded installment without posting another payment.</span></div> : null}</> : <Empty>Submit a payment or open a payment record to preview its receipt.</Empty>}</div> : null}
+          {activeTab === 'payment-receipt' ? <div className={styles.card}><SectionHead icon="🧾" title="Receipt Preview" note="Authoritative payment record" />{receipt ? <PaymentReceiptPreview receipt={receipt} settings={settings} defaultCurrencyCode={currencyCode} /> : <Empty>Submit a payment or open a payment record to preview its receipt.</Empty>}</div> : null}
         </>}
       </WorkspaceTabs>
     </>;

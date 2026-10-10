@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { LuckyDrawModule } from '../lucky-draw/lucky-draw.module';
 import { MemberPortalReadController } from './member-portal-read.controller';
 import { MemberPortalReadService } from './member-portal-read.service';
 import { OperationalCompletionController } from './operational-completion.controller';
@@ -11,6 +12,7 @@ import { OperationalJsonSafeInterceptor } from './operational-json-safe.intercep
 import { OperationalReadService } from './operational-read.service';
 
 @Module({
+  imports: [LuckyDrawModule],
   controllers: [
     MemberPortalReadController,
     MemberOperationalReadController,

@@ -1,4 +1,5 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
+import { LuckyDrawTokenService } from '../lucky-draw/lucky-draw-token.service';
 import { printedLuckyDrawTokenReference } from '../lucky-draw/lucky-draw-token.util';
 import { PrismaService } from '../database/prisma.service';
 import { OperationalReadService } from './operational-read.service';
@@ -8,13 +9,26 @@ type GenericRow = Record<string, unknown>;
 
 @Injectable()
 export class MemberPortalReadService {
+  private readonly logger = new Logger(MemberPortalReadService.name);
+
   constructor(
     private readonly reads: OperationalReadService,
     private readonly prisma: PrismaService,
+    private readonly drawTokens: LuckyDrawTokenService,
   ) {}
 
   /** A member-scoped, read-only register for all months of each enrollment. */
   async installmentHistory(userId: string) {
+    // Repair any historical fully-paid months automatically for THIS member.
+    // Never block financial history if token provisioning is transiently unavailable.
+    let tokenSyncPending = false;
+    try {
+      await this.drawTokens.ensureMemberConfirmedInstallmentTokens(userId);
+    } catch (reason) {
+      tokenSyncPending = true;
+      this.logger.warn('Member installment draw token self-repair needs retry: ' +
+        (reason instanceof Error ? reason.message : String(reason)));
+    }
     type Enrollment = {
       id: string; seasonId: string; seasonCode: string; seasonName: string;
       status: string; currencyCode: string; installmentCountSnapshot: number;
@@ -94,6 +108,7 @@ export class MemberPortalReadService {
       tokensByMonth.set(token.installmentId, entries);
     }
     return {
+      tokenSyncPending,
       enrollments: enrollments.map((enrollment) => {
         const installments = months
           .filter((month) => month.enrollmentId === enrollment.id)
