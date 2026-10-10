@@ -4,6 +4,8 @@ import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/database/prisma.service';
 import { FinancialDbService } from '../src/database/financial-db.service';
 import { ProgramPaymentService } from '../src/program/program-payment.service';
+import { MemberPortalReadService } from '../src/operations/member-portal-read.service';
+import { WithdrawalService } from '../src/withdrawal/withdrawal.service';
 import { applyInstallmentReserveOnEarning } from '../src/installment-recovery/installment-recovery.engine';
 import { PolicyLifecycle, ProgramIntervalUnit, UserStatus } from '../src/generated/prisma/enums';
 
@@ -161,8 +163,10 @@ describe('After-draw 50% reserve, EMI autopayment, token and ledger integration'
     expect(await accountBalance('USER_WALLET')).toBe(400);
     expect(await accountBalance('USER_INSTALLMENT_RESERVE')).toBe(0);
     const past= new Date(drawDate.getTime()+2*86400000);
-    const ids=[];
-    for(let i=0;i<5;i++)ids.push(await earn(400,past));
+    const ids=[await earn(400,past)];
+    expect(await accountBalance('USER_INSTALLMENT_RESERVE')).toBe(200);
+    expect(await accountBalance('USER_WALLET')).toBe(600);
+    for(let i=1;i<5;i++)ids.push(await earn(400,past));
     expect(await accountBalance('USER_INSTALLMENT_RESERVE')).toBe(0);
     expect(await accountBalance('USER_WALLET')).toBe(1400);
     const payments=await prisma.$queryRawUnsafe<Array<{id:string;amount:string;provider:string}>>(
@@ -178,6 +182,28 @@ describe('After-draw 50% reserve, EMI autopayment, token and ledger integration'
     const tokens=await prisma.$queryRawUnsafe<Array<{token:string}>>(
       'SELECT token FROM lucky_draw_tokens WHERE enrollmentId=? AND installmentId=?',enrollmentId,nextId);
     expect(tokens).toHaveLength(1);
+
+    // Contract UAT: the ledger-funded EMI must be visible to the member as a
+    // confirmed installment, receipt and permanent draw token, not just DB rows.
+    const history=await app.get(MemberPortalReadService).installmentHistory(userId);
+    expect(history.tokenSyncPending).toBe(false);
+    const memberEnrollment=history.enrollments.find(item=>item.id===enrollmentId);
+    const paidMonth=memberEnrollment?.installments.find(item=>item.sequence===2);
+    expect(paidMonth).toMatchObject({ status:'PAID', netPaid:'1000.00', balance:'0.00' });
+    expect(paidMonth?.payments).toEqual(expect.arrayContaining([
+      expect.objectContaining({ mode:'INCOME_RESERVE',netAmount:'1000.00' }),
+    ]));
+    expect(paidMonth?.drawTokens).toEqual(expect.arrayContaining([
+      expect.objectContaining({ token:tokens[0]!.token }),
+    ]));
+
+    // Installment reserve is a different account from the spendable wallet.
+    // Once auto-payment clears the reserve, no payout reservation is created.
+    const withdrawal=await app.get(WithdrawalService).getMemberOverview(userId,{currencyCode:'INR'});
+    expect(Number(withdrawal.wallet.balance)).toBe(1400);
+    expect(Number(withdrawal.wallet.installmentReserveAmount)).toBe(0);
+    expect(Number(withdrawal.wallet.availableBalance)).toBe(1400);
+
     await financial.transaction(c=>applyInstallmentReserveOnEarning(c,{
       userId,currencyCode:'INR',amount:400,earningTransactionId:ids[0]!,now:past,
     }));
