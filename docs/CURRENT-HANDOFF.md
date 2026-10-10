@@ -1,7 +1,7 @@
 # MegaGoldenClub — CURRENT HANDOFF
 
 Last refreshed: **2026-10-10 evening IST**  
-Repository: `canzone-tech/megamitra`  
+Repository: **current connected MegaGoldenClub GitHub repository**  
 **ONLY working branch:** `dev/local-foundation`  
 **Last verified APPLICATION code commit:** `52180b77be193ce0e325e11680da4057ef7325af`  
 The commit updating this document is documentation-only; confirm fresh branch HEAD when resuming.
@@ -39,9 +39,9 @@ Root `npm run verify` is the authoritative local gate. Do not give manual file e
 - Recent fix `52180b7`: reject unbalanced cash refunds of EMI payments funded through income reserve.
 
 **GitHub CI confirmed PASS at code commit `52180b7`:**
-- Backend: https://github.com/canzone-tech/megamitra/actions/runs/38055136509
-- Frontend: https://github.com/canzone-tech/megamitra/actions/runs/38055136502
-- Release Evidence: https://github.com/canzone-tech/megamitra/actions/runs/38055136699
+- Backend: GitHub Actions run #38055136509
+- Frontend: GitHub Actions run #38055136502
+- Release Evidence: GitHub Actions run #38055136699
 
 **NOT YET CONFIRMED:** User's local `npm run verify` for application commit `52180b7` and human UAT against their actual 2027 draw/session, real earnings and wallet. Do not claim these green or that real future draw has occurred. The latest conversation was interrupted because chat is full, not because an implementation blocker remained.
 
