@@ -81,7 +81,7 @@ export function OwnerSeasonAdvancedPanel({ embedded = false }: { embedded?: bool
     setError(reason instanceof Error ? reason.message : 'Request failed');
   }, [router]);
 
-  const useRecovery = useCallback((next: RecoveryPolicy) => {
+  const applyRecoverySnapshot = useCallback((next: RecoveryPolicy) => {
     setRecovery(next);
     setRecoveryEnabled(Boolean(next.current?.enabled));
     setRecoveryPercent(String(next.current?.reservePercent ?? 50));
@@ -95,10 +95,10 @@ export function OwnerSeasonAdvancedPanel({ embedded = false }: { embedded?: bool
         apiJson<Advanced>(`${API}/seasons/${encodeURIComponent(id)}/advanced-configuration`),
         apiJson<RecoveryPolicy>(`${API}/seasons/${encodeURIComponent(id)}/installment-recovery`),
       ]);
-      setConfig(next); useRecovery(policy);
+      setConfig(next); applyRecoverySnapshot(policy);
     } catch (reason) { fail(reason); }
     finally { setLoading(false); }
-  }, [fail, useRecovery]);
+  }, [fail, applyRecoverySnapshot]);
 
   const load = useCallback(async () => {
     setLoading(true); setError('');
@@ -112,11 +112,11 @@ export function OwnerSeasonAdvancedPanel({ embedded = false }: { embedded?: bool
           apiJson<Advanced>(`${API}/seasons/${encodeURIComponent(preferred)}/advanced-configuration`),
           apiJson<RecoveryPolicy>(`${API}/seasons/${encodeURIComponent(preferred)}/installment-recovery`),
         ]);
-        setConfig(next);useRecovery(policy);
+        setConfig(next);applyRecoverySnapshot(policy);
       }else {setConfig(null);setRecovery(null);}
     } catch (reason) { fail(reason); }
     finally { setLoading(false); }
-  }, [fail, seasonId, useRecovery]);
+  }, [fail, seasonId, applyRecoverySnapshot]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 0);
@@ -194,7 +194,7 @@ export function OwnerSeasonAdvancedPanel({ embedded = false }: { embedded?: bool
       const next=await apiJson<RecoveryPolicy>(`${API}/seasons/${encodeURIComponent(seasonId)}/installment-recovery`,{
         method:'PUT',body:JSON.stringify({enabled:recoveryEnabled,reservePercent:rate}),
       });
-      useRecovery(next);
+      applyRecoverySnapshot(next);
       setNotice('New installment income recovery policy version published.');
     }catch(reason){fail(reason);}finally{setBusy(false);}
   }
@@ -296,7 +296,7 @@ export function OwnerSeasonAdvancedPanel({ embedded = false }: { embedded?: bool
           <small>Super Admin • versioned income reserve, fully-paid EMI auto-adjustment</small></div></div>
           <span className={styles.tag}>{recovery.current ? 'PUBLISHED v'+recovery.current.version : 'NOT PUBLISHED'}</span>
         </div>
-        <div className={styles.notice}>Recovery begins only from the calendar day <b>after the configured draw</b> when the next eligible installment remains unpaid. Percentage applies only to newly posted earnings, not historical wallet balance. The amount is capped at that EMI's remaining due. Fully recovered EMIs are paid automatically and linked to the permanent draw token.</div>
+        <div className={styles.notice}>Recovery begins only from the calendar day <b>after the configured draw</b> when the next eligible installment remains unpaid. Percentage applies only to newly posted earnings, not historical wallet balance. The amount is capped at that EMI&apos;s remaining due. Fully recovered EMIs are paid automatically and linked to the permanent draw token.</div>
         <form method="post" onSubmit={saveRecovery}>
           <div className={styles.fields}>
             <div className={styles.field}><label htmlFor="installment-recovery-enabled">Recovery enabled</label>
