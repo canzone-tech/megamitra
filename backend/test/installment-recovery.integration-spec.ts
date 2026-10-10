@@ -3,6 +3,7 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/database/prisma.service';
 import { FinancialDbService } from '../src/database/financial-db.service';
+import { ProgramPaymentService } from '../src/program/program-payment.service';
 import { applyInstallmentReserveOnEarning } from '../src/installment-recovery/installment-recovery.engine';
 import { PolicyLifecycle, ProgramIntervalUnit, UserStatus } from '../src/generated/prisma/enums';
 
@@ -168,6 +169,12 @@ describe('After-draw 50% reserve, EMI autopayment, token and ledger integration'
       "SELECT id,amount,provider FROM program_payment_records WHERE enrollmentId=? AND provider='INCOME_RESERVE'",enrollmentId);
     expect(payments).toHaveLength(1);
     expect(Number(payments[0]!.amount)).toBe(1000);
+    const paymentsService=app.get(ProgramPaymentService);
+    await expect(paymentsService.createRefund({
+      sourceKey:'recovery:invalid-refund:'+suffix,
+      paymentRecordId:payments[0]!.id,
+      amount:'1000.00',currencyCode:'INR',occurredAt:new Date().toISOString(),
+    },userId)).rejects.toThrow('Income-reserve EMI payments require a balanced recovery reversal');
     const tokens=await prisma.$queryRawUnsafe<Array<{token:string}>>(
       'SELECT token FROM lucky_draw_tokens WHERE enrollmentId=? AND installmentId=?',enrollmentId,nextId);
     expect(tokens).toHaveLength(1);

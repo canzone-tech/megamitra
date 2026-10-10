@@ -76,6 +76,7 @@ type PaymentRow = {
   enrollmentId: string;
   amount: string;
   currencyCode: string;
+  provider: string | null;
 };
 
 type CountAmountRow = { total: string | number | null };
@@ -599,12 +600,18 @@ export class ProgramPaymentService {
     }
 
     const paymentRows = await connection.query<PaymentRow[]>(
-      `SELECT id, enrollmentId, amount, currencyCode
+      `SELECT id, enrollmentId, amount, currencyCode, provider
        FROM program_payment_records WHERE id = ? LIMIT 1`,
       [dto.paymentRecordId],
     );
     const payment = paymentRows[0];
     if (!payment) throw new NotFoundException('Program payment record not found');
+    // Income-reserve payments are internally ledger-funded, never external cash.
+    // Refunding them via the normal cash refund path would undo the EMI allocation
+    // without reversing the clearing entry and restoring the member reserve.
+    if (payment.provider === 'INCOME_RESERVE') {
+      throw new ConflictException('Income-reserve EMI payments require a balanced recovery reversal and cannot be refunded as cash');
+    }
     if (payment.currencyCode !== currencyCode) {
       throw new BadRequestException('Refund currency must match payment currency');
     }
