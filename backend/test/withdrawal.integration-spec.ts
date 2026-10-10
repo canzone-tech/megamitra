@@ -374,6 +374,71 @@ describe('MegaGoldenClub withdrawal foundation integration', () => {
     expect(ledger.body.type).toBe('WITHDRAWAL_PAYOUT');
   });
 
+  it('snapshots configured service charge and TDS, then balances payout to distinct revenue and tax-payable accounts', async () => {
+    // Isolated fixture: temporarily configure the test default policy, then
+    // restore it immediately after request creation. An actual operator uses
+    // create/publish version APIs, not direct edits to published policy.
+    const versions = await prisma.$queryRawUnsafe<Array<{ id: string; feeMode: string; feeValue: string | number; minimumFee: string | number | null; maximumFee: string | number | null; tdsRatePercent: string | number }>>(
+      `SELECT v.id, v.feeMode, v.feeValue, v.minimumFee, v.maximumFee, v.tdsRatePercent
+       FROM withdrawal_policy_versions v JOIN withdrawal_policies p ON p.id=v.policyId
+       WHERE p.code='MEMBER_STANDARD_INR' AND v.lifecycle='PUBLISHED' LIMIT 1`,
+    );
+    const original = versions[0]!;
+    const destinations = await prisma.$queryRawUnsafe<Array<{ id: string }>>(
+      'SELECT id FROM withdrawal_destinations WHERE userId=? AND status=\'ACTIVE\' LIMIT 1', memberId,
+    );
+    let created: { status: number; body: Record<string, any> };
+    try {
+      await prisma.$executeRawUnsafe(
+        'UPDATE withdrawal_policy_versions SET feeMode=\'PERCENTAGE\', feeValue=2, minimumFee=NULL, maximumFee=NULL, tdsRatePercent=5 WHERE id=?', original.id,
+      );
+      created = await request('/withdrawals/me/requests', {
+        method: 'POST',
+        body: JSON.stringify({
+          sourceKey: `withdrawal:withholding:${randomUUID()}`,
+          destinationId: destinations[0]!.id, amount: 200, currencyCode: 'INR',
+        }),
+      }, memberToken);
+    } finally {
+      await prisma.$executeRawUnsafe(
+        'UPDATE withdrawal_policy_versions SET feeMode=?, feeValue=?, minimumFee=?, maximumFee=?, tdsRatePercent=? WHERE id=?',
+        original.feeMode, original.feeValue, original.minimumFee, original.maximumFee, original.tdsRatePercent, original.id,
+      );
+    }
+    expect(created!.status).toBe(201);
+    expect(Number(created!.body.amount)).toBe(200);
+    expect(Number(created!.body.feeAmount)).toBe(4);
+    expect(Number(created!.body.tdsAmount)).toBe(10);
+    expect(Number(created!.body.netAmount)).toBe(186);
+    const id = String(created!.body.id);
+    const approved = await request(`/admin/withdrawals/requests/${id}/approve`, { method: 'POST' }, adminToken);
+    expect(approved.status).toBe(201);
+    const attempt = await request(`/admin/withdrawals/requests/${id}/payout-attempts`, {
+      method: 'POST',
+      body: JSON.stringify({ sourceKey: `withdrawal:withholding:payout:${randomUUID()}`, provider: 'TEST_PROVIDER', providerReference: 'test-withholding' }),
+    }, adminToken);
+    expect(attempt.status).toBe(201);
+    const confirm = await request(`/admin/withdrawals/payout-attempts/${attempt.body.id}/confirm`, {
+      method: 'PATCH', body: JSON.stringify({}),
+    }, adminToken);
+    expect(confirm.status).toBe(200);
+    const final = await request(`/admin/withdrawals/requests/${id}`, {}, adminToken);
+    expect(final.body.status).toBe('PAID');
+    const parts = await prisma.$queryRawUnsafe<Array<{ kind: string; direction: string; amount: string | number }>>(
+      `SELECT a.kind, e.direction, e.amount
+       FROM ledger_entries e JOIN ledger_accounts a ON a.id=e.accountId
+       WHERE e.transactionId=?`, String(final.body.ledgerTransactionId),
+    );
+    expect(parts.map((row) => [row.kind, row.direction, Number(row.amount)]).sort()).toEqual([
+      ['USER_WALLET', 'DEBIT', 200],
+      ['WITHDRAWAL_CLEARING', 'CREDIT', 186],
+      ['WITHDRAWAL_FEE_REVENUE', 'CREDIT', 4],
+      ['WITHDRAWAL_TDS_PAYABLE', 'CREDIT', 10],
+    ].sort());
+    const ledgerView = await request(`/admin/ledger/transactions/${final.body.ledgerTransactionId}`, {}, adminToken);
+    expect(ledgerView.status).toBe(200);
+    expect(ledgerView.body.balanced).toBe(true);
+  });
   it('supports versioned configurable withdrawal policies', async () => {
     const suffix = randomUUID().replaceAll('-', '').slice(0, 8).toUpperCase();
     const policy = await request(
