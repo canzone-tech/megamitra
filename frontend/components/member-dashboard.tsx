@@ -211,6 +211,11 @@ export function MemberDashboard() {
                 <span className="mm-metric-detail">{money(binarySummary.payoutAmount, latestSettlement.currencyCode ?? binaryContext.currencyCode)} recorded payout</span>
               </article>
               <article className="mm-card mm-stat">
+                <div className="mm-stat-label">Installment reserve</div>
+                <div className="mm-stat-value">{data.withdrawals ? money(data.withdrawals.wallet.installmentReserveAmount, data.withdrawals.currencyCode) : '—'}</div>
+                <span className="mm-metric-detail">New earnings held for next unpaid EMI after draw</span>
+              </article>
+              <article className="mm-card mm-stat">
                 <div className="mm-stat-label">Available to withdraw</div>
                 <div className="mm-stat-value">{data.withdrawals ? money(data.withdrawals.wallet.availableBalance, data.withdrawals.currencyCode) : '—'}</div>
                 <span className="mm-metric-detail">After pending payout reservations</span>

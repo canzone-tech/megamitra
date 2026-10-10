@@ -116,6 +116,7 @@ export class WithdrawalService {
     ]);
 
     const reserved = await this.getReservedAmount(userId, currencyCode);
+    const installmentReserveAmount = await this.getInstallmentReserveAmount(userId, currencyCode);
     const policyAvailability = policy ? { status: 'ACTIVE' as const, effectiveFrom: null } :
       await this.findPolicyAvailability(currencyCode);
     return {
@@ -126,6 +127,7 @@ export class WithdrawalService {
       wallet: {
         ...wallet,
         reservedAmount: reserved,
+        installmentReserveAmount,
         availableBalance: Prisma.Decimal.max(wallet.balance.minus(reserved), 0),
       },
       destinations: destinations.map((row) => this.normalizeRow(row)),
@@ -1115,6 +1117,16 @@ export class WithdrawalService {
       accountId: accountRows[0].id,
       balance: new Prisma.Decimal(balanceRows[0]?.balance ?? 0),
     };
+  }
+
+  private async getInstallmentReserveAmount(userId:string,currencyCode:string) {
+    const rows=await this.prisma.$queryRawUnsafe<Array<{amount:string|number}>>(
+      `SELECT COALESCE(SUM(CASE WHEN e.direction='CREDIT' THEN e.amount ELSE -e.amount END),0) AS amount
+       FROM ledger_accounts a JOIN ledger_entries e ON e.accountId=a.id
+       WHERE a.ownerUserId=? AND a.currencyCode=? AND a.kind='USER_INSTALLMENT_RESERVE'`,
+      userId,currencyCode,
+    );
+    return new Prisma.Decimal(rows[0]?.amount??0);
   }
 
   private async getReservedAmount(userId: string, currencyCode: string) {

@@ -512,6 +512,38 @@ export class OwnerSeasonConfigurationService {
     return this.getAdvancedConfiguration(id);
   }
 
+  async getInstallmentRecoveryPolicy(seasonId: string) {
+    await this.requireSeason(seasonId);
+    const rows = await this.rows<{ id:string; version:number; lifecycle:string; enabled:number|boolean; reservePercent:string }>(
+      `SELECT id,version,lifecycle,enabled,reservePercent FROM installment_recovery_policy_versions
+       WHERE seasonId=? ORDER BY version DESC`,[seasonId],
+    );
+    return { seasonId, current: rows.find(r=>r.lifecycle==='PUBLISHED')??null, versions:rows };
+  }
+
+  async updateInstallmentRecoveryPolicy(seasonId:string,enabled:boolean,percent:number,actorUserId:string) {
+    if(!Number.isFinite(percent)||percent<0||percent>100)
+      throw new BadRequestException('Reserve percentage must be 0–100');
+    await this.db.transaction(async (c)=>{
+      const found=await c.query<Array<{id:string}>>(
+        'SELECT id FROM owner_seasons WHERE id=? LIMIT 1 FOR UPDATE',[seasonId]);
+      if(!found.length)throw new NotFoundException('Season not found');
+      const prior=await c.query<Array<{version:number}>>(
+        'SELECT version FROM installment_recovery_policy_versions WHERE seasonId=? ORDER BY version DESC LIMIT 1',
+        [seasonId]);
+      await c.query(`UPDATE installment_recovery_policy_versions SET lifecycle='RETIRED'
+        WHERE seasonId=? AND lifecycle='PUBLISHED'`,[seasonId]);
+      await c.query(`INSERT INTO installment_recovery_policy_versions
+        (id,seasonId,version,lifecycle,enabled,reservePercent,createdByUserId)
+        VALUES(?,?,?,'PUBLISHED',?,?,?)`,
+        [randomUUID(),seasonId,Number(prior[0]?.version??0)+1,enabled,percent.toFixed(2),actorUserId]);
+    });
+    await this.audit.log({actorUserId,action:AuditAction.UPDATE,entityType:'InstallmentRecoveryPolicy',
+      entityId:seasonId,description:'Published next after-draw installment recovery policy',
+      metadata:{enabled,reservePercent:percent}});
+    return this.getInstallmentRecoveryPolicy(seasonId);
+  }
+
   async changeSeasonStatus(
     id: string,
     dto: OwnerSeasonStatusDto,
@@ -680,6 +712,14 @@ export class OwnerSeasonConfigurationService {
         : 'UPDATE owner_seasons SET status=? WHERE id=?',
       actorColumn ? [target, actorUserId, id] : [target, id],
     );
+    if(target==='ACTIVE'){
+      await this.db.execute(
+        `INSERT INTO installment_recovery_policy_versions
+         (id,seasonId,version,lifecycle,enabled,reservePercent)
+         SELECT UUID(),?,1,'PUBLISHED',TRUE,50.00
+         WHERE NOT EXISTS(SELECT 1 FROM installment_recovery_policy_versions WHERE seasonId=?)`,
+         [id,id]);
+    }
     await this.audit.log({
       actorUserId,
       action: AuditAction.UPDATE,

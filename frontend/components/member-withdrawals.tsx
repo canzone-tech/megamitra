@@ -56,6 +56,7 @@ type Overview = {
     accountId: string | null;
     balance: string | number;
     reservedAmount: string | number;
+    installmentReserveAmount: string | number;
     availableBalance: string | number;
   };
   destinations: Destination[];
@@ -239,7 +240,8 @@ export function MemberWithdrawals() {
           <>
             <section className="mm-dashboard-grid">
               <article className="mm-card mm-stat"><div className="mm-stat-label">Wallet balance</div><div className="mm-stat-value">{money(data.wallet.balance, data.currencyCode)}</div></article>
-              <article className="mm-card mm-stat"><div className="mm-stat-label">Reserved</div><div className="mm-stat-value">{money(data.wallet.reservedAmount, data.currencyCode)}</div></article>
+              <article className="mm-card mm-stat"><div className="mm-stat-label">Payout reserved</div><div className="mm-stat-value">{money(data.wallet.reservedAmount, data.currencyCode)}</div></article>
+              <article className="mm-card mm-stat"><div className="mm-stat-label">Installment reserve</div><div className="mm-stat-value">{money(data.wallet.installmentReserveAmount, data.currencyCode)}</div><span className="mm-metric-detail">From earnings after draw; auto-pays next EMI on full recovery</span></article>
               <article className="mm-card mm-stat"><div className="mm-stat-label">Available</div><div className="mm-stat-value">{money(data.wallet.availableBalance, data.currencyCode)}</div></article>
               <article className="mm-card mm-stat"><div className="mm-stat-label">KYC</div><div className="mm-stat-value" style={{ fontSize: 22 }}>{data.kycStatus.replaceAll('_', ' ')}</div></article>
             </section>

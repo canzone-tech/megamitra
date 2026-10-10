@@ -4,6 +4,7 @@ import {
   IsIn,
   IsInt,
   IsNumberString,
+  IsNumber,
   IsOptional,
   Max,
   Min,
@@ -96,4 +97,13 @@ export class OwnerSeasonAdvancedConfigDto {
   @IsArray()
   @IsIn(OWNER_ALLOCATION_TYPES, { each: true })
   requiredAllocationTypes!: Array<(typeof OWNER_ALLOCATION_TYPES)[number]>;
+}
+
+export class OwnerInstallmentRecoveryPolicyDto {
+  @IsBoolean()
+  enabled!: boolean;
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
+  @Max(100)
+  reservePercent!: number;
 }

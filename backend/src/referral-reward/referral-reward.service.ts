@@ -21,6 +21,7 @@ import {
   ReferralRoundingMode,
   UserStatus,
 } from '../generated/prisma/enums';
+import { applyInstallmentReserveOnEarning } from '../installment-recovery/installment-recovery.engine';
 import { ReferralEligibilityService } from './referral-eligibility.service';
 import type { CreateReferralRewardEventDto } from './referral-reward.dto';
 
@@ -449,6 +450,9 @@ export class ReferralRewardService {
         currencyCode,
       ],
     );
+    await applyInstallmentReserveOnEarning(connection, {
+      userId: sponsorUserId, currencyCode, amount: rewardAmount, earningTransactionId: transactionId,
+    });
     return transactionId;
   }
 

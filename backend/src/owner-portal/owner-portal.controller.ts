@@ -45,7 +45,8 @@ import { OwnerPortalDrawWorkflowService } from './owner-portal-draw-workflow.ser
 import { OwnerPortalFinanceService } from './owner-portal-finance.service';
 import { AssignOwnerPlacementDto } from './owner-portal-placement.dto';
 import { OwnerPortalService } from './owner-portal.service';
-import { OwnerSeasonAdvancedConfigDto } from './owner-season-configuration.dto';
+import { OwnerSeasonAdvancedConfigDto, OwnerInstallmentRecoveryPolicyDto } from './owner-season-configuration.dto';
+import { Roles } from '../rbac/roles.decorator';
 import { OwnerSeasonConfigurationService } from './owner-season-configuration.service';
 
 @Controller('admin/owner-portal')
@@ -132,6 +133,20 @@ export class OwnerPortalController {
     @CurrentUser() actor: AuthUser,
   ) {
     return this.seasonConfiguration.updateSeason(id, dto, actor.id);
+  }
+
+  @Permissions('program.read')
+  @Get('seasons/:id/installment-recovery')
+  getInstallmentRecoveryPolicy(@Param('id') id: string) {
+    return this.seasonConfiguration.getInstallmentRecoveryPolicy(id);
+  }
+
+  @Roles('SUPER_ADMIN')
+  @Permissions('program.manage')
+  @Put('seasons/:id/installment-recovery')
+  updateInstallmentRecoveryPolicy(@Param('id') id: string,
+    @Body() dto: OwnerInstallmentRecoveryPolicyDto, @CurrentUser() actor: AuthUser) {
+    return this.seasonConfiguration.updateInstallmentRecoveryPolicy(id,dto.enabled,dto.reservePercent,actor.id);
   }
 
   @Permissions('program.read')

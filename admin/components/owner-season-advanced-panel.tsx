@@ -8,6 +8,7 @@ import styles from './owner-portal.module.css';
 import extension from './owner-portal-extension.module.css';
 
 type Season = { id: string; code: string; name: string; status: string };
+type RecoveryPolicy = { seasonId:string; current:{version:number;enabled:boolean|number;reservePercent:string}|null; versions:unknown[] };
 type Advanced = {
   season: Season;
   binary: {
@@ -64,6 +65,9 @@ export function OwnerSeasonAdvancedPanel({ embedded = false }: { embedded?: bool
   const [seasons, setSeasons] = useState<Season[]>([]);
   const [seasonId, setSeasonId] = useState('');
   const [config, setConfig] = useState<Advanced | null>(null);
+  const [recovery, setRecovery] = useState<RecoveryPolicy | null>(null);
+  const [recoveryEnabled, setRecoveryEnabled] = useState(true);
+  const [recoveryPercent, setRecoveryPercent] = useState('50');
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -77,14 +81,24 @@ export function OwnerSeasonAdvancedPanel({ embedded = false }: { embedded?: bool
     setError(reason instanceof Error ? reason.message : 'Request failed');
   }, [router]);
 
+  const useRecovery = useCallback((next: RecoveryPolicy) => {
+    setRecovery(next);
+    setRecoveryEnabled(Boolean(next.current?.enabled));
+    setRecoveryPercent(String(next.current?.reservePercent ?? 50));
+  }, []);
+
   const loadConfig = useCallback(async (id: string) => {
     if (!id) { setConfig(null); return; }
     setLoading(true); setError('');
     try {
-      setConfig(await apiJson<Advanced>(`${API}/seasons/${encodeURIComponent(id)}/advanced-configuration`));
+      const [next, policy] = await Promise.all([
+        apiJson<Advanced>(`${API}/seasons/${encodeURIComponent(id)}/advanced-configuration`),
+        apiJson<RecoveryPolicy>(`${API}/seasons/${encodeURIComponent(id)}/installment-recovery`),
+      ]);
+      setConfig(next); useRecovery(policy);
     } catch (reason) { fail(reason); }
     finally { setLoading(false); }
-  }, [fail]);
+  }, [fail, useRecovery]);
 
   const load = useCallback(async () => {
     setLoading(true); setError('');
@@ -93,10 +107,16 @@ export function OwnerSeasonAdvancedPanel({ embedded = false }: { embedded?: bool
       setSeasons(rows);
       const preferred = seasonId || rows.find((row) => ['DRAFT', 'REVIEW'].includes(row.status))?.id || rows[0]?.id || '';
       setSeasonId(preferred);
-      setConfig(preferred ? await apiJson<Advanced>(`${API}/seasons/${encodeURIComponent(preferred)}/advanced-configuration`) : null);
+      if(preferred){
+        const [next, policy]=await Promise.all([
+          apiJson<Advanced>(`${API}/seasons/${encodeURIComponent(preferred)}/advanced-configuration`),
+          apiJson<RecoveryPolicy>(`${API}/seasons/${encodeURIComponent(preferred)}/installment-recovery`),
+        ]);
+        setConfig(next);useRecovery(policy);
+      }else {setConfig(null);setRecovery(null);}
     } catch (reason) { fail(reason); }
     finally { setLoading(false); }
-  }, [fail, seasonId]);
+  }, [fail, seasonId, useRecovery]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 0);
@@ -162,6 +182,21 @@ export function OwnerSeasonAdvancedPanel({ embedded = false }: { embedded?: bool
       setNotice('Binary 1:4 controls, monthly lucky draw recurrence and automatic payment rules saved as the Season draft.');
     } catch (reason) { fail(reason); }
     finally { setBusy(false); }
+  }
+
+  async function saveRecovery(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if(!seasonId||!recovery)return;
+    setBusy(true);setError('');setNotice('');
+    try{
+      const rate=Number(recoveryPercent);
+      if(!Number.isFinite(rate)||rate<0||rate>100)throw new Error('Reserve percentage must be 0–100');
+      const next=await apiJson<RecoveryPolicy>(`${API}/seasons/${encodeURIComponent(seasonId)}/installment-recovery`,{
+        method:'PUT',body:JSON.stringify({enabled:recoveryEnabled,reservePercent:rate}),
+      });
+      useRecovery(next);
+      setNotice('New installment income recovery policy version published.');
+    }catch(reason){fail(reason);}finally{setBusy(false);}
   }
 
   const editable = Boolean(config && ['DRAFT', 'REVIEW'].includes(config.season.status));
@@ -255,6 +290,29 @@ export function OwnerSeasonAdvancedPanel({ embedded = false }: { embedded?: bool
           </form>
         ) : <div className={styles.empty}>Create a Season draft before configuring advanced rules.</div>}
       </div>
+      {seasonId && recovery ? <div className={styles.card} style={{marginTop:16}}>
+        <div className={styles.sectionHead}><div className={styles.sectionTitle}>
+          <span className={styles.sectionIcon}>💰</span><div><h2>After-Draw Installment Reserve</h2>
+          <small>Super Admin • versioned income reserve, fully-paid EMI auto-adjustment</small></div></div>
+          <span className={styles.tag}>{recovery.current ? 'PUBLISHED v'+recovery.current.version : 'NOT PUBLISHED'}</span>
+        </div>
+        <div className={styles.notice}>Recovery begins only from the calendar day <b>after the configured draw</b> when the next eligible installment remains unpaid. Percentage applies only to newly posted earnings, not historical wallet balance. The amount is capped at that EMI's remaining due. Fully recovered EMIs are paid automatically and linked to the permanent draw token.</div>
+        <form onSubmit={saveRecovery}>
+          <div className={styles.fields}>
+            <div className={styles.field}><label htmlFor="installment-recovery-enabled">Recovery enabled</label>
+              <select id="installment-recovery-enabled" className={styles.select} value={String(recoveryEnabled)} onChange={e=>setRecoveryEnabled(e.target.value==='true')}>
+                <option value="true">Enabled</option><option value="false">Disabled for future earnings</option>
+              </select>
+            </div>
+            <div className={styles.field}><label htmlFor="installment-recovery-percent">Reserve from each eligible earning (%)</label>
+              <input id="installment-recovery-percent" className={styles.input} type="number" min="0" max="100" step="0.01" required
+                value={recoveryPercent} onChange={e=>setRecoveryPercent(e.target.value)}/>
+            </div>
+          </div>
+          <div className={styles.buttonLine}><button className={styles.button} disabled={busy}>
+            {busy?'SAVING…':'PUBLISH NEW RECOVERY POLICY VERSION'}</button></div>
+        </form>
+      </div> : null}
     </section>
   );
 }

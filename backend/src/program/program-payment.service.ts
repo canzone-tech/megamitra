@@ -18,6 +18,7 @@ import {
   ProgramPaymentAttemptStatus,
 } from '../generated/prisma/enums';
 import { ProgramAutomationService } from './program-automation.service';
+import { reconcileReserveAfterExternalPayment } from '../installment-recovery/installment-recovery.engine';
 import type {
   ConfirmProgramPaymentAttemptDto,
   CreateProgramPaymentAttemptDto,
@@ -464,6 +465,14 @@ export class ProgramPaymentService {
       throw new ConflictException('Payment attempt currency no longer matches enrollment currency');
     }
 
+    // Synchronize new external EMI payment with concurrent income reserve transfers.
+    const ownerRows = await connection.query<Array<{ userId: string }>>(
+      'SELECT userId FROM program_enrollments WHERE id=? LIMIT 1', [enrollment.id],
+    );
+    if (ownerRows[0]) {
+      await connection.query('SELECT id FROM users WHERE id=? LIMIT 1 FOR UPDATE', [ownerRows[0].userId]);
+    }
+
     const installments = await connection.query<InstallmentRow[]>(
       `SELECT id, sequence, amount FROM program_installments
        WHERE enrollmentId = ? ORDER BY sequence ASC`,
@@ -536,6 +545,13 @@ export class ProgramPaymentService {
         JSON.stringify({ paymentAttemptId: attempt.id, amount: attempt.amount, currencyCode: attempt.currencyCode }),
       ],
     );
+
+    if (ownerRows[0]) {
+      await reconcileReserveAfterExternalPayment(connection, {
+        userId: ownerRows[0].userId, enrollmentId: enrollment.id,
+        currencyCode: attempt.currencyCode, paymentRecordId: paymentId,
+      });
+    }
 
     if (pending.outstandingAfter.equals(0)) {
       await connection.query(

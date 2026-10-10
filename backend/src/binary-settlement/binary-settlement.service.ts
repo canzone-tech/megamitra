@@ -8,6 +8,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import type { PoolConnection } from 'mariadb';
 import { AuditService } from '../audit/audit.service';
 import { FinancialDbService } from '../database/financial-db.service';
+import { applyInstallmentReserveOnEarning } from '../installment-recovery/installment-recovery.engine';
 import { PrismaService } from '../database/prisma.service';
 import { Prisma } from '../generated/prisma/client';
 import {
@@ -535,6 +536,9 @@ export class BinarySettlementService {
         currencyCode,
       ],
     );
+    await applyInstallmentReserveOnEarning(connection, {
+      userId: dto.memberUserId, currencyCode, amount: payoutAmount, earningTransactionId: transactionId,
+    });
     return transactionId;
   }
 

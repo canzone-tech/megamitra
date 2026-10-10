@@ -11,6 +11,7 @@ import { randomUUID } from 'node:crypto';
 import type { PoolConnection } from 'mariadb';
 import { AuditService } from '../audit/audit.service';
 import { FinancialDbService } from '../database/financial-db.service';
+import { applyInstallmentReserveOnEarning } from '../installment-recovery/installment-recovery.engine';
 import { PrismaService } from '../database/prisma.service';
 import { AuditAction, PolicyLifecycle, UserStatus } from '../generated/prisma/enums';
 
@@ -503,6 +504,9 @@ export class RankAchievementService {
       [randomUUID(), id, expenseId, 'DEBIT', amount, currency,
         randomUUID(), id, walletId, 'CREDIT', amount, currency],
     );
+    await applyInstallmentReserveOnEarning(connection, {
+      userId, currencyCode: currency, amount, earningTransactionId: id,
+    });
     return id;
   }
 
