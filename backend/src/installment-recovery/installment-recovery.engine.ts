@@ -68,7 +68,7 @@ async function selectTarget(c:PoolConnection,user:string,currency:string,now:Dat
   const latest=new Map<string,DrawRow>();
   for(const row of rows){
     if(latest.has(row.enrollmentId))continue;
-    if(!Boolean(row.enabled)||Number(row.reservePercent)<=0)continue;
+    if(Number(row.enabled)===0||Number(row.reservePercent)<=0)continue;
     if(!afterDrawDay(row.drawAt,now,row.drawTimezone||'Asia/Kolkata'))continue;
     latest.set(row.enrollmentId,row);
   }
