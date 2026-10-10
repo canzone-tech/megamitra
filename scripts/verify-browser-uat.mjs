@@ -263,6 +263,7 @@ async function runScenario(debugPort, scenario) {
   const pageExceptions = [];
   const serverErrors = [];
   const memberApiErrors = [];
+  const withdrawalApiErrors = [];
 
   try {
     await Promise.all([
@@ -291,6 +292,9 @@ async function runScenario(debugPort, scenario) {
       }
       if (status >= 400 && url.startsWith(`${memberBaseUrl}/api/backend/`)) {
         memberApiErrors.push(`${status} ${url}`);
+      }
+      if (status >= 400 && url.includes('/api/backend/admin/withdrawals/')) {
+        withdrawalApiErrors.push(`${status} ${url}`);
       }
     });
 
@@ -390,6 +394,25 @@ async function runScenario(debugPort, scenario) {
       );
     }
 
+    if (scenario.verifyAdminWithdrawals) {
+      await waitForExpression(client, `(() => {
+        const href = '/portal/withdrawals';
+        const links = [...document.querySelectorAll('a[href]')];
+        return Boolean(links.find((item) => item.getAttribute('href') === href));
+      })()`, 'Admin withdrawals is present in the shared sidebar/drawer');
+      await waitForExpression(client, `(() => {
+        const refresh = [...document.querySelectorAll('button')].find((item) => item.textContent?.trim() === 'Refresh');
+        return Boolean(refresh && !refresh.disabled);
+      })()`, 'Admin withdrawal queue and policy fetch completed');
+      const withdrawalStatus = await evaluate(client, `(() => ({
+        queue: [...document.querySelectorAll('h2')].some((item) => item.textContent?.trim() === 'Request queue'),
+        noError: !document.querySelector('.mm-withdrawals-panel .mm-error'),
+        noDuplicateHeader: document.querySelectorAll('.mm-topbar').length === 0,
+      }))()`);
+      if (!withdrawalStatus.queue || !withdrawalStatus.noError || !withdrawalStatus.noDuplicateHeader || withdrawalApiErrors.length) {
+        throw new Error(`${scenario.name} withdrawal workspace failed: ${JSON.stringify({ withdrawalStatus, withdrawalApiErrors })}`);
+      }
+    }
     if (scenario.checkMemberSecurity) {
       const prohibited = await evaluate(client, `(() => ({
         form: Boolean(document.querySelector('#email-change-password, #email-change-new-email')),
@@ -724,6 +747,26 @@ async function main() {
       mobile: false,
       expectedTexts: ['Season Management', 'Create New Season'],
       verifyBlankSeasonSetup: true,
+    },
+    {
+      name: 'admin-withdrawals-desktop',
+      baseUrl: adminBaseUrl,
+      path: '/portal/withdrawals',
+      cookieName: 'megagoldenclub_admin_access',
+      token: adminToken,
+      width: 1440, height: 1000, mobile: false,
+      expectedTexts: ['Withdrawals', 'Request queue', 'Policies', 'Create policy version'],
+      verifyAdminWithdrawals: true,
+    },
+    {
+      name: 'admin-withdrawals-mobile',
+      baseUrl: adminBaseUrl,
+      path: '/portal/withdrawals',
+      cookieName: 'megagoldenclub_admin_access',
+      token: adminToken,
+      width: 390, height: 844, mobile: true,
+      expectedTexts: ['Withdrawals', 'Request queue', 'Policies'],
+      verifyAdminWithdrawals: true,
     },
     {
       name: 'admin-appearance-desktop',

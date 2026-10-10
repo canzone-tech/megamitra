@@ -38,7 +38,7 @@ function tone(status: unknown) {
   return '';
 }
 
-export function WithdrawalsAdmin() {
+export function WithdrawalsAdmin({ embedded = false }: { embedded?: boolean } = {}) {
   const router = useRouter();
   const [requests, setRequests] = useState<Page<Row> | null>(null);
   const [policies, setPolicies] = useState<Policy[]>([]);
@@ -200,13 +200,13 @@ export function WithdrawalsAdmin() {
   const detailStatus = text(detail?.status ?? selectedRow?.status);
 
   return (
-    <div className="mm-admin-shell">
-      <header className="mm-topbar">
+    <div className={embedded ? 'mm-withdrawals-embedded' : 'mm-admin-shell'}>
+      {!embedded ? <header className="mm-topbar">
         <div className="mm-brand"><span className="mm-brand-mark">M</span><div><div>Mega<span className="mm-brand-accent">GoldenClub</span></div><div className="mm-brand-subtitle">Withdrawal operations</div></div></div>
         <nav style={{ display: 'flex', gap: 8 }}><Link className="mm-button secondary" href="/operations">Operations</Link><Link className="mm-button secondary" href="/kyc">KYC</Link><Link className="mm-button secondary" href="/security">Security</Link></nav>
-      </header>
+      </header> : null}
 
-      <main className="mm-page">
+      <main className={embedded ? 'mm-withdrawals-panel' : 'mm-page'}>
         <div className="mm-hero-row">
           <div><p className="mm-eyebrow">Withdrawal operations</p><h1 className="mm-title">Withdrawals</h1><p className="mm-subtitle">Review withdrawal requests, approve payouts and track payment status from one place.</p></div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'end' }}><div className="mm-field" style={{ margin: 0 }}><label htmlFor="withdrawal-status-filter">Status</label><select className="mm-input" id="withdrawal-status-filter" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="">All</option>{['REQUESTED','APPROVED','PROCESSING','PAYOUT_FAILED','PAID','REJECTED','CANCELLED'].map((status) => <option key={status} value={status}>{status.replaceAll('_', ' ')}</option>)}</select></div><button className="mm-button" type="button" disabled={loading} onClick={() => void load()}>{loading ? 'Refreshing…' : 'Refresh'}</button></div>

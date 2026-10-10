@@ -11,6 +11,7 @@ export type OwnerManagementSection =
   | 'payments'
   | 'member-payments'
   | 'wallet'
+  | 'withdrawals'
   | 'epins'
   | 'auth-codes'
   | 'staff'
@@ -39,6 +40,7 @@ export const OWNER_MANAGEMENT_NAV: OwnerManagementNavItem[] = [
   { section: 'payments', label: 'Payments / Bills', symbol: '💳', group: 'Finance & Security' },
   { section: 'member-payments', label: 'Member Verification', symbol: '✅', group: 'Finance & Security' },
   { section: 'wallet', label: 'Wallet / Ledger', symbol: '📒', group: 'Finance & Security' },
+  { section: 'withdrawals', label: 'Withdrawals', symbol: '💸', group: 'Finance & Security' },
   { section: 'epins', label: 'E-PIN Management', symbol: '🔑', group: 'Finance & Security' },
   { section: 'auth-codes', label: 'Auth Codes', symbol: '🔐', group: 'Finance & Security' },
   { section: 'staff', label: 'Admins & Agents', symbol: '🧑‍💼', group: 'Access Control' },

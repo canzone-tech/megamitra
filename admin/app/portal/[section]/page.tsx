@@ -9,6 +9,7 @@ import { OwnerCoreV14Portal, type OwnerCoreV14Section } from '@/components/owner
 import { OwnerFinancePortal, type OwnerFinanceSection } from '@/components/owner-finance-portal';
 import { OwnerKycPanel } from '@/components/owner-kyc-panel';
 import { OwnerManagementShell } from '@/components/owner-management-shell';
+import { WithdrawalsAdmin } from '@/components/withdrawals-admin';
 import { OwnerMembersPortal } from '@/components/owner-members-portal';
 import { OwnerSeasonAdvancedPanel } from '@/components/owner-season-advanced-panel';
 import { SettingsGovernancePortal } from '@/components/settings-governance-portal';
@@ -25,6 +26,7 @@ const SECTIONS = new Set([
   'payments',
   'member-payments',
   'wallet',
+  'withdrawals',
   'epins',
   'auth-codes',
   'staff',
@@ -71,6 +73,7 @@ export default async function OwnerPortalSectionPage({ params }: PageProps) {
   if (!SECTIONS.has(section)) notFound();
   if (section === 'settings') return <SettingsGovernancePortal />;
   if (section === 'member-payments') return <MemberPaymentVerificationPortal />;
+  if (section === 'withdrawals') return <OwnerManagementShell title="Withdrawals" currentSection="withdrawals"><WithdrawalsAdmin embedded /></OwnerManagementShell>;
   if (section === 'staff' || section === 'rbac') return <AccessControlPortal section={section} />;
   if (section === 'members') {
     return (

@@ -165,3 +165,12 @@ body {
   .mm-topbar { padding-inline: 16px; }
   .mm-list-row { align-items: flex-start; flex-direction: column; }
 }
+
+/* Withdrawal operations embedded in the authoritative shared Admin management shell. */
+.mm-withdrawals-embedded,.mm-withdrawals-panel{width:100%;min-width:0;max-width:100%}
+.mm-withdrawals-panel{display:block;padding:0}
+.mm-withdrawals-panel .mm-hero-row{min-width:0;flex-wrap:wrap}
+.mm-withdrawals-panel .mm-card,.mm-withdrawals-panel .mm-grid,.mm-withdrawals-panel .mm-card-body{min-width:0}
+.mm-withdrawals-panel .mm-list-row strong{overflow-wrap:anywhere}
+.mm-withdrawals-panel .mm-table-wrap{max-width:100%;overflow-x:auto}
+@media(max-width:700px){.mm-withdrawals-panel .mm-card-head,.mm-withdrawals-panel .mm-hero-row{flex-wrap:wrap}.mm-withdrawals-panel .mm-card-body{padding:14px}.mm-withdrawals-panel .mm-table{min-width:640px}}
