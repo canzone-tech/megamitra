@@ -7,11 +7,12 @@ import net from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { selectVerifyPort } from '../backend/scripts/select-verify-port.mjs';
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(scriptDir, '..');
-const adminBaseUrl = (process.env.BROWSER_UAT_ADMIN_URL ?? 'http://127.0.0.1:3101').replace(/\/$/, '');
-const memberBaseUrl = (process.env.BROWSER_UAT_MEMBER_URL ?? 'http://127.0.0.1:3102').replace(/\/$/, '');
+let adminBaseUrl = (process.env.BROWSER_UAT_ADMIN_URL ?? 'http://127.0.0.1:3101').replace(/\/$/, '');
+let memberBaseUrl = (process.env.BROWSER_UAT_MEMBER_URL ?? 'http://127.0.0.1:3102').replace(/\/$/, '');
 const adminToken = process.env.UAT_ADMIN_TOKEN ?? '';
 const memberToken = process.env.UAT_MEMBER_TOKEN ?? '';
 const artifactDir = path.resolve(
@@ -55,10 +56,10 @@ async function findChrome() {
   throw new Error('Chrome/Chromium executable was not found on the browser UAT runner');
 }
 
-function spawnLogged(label, command, args, logPath, extraEnv = {}) {
+function spawnLogged(label, command, args, logPath, extraEnv = {}, cwd = rootDir) {
   const fd = openSync(logPath, 'w');
   const child = spawn(command, args, {
-    cwd: rootDir,
+    cwd,
     detached: true,
     env: { ...process.env, ...extraEnv },
     stdio: ['ignore', fd, fd],
@@ -678,19 +679,36 @@ async function main() {
   await rm(artifactDir, { recursive: true, force: true });
   await mkdir(artifactDir, { recursive: true });
 
+  // Run Next.js UAT independently of already-running local admin/member apps.
+  // The selected URLs drive BOTH the spawned processes and browser assertions.
+  const adminUrl = new URL(adminBaseUrl);
+  const memberUrl = new URL(memberBaseUrl);
+  for (const [label, url] of [['admin', adminUrl], ['member', memberUrl]]) {
+    if (url.protocol !== 'http:' || url.hostname !== '127.0.0.1' || !url.port || url.pathname !== '/' || url.search || url.hash) {
+      throw new Error(`Browser UAT ${label} URL must be a localhost http://127.0.0.1:<port> base URL`);
+    }
+  }
+  const adminPort = (await selectVerifyPort(Number(adminUrl.port))).port;
+  const memberPort = (await selectVerifyPort(Number(memberUrl.port))).port;
+  if (adminPort === memberPort) throw new Error('Browser UAT Admin and Member ports collide');
+  adminBaseUrl = `http://127.0.0.1:${adminPort}`;
+  memberBaseUrl = `http://127.0.0.1:${memberPort}`;
+
   const admin = spawnLogged(
     'MegaGoldenClub admin',
-    'npm',
-    ['--prefix', 'admin', 'run', 'start'],
+    process.execPath,
+    ['node_modules/next/dist/bin/next', 'start', '-H', '127.0.0.1', '-p', String(adminPort)],
     path.join(artifactDir, 'admin-next.log'),
     { NODE_ENV: 'production' },
+    path.join(rootDir, 'admin'),
   );
   const member = spawnLogged(
     'MegaGoldenClub member',
-    'npm',
-    ['--prefix', 'frontend', 'run', 'start'],
+    process.execPath,
+    ['node_modules/next/dist/bin/next', 'start', '-H', '127.0.0.1', '-p', String(memberPort)],
     path.join(artifactDir, 'member-next.log'),
     { NODE_ENV: 'production' },
+    path.join(rootDir, 'frontend'),
   );
 
   await Promise.all([

@@ -133,53 +133,67 @@ smoke_frontends() {
   MEMBER_LOG="$(mktemp -t megagoldenclub-member.XXXXXX.log)"
   trap cleanup_smoke EXIT INT TERM
 
-  setsid npm --prefix "${ROOT_DIR}/admin" run start >"${ADMIN_LOG}" 2>&1 &
+  # Existing local dev instances must remain untouched. Use the shared API
+  # verify-port fallback instead of assuming ports 3101/3102 are free.
+  local admin_port member_port admin_base_url member_base_url
+  admin_port="$(node "${ROOT_DIR}/backend/scripts/select-verify-port.mjs" 3101)"
+  member_port="$(node "${ROOT_DIR}/backend/scripts/select-verify-port.mjs" 3102)"
+  if [[ "${admin_port}" == "${member_port}" ]]; then
+    echo 'ERROR: Admin and Member smoke selected the same port' >&2
+    exit 1
+  fi
+  admin_base_url="http://127.0.0.1:${admin_port}"
+  member_base_url="http://127.0.0.1:${member_port}"
+
+  setsid bash -c 'cd "$1"; exec node node_modules/next/dist/bin/next start -H 127.0.0.1 -p "$2"' \
+    _ "${ROOT_DIR}/admin" "${admin_port}" >"${ADMIN_LOG}" 2>&1 &
   ADMIN_PID=$!
-  setsid npm --prefix "${ROOT_DIR}/frontend" run start >"${MEMBER_LOG}" 2>&1 &
+  setsid bash -c 'cd "$1"; exec node node_modules/next/dist/bin/next start -H 127.0.0.1 -p "$2"' \
+    _ "${ROOT_DIR}/frontend" "${member_port}" >"${MEMBER_LOG}" 2>&1 &
   MEMBER_PID=$!
 
-  wait_for_url "http://127.0.0.1:3101/login" "${ADMIN_PID}" "${ADMIN_LOG}"
-  wait_for_url "http://127.0.0.1:3102/" "${MEMBER_PID}" "${MEMBER_LOG}"
-  expect_security_headers "http://127.0.0.1:3101/login"
-  expect_security_headers "http://127.0.0.1:3102/"
+  wait_for_url "${admin_base_url}/login" "${ADMIN_PID}" "${ADMIN_LOG}"
+  wait_for_url "${member_base_url}/" "${MEMBER_PID}" "${MEMBER_LOG}"
+  expect_security_headers "${admin_base_url}/login"
+  expect_security_headers "${member_base_url}/"
 
-  expect_body_text "http://127.0.0.1:3101/login" "MegaGoldenClub"
-  expect_body_absent "http://127.0.0.1:3101/login" "${LEGACY_UI_BRAND}"
-  expect_body_absent "http://127.0.0.1:3101/login" "HttpOnly"
-  expect_body_absent "http://127.0.0.1:3101/login" "verified by the API"
-  expect_post_form "http://127.0.0.1:3101/login"
-  expect_body_text "http://127.0.0.1:3102/login" "MegaGoldenClub"
-  expect_body_absent "http://127.0.0.1:3102/login" "${LEGACY_UI_BRAND}"
-  expect_body_absent "http://127.0.0.1:3102/login" "HttpOnly"
-  expect_post_form "http://127.0.0.1:3102/login"
-  expect_body_text "http://127.0.0.1:3102/" "MegaGoldenClub"
-  expect_body_absent "http://127.0.0.1:3102/" "${LEGACY_UI_BRAND}"
+  expect_body_text "${admin_base_url}/login" "MegaGoldenClub"
+  expect_body_absent "${admin_base_url}/login" "${LEGACY_UI_BRAND}"
+  expect_body_absent "${admin_base_url}/login" "HttpOnly"
+  expect_body_absent "${admin_base_url}/login" "verified by the API"
+  expect_post_form "${admin_base_url}/login"
+  expect_body_text "${member_base_url}/login" "MegaGoldenClub"
+  expect_body_absent "${member_base_url}/login" "${LEGACY_UI_BRAND}"
+  expect_body_absent "${member_base_url}/login" "HttpOnly"
+  expect_post_form "${member_base_url}/login"
+  expect_body_text "${member_base_url}/" "MegaGoldenClub"
+  expect_body_absent "${member_base_url}/" "${LEGACY_UI_BRAND}"
 
-  expect_status 307 "http://127.0.0.1:3101/operations"
-  expect_status 307 "http://127.0.0.1:3101/business-plan"
-  expect_status 307 "http://127.0.0.1:3101/presentation"
-  expect_status 307 "http://127.0.0.1:3101/kyc"
-  expect_status 307 "http://127.0.0.1:3101/withdrawals"
-  expect_status 307 "http://127.0.0.1:3101/entitlements"
-  expect_status 307 "http://127.0.0.1:3101/security"
-  expect_status 200 "http://127.0.0.1:3101/forgot-password"
-  expect_status 200 "http://127.0.0.1:3101/request-email-verification"
+  expect_status 307 "${admin_base_url}/operations"
+  expect_status 307 "${admin_base_url}/business-plan"
+  expect_status 307 "${admin_base_url}/presentation"
+  expect_status 307 "${admin_base_url}/kyc"
+  expect_status 307 "${admin_base_url}/withdrawals"
+  expect_status 307 "${admin_base_url}/entitlements"
+  expect_status 307 "${admin_base_url}/security"
+  expect_status 200 "${admin_base_url}/forgot-password"
+  expect_status 200 "${admin_base_url}/request-email-verification"
 
-  expect_status 307 "http://127.0.0.1:3102/member"
-  expect_status 307 "http://127.0.0.1:3102/member/payments"
-  expect_status 307 "http://127.0.0.1:3102/member/change-password"
-  expect_status 307 "http://127.0.0.1:3102/member/kyc"
-  expect_status 307 "http://127.0.0.1:3102/member/withdrawals"
-  expect_status 307 "http://127.0.0.1:3102/member/entitlements"
-  expect_status 307 "http://127.0.0.1:3102/member/security"
-  expect_status 200 "http://127.0.0.1:3102/forgot-password"
-  expect_status 200 "http://127.0.0.1:3102/request-email-verification"
-  expect_status 200 "http://127.0.0.1:3102/reset-password?token=smoke-test-token"
-  expect_status 200 "http://127.0.0.1:3102/verify-email?token=smoke-test-token"
-  expect_status 200 "http://127.0.0.1:3102/confirm-email-change?token=smoke-test-token"
+  expect_status 307 "${member_base_url}/member"
+  expect_status 307 "${member_base_url}/member/payments"
+  expect_status 307 "${member_base_url}/member/change-password"
+  expect_status 307 "${member_base_url}/member/kyc"
+  expect_status 307 "${member_base_url}/member/withdrawals"
+  expect_status 307 "${member_base_url}/member/entitlements"
+  expect_status 307 "${member_base_url}/member/security"
+  expect_status 200 "${member_base_url}/forgot-password"
+  expect_status 200 "${member_base_url}/request-email-verification"
+  expect_status 200 "${member_base_url}/reset-password?token=smoke-test-token"
+  expect_status 200 "${member_base_url}/verify-email?token=smoke-test-token"
+  expect_status 200 "${member_base_url}/confirm-email-change?token=smoke-test-token"
 
-  expect_status 400 -X POST -H 'content-type: application/json' --data '{' "http://127.0.0.1:3101/api/session/login"
-  expect_status 400 -X POST -H 'content-type: application/json' --data '{' "http://127.0.0.1:3102/api/session/login"
+  expect_status 400 -X POST -H 'content-type: application/json' --data '{' "${admin_base_url}/api/session/login"
+  expect_status 400 -X POST -H 'content-type: application/json' --data '{' "${member_base_url}/api/session/login"
 
   cleanup_smoke
   trap - EXIT INT TERM

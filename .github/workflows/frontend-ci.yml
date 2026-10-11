@@ -33,7 +33,7 @@ jobs:
           test -f frontend/package-lock.json
 
       - name: Verify admin and member apps
-        run: bash scripts/verify-frontends.sh
+        run: node scripts/run-with-occupied-frontend-ports.mjs bash scripts/verify-frontends.sh
 
       - name: Verify pinned framework versions
         run: |
