@@ -70,8 +70,8 @@ function assertExternalHost(host, label) {
     'host.docker.internal', 'gateway.docker.internal', 'mysql', 'mongodb', 'redis',
   ]);
   if (forbidden.has(name) || name.endsWith('.localhost') ||
-      /^127(?:\\.\\d{1,3}){3}$/.test(name) ||
-      /^::ffff:127\\./.test(name) || /^169\\.254\\./.test(name)) {
+      /^127(?:\.\d{1,3}){3}$/.test(name) ||
+      /^::ffff:127\./.test(name) || /^169\.254\./.test(name)) {
     fail(`${label} must be an external service, not a local or Docker Compose endpoint`);
   }
 }
@@ -191,6 +191,7 @@ export function validateProductionConfig(env, options = {}) {
   };
 
   if (value(env, 'NODE_ENV') !== 'production') errors.push('NODE_ENV must be production');
+  if (value(env, 'MYSQL_ROOT_PASSWORD')) errors.push('MYSQL_ROOT_PASSWORD must not be present on the production runtime host');
 
   capture(() => validateDatabaseIdentity(env));
   capture(() => validateMongo(env));

@@ -98,6 +98,11 @@ describe('MegaGoldenClub production configuration readiness contract', () => {
       expect(result.stderr).toContain('must be an external service');
     }
 
+    await writeFile(envPath, encodeEnv({ ...env, MYSQL_ROOT_PASSWORD: 'root-should-not-be-here' }));
+    const rootCredential = run();
+    expect(rootCredential.status).toBe(1);
+    expect(rootCredential.stderr).toContain('MYSQL_ROOT_PASSWORD must not be present');
+
     await writeFile(envPath, encodeEnv(env));
     expect(run(['--check-files']).status).toBe(0);
   });
