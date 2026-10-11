@@ -35,7 +35,7 @@ trap cleanup EXIT INT TERM
 
 (
   cd "${RELEASE_DIR}/api"
-  PORT=3210 setsid node dist/main.js
+  HOST=127.0.0.1 PORT=3210 setsid node dist/main.js
 ) >"${LOG_API}" 2>&1 &
 PIDS+=("$!")
 

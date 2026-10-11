@@ -12,6 +12,12 @@ This runbook covers the immutable source-free production runtime and recovery co
 - **Recovery:** use the remote providers' verified, encrypted, off-host backup/snapshot and isolated remote restore facilities. Local Compose backup/restore scripts below remain development/CI drills, not production backup procedures.
 
 
+## Ubuntu VPS implementation reference
+
+For an Ubuntu 24.04 LTS application VPS, use the versioned templates in `infra/ubuntu-vps/`: three unprivileged systemd services bound to `127.0.0.1`, and a two-domain Caddy HTTPS reverse proxy. The domains, SSH/host access, off-host database providers, Caddy certificate issuance, secret injection and rollout approval must be supplied by the operator; none are assumed by CI.
+
+The application release artifact's portable `.tar.gz.sha256` must be checked after transfer, and the embedded `RELEASE_SHA` must match the approved exact commit before installing an immutable release directory. Never provision local MySQL/MongoDB/Redis, install a source checkout or run migration tooling on that VPS. No source checkout is needed to operate systemd services.
+
 ## Release gate
 
 A release candidate must be built from the intended commit on `dev/local-foundation` and must have green Backend CI, Frontend CI and Release Evidence workflows for that exact commit. The Release Evidence workflow waits for Backend CI and Frontend CI on the same SHA, requires the authenticated browser-UAT artifact from Backend CI, and uploads exact-SHA JSON/Markdown evidence.

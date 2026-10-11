@@ -1,0 +1,14 @@
+# Set ADMIN_DOMAIN and MEMBER_DOMAIN in Caddy's systemd environment.
+# Domain records must point to the VPS and ports 80/443 must be reachable
+# before Caddy can obtain the public TLS certificates automatically.
+# Keep API port 3100 private; Next.js server-side routes proxy it.
+
+{$ADMIN_DOMAIN} {
+  encode zstd gzip
+  reverse_proxy 127.0.0.1:3101
+}
+
+{$MEMBER_DOMAIN} {
+  encode zstd gzip
+  reverse_proxy 127.0.0.1:3102
+}

@@ -66,6 +66,9 @@ jobs:
         working-directory: .
         run: node scripts/verify-test-data-isolation.mjs
 
+      - name: Verify Ubuntu VPS remote-data service templates
+        run: node ../scripts/verify-ubuntu-vps-config.mjs
+
       - name: Start CI data services
         run: |
           docker compose -f ../docker-compose.yml up -d --wait --wait-timeout 120

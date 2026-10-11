@@ -11,3 +11,5 @@ Production target: Ubuntu 24.04 LTS, Node.js 24 runtime and immutable, checksum-
 Production reverse proxy supplies HTTPS routing to the compiled API/Admin/Member processes. Runtime secrets come from secret management, and backups originate from the remote data providers with independent off-host recovery.
 
 See `docs/PRODUCTION-RUNBOOK.md`, `docs/GO-LIVE-READINESS.md` and `docs/RELEASE-SIGNOFF.md` for deployment order and remaining human/provider gates.
+
+Ubuntu application-host templates, HTTPS proxy routing, and release boundaries: [infra/ubuntu-vps/README.md](ubuntu-vps/README.md).

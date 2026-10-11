@@ -65,5 +65,13 @@ fi
 
 tar --sort=name --mtime='@0' --owner=0 --group=0 --numeric-owner \
   -C "${TARGET}" -czf "${TARGET}.tar.gz" .
-sha256sum "${TARGET}.tar.gz" >"${TARGET}.tar.gz.sha256"
+# Checksum must refer to the portable archive filename, not a CI-runner path.
+(
+  cd "$(dirname "${TARGET}")"
+  sha256sum "$(basename "${TARGET}").tar.gz" >"$(basename "${TARGET}").tar.gz.sha256"
+)
+(
+  cd "$(dirname "${TARGET}")"
+  sha256sum -c --status "$(basename "${TARGET}").tar.gz.sha256"
+)
 echo "Source-free MegaGoldenClub runtime packaged for ${RELEASE_SHA}"

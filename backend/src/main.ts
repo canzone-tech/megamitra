@@ -7,8 +7,11 @@ async function bootstrap() {
   configureApp(app);
 
   const port = Number(process.env.PORT ?? 3100);
-  await app.listen(port);
-  console.log(`MegaGoldenClub API listening on http://localhost:${port}`);
+  // Ubuntu VPS services set HOST=127.0.0.1 so the API cannot be reached
+  // directly from the internet. Existing CI/development defaults are preserved.
+  const host = process.env.HOST || '0.0.0.0';
+  await app.listen(port, host);
+  console.log(`MegaGoldenClub API listening on ${host}:${port}`);
 }
 
 void bootstrap();

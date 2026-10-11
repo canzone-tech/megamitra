@@ -19,6 +19,8 @@ bash -n scripts/*.sh
 
 echo "==> Verifying compiled API port fallback"
 node scripts/test-select-verify-port.mjs
+echo "==> Verifying Ubuntu VPS source-free service templates"
+node "${ROOT_DIR}/scripts/verify-ubuntu-vps-config.mjs"
 
 echo "==> Verifying canonical UAT documentation"
 node "${ROOT_DIR}/scripts/verify-uat-docs.mjs"
