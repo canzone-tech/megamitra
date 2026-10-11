@@ -17,6 +17,7 @@ if (process.env.SECURITY_HSTS_ENABLED === 'true') {
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  ...(process.env.MEGAGOLDENCLUB_STANDALONE_BUILD === 'true' ? { output: 'standalone' as const } : {}),
   reactStrictMode: true,
   async headers() {
     return [{ source: '/:path*', headers: securityHeaders }];

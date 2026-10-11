@@ -61,13 +61,28 @@ function normalizeHost(host) {
   return host.replace(/^\[(.*)\]$/, '$1').toLowerCase();
 }
 
+function assertExternalHost(host, label) {
+  const name = normalizeHost(host);
+  // A production application host must never fall back to its own or Compose's
+  // datastore processes. Private/VPC DNS and addresses remain valid.
+  const forbidden = new Set([
+    'localhost', 'localhost.localdomain', '0.0.0.0', '::', '::1',
+    'host.docker.internal', 'gateway.docker.internal', 'mysql', 'mongodb', 'redis',
+  ]);
+  if (forbidden.has(name) || name.endsWith('.localhost') ||
+      /^127(?:\\.\\d{1,3}){3}$/.test(name) ||
+      /^::ffff:127\\./.test(name) || /^169\\.254\\./.test(name)) {
+    fail(`${label} must be an external service, not a local or Docker Compose endpoint`);
+  }
+}
+
 function validateDatabaseIdentity(env) {
   const mysqlHost = requireValue(env, 'MYSQL_HOST');
   const mysqlPort = parseInteger(env, 'MYSQL_PORT', 1, 65535);
   const mysqlDatabase = requireValue(env, 'MYSQL_DATABASE');
   const mysqlUser = requireValue(env, 'MYSQL_USER');
   const mysqlPassword = requireSecret(env, 'MYSQL_PASSWORD');
-  requireSecret(env, 'MYSQL_ROOT_PASSWORD');
+  // The app needs only its own least-privilege user; root stays off the runtime host.
 
   let url;
   try {
@@ -81,6 +96,7 @@ function validateDatabaseIdentity(env) {
   const urlUser = decodeURIComponent(url.username);
   const urlPassword = decodeURIComponent(url.password);
 
+  assertExternalHost(mysqlHost, 'MYSQL_HOST');
   if (
     normalizeHost(url.hostname) !== normalizeHost(mysqlHost) ||
     urlPort !== mysqlPort ||
@@ -118,6 +134,7 @@ function validateMongo(env) {
     fail('MONGODB_URI must use mongodb:// or mongodb+srv://');
   }
   if (!url.hostname) fail('MONGODB_URI must include a host');
+  assertExternalHost(url.hostname, 'MONGODB_URI');
 }
 
 function validateSmtp(env, requireSmtp) {
@@ -177,7 +194,7 @@ export function validateProductionConfig(env, options = {}) {
 
   capture(() => validateDatabaseIdentity(env));
   capture(() => validateMongo(env));
-  capture(() => requireValue(env, 'REDIS_HOST'));
+  capture(() => assertExternalHost(requireValue(env, 'REDIS_HOST'), 'REDIS_HOST'));
   capture(() => parseInteger(env, 'REDIS_PORT', 1, 65535));
   capture(() => requireSecret(env, 'REDIS_PASSWORD'));
 

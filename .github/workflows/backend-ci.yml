@@ -267,6 +267,24 @@ jobs:
             exit 1
           fi
 
+      - name: Package source-free production runtime
+        working-directory: .
+        run: bash scripts/build-production-artifact.sh "${RUNNER_TEMP}/megagoldenclub-runtime"
+
+      - name: Smoke-test exact packaged production runtime
+        working-directory: .
+        run: bash scripts/verify-production-artifact.sh "${RUNNER_TEMP}/megagoldenclub-runtime"
+
+      - name: Upload source-free production runtime
+        uses: actions/upload-artifact@v4
+        with:
+          name: megagoldenclub-runtime-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/megagoldenclub-runtime.tar.gz
+            ${{ runner.temp }}/megagoldenclub-runtime.tar.gz.sha256
+          if-no-files-found: error
+          retention-days: 90
+
       - name: Upload browser UAT evidence
         if: always()
         uses: actions/upload-artifact@v4

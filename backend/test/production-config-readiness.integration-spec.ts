@@ -7,7 +7,6 @@ function baseEnv(keyPath: string) {
   return {
     NODE_ENV: 'production',
     PORT: '3100',
-    MYSQL_ROOT_PASSWORD: 'prod-root-password-123456789',
     MYSQL_HOST: 'db.internal',
     MYSQL_PORT: '3306',
     MYSQL_DATABASE: 'megagoldenclub',
@@ -82,6 +81,25 @@ describe('MegaGoldenClub production configuration readiness contract', () => {
     expect(result.stdout).toContain('smtp=DISABLED');
     expect(result.stdout).toContain('backupKey=VERIFIED');
     expect(result.stdout).not.toContain('prod-db-password');
+  });
+
+  it('rejects local MySQL, MongoDB and Redis in production, without requiring a root password', async () => {
+    const env = baseEnv(keyPath);
+    expect(env).not.toHaveProperty('MYSQL_ROOT_PASSWORD');
+
+    for (const change of [
+      { MYSQL_HOST: '127.0.0.1', DATABASE_URL: 'mysql://megagoldenclub_app:prod-db-password-123456789@127.0.0.1:3306/megagoldenclub' },
+      { MONGODB_URI: 'mongodb://mongodb:27017/megagoldenclub' },
+      { REDIS_HOST: 'localhost' },
+    ]) {
+      await writeFile(envPath, encodeEnv({ ...env, ...change }));
+      const result = run();
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain('must be an external service');
+    }
+
+    await writeFile(envPath, encodeEnv(env));
+    expect(run(['--check-files']).status).toBe(0);
   });
 
   it('rejects placeholder secrets and insecure production switches', async () => {

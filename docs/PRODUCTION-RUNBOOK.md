@@ -1,6 +1,16 @@
 # MegaGoldenClub Production Runbook
 
-This runbook covers deployment and recovery controls after business milestone 0024. It does not introduce or redefine business rules.
+This runbook covers the immutable source-free production runtime and recovery controls. It does not introduce or redefine business rules.
+
+## Locked production topology: remote data, no source checkout
+
+- **Production application host:** run only the GitHub CI-built, checksum-verified `megagoldenclub-runtime-<SHA>` archive. It contains the compiled NestJS API plus Next.js standalone Admin and Member applications and required runtime dependencies/static assets. Never copy Git metadata, `src/`, TS/TSX, development lockfiles, Prisma schema/migrations, Docker Compose, seed fixtures, unit/integration tests or local data-service volumes to the production runtime host. JavaScript compiled output is required by the Node.js runtime and is not the original TypeScript application source.
+- **Data:** connect the API to separate managed/remote MySQL (financial source of truth), MongoDB (presentation/GridFS) and Redis (non-authoritative). Do **not** start MySQL, MongoDB or Redis containers/processes on the production application host. Use private network access and provider-supported encrypted transport, authenticate with dedicated least-privilege accounts; never supply the MySQL root credential to the application host.
+- **Build and verification:** source code, `npm run verify`, packaging, Prisma schema/migration files and test-only Docker Compose services stay on trusted local/CI/build infrastructure. They are never installed on the production runtime host.
+- **Schema changes:** run the reviewed append-only `prisma migrate deploy` from a separately authorized, short-lived build/release runner with secure network access to the remote authoritative MySQL. Take and verify a recoverable remote backup first. Never run migrations on application startup or from the source-free runtime host.
+- **Secrets:** inject at runtime via the hosting platform/secret manager; do not embed real connection strings, JWT secrets, backup keys or admin credentials in CI artifacts. Apply per-service process isolation, non-root execution, minimal write permissions, network egress controls and TLS at the HTTPS edge.
+- **Recovery:** use the remote providers' verified, encrypted, off-host backup/snapshot and isolated remote restore facilities. Local Compose backup/restore scripts below remain development/CI drills, not production backup procedures.
+
 
 ## Release gate
 
@@ -8,11 +18,13 @@ A release candidate must be built from the intended commit on `dev/local-foundat
 
 The Release Evidence artifact proves the automated candidate gates only. It intentionally records production approval as pending manual sign-off and does not mark target-host verification, human visual review, provider UAT, off-host recovery exercise or release ownership complete.
 
-On the deployment host, pull the exact candidate commit and run from the repository root:
+On the **trusted local or target-like verification machine** (not on the production runtime host), pull the exact candidate commit and run from the repository root:
 
 ```bash
 npm run verify
 ```
+
+The production application host receives only the corresponding source-free release artifact after approval.
 
 Record the operator, environment, exact commit and result in the release sign-off record. Do not deploy when migrations, lint, tests, production builds, frontend route smoke, API readiness, authenticated UAT smoke, browser UAT, release-evidence collection or target-host verification fail.
 
@@ -35,13 +47,13 @@ Use `docs/GO-LIVE-READINESS.md` as the finite ledger of repository-controlled ve
 
 Use unique production secrets for CAPTCHA HMAC, JWT access and refresh signing. Do not reuse development or CI values. Set `NODE_ENV=production`.
 
-Before production sign-off, validate the actual deployment environment file from the repository root:
+Before production sign-off, validate the actual deployment secrets and remote endpoint configuration on a **secure operator/build machine** with the repository (never a production source checkout):
 
 ```bash
 npm --prefix backend run verify:production-config -- /absolute/path/to/production.env --check-files
 ```
 
-The validator does not print secret values. It rejects development/CI placeholders, mismatched MySQL identity between `DATABASE_URL` and `MYSQL_*`, missing Redis authentication, insecure public HTTP/loopback URLs, disabled HSTS/rate limiting, test-only rate limiting, invalid proxy-hop bounds, malformed MongoDB configuration, incomplete/insecure SMTP configuration when present, and a missing/insecure backup-key file when `--check-files` is used. Add `--require-smtp` when email-based authentication features will be enabled in the target environment.
+The validator does not print secret values. It rejects development/CI placeholders, loopback and local Compose MySQL/MongoDB/Redis endpoints, mismatched MySQL identity between `DATABASE_URL` and `MYSQL_*`, missing Redis authentication, insecure public HTTP/loopback URLs, disabled HSTS/rate limiting, test-only rate limiting, invalid proxy-hop bounds, malformed MongoDB configuration, incomplete/insecure SMTP configuration when present, and a missing/insecure backup-key file when `--check-files` is used. Remote MySQL requires only the application DB user, **not `MYSQL_ROOT_PASSWORD`**. Config syntax checking alone does not prove DNS resolution, encrypted transport, least privilege or backup restore. Add `--require-smtp` when email-based authentication features will be enabled in the target environment.
 
 A validator `PASS` is necessary but not sufficient for production approval: domain/TLS/edge routing, monitoring/alerts, retention controls, provider/process UAT and the real off-host restore exercise remain operational gates.
 
@@ -90,7 +102,7 @@ Every API response carries `X-Request-Id`. A valid incoming request ID is preser
 
 MySQL is the authoritative business/financial system of record. MongoDB stores presentation/theme/template documents. Redis is non-authoritative and is intentionally excluded from backups.
 
-From `backend/`:
+**The following repository backup command is for local development/isolated CI data services only; never run it on the production runtime host.** Remote production backups require provider-native encrypted snapshots/exports, off-host retention, restore testing and an approved recovery point. From `backend/` on a local/CI test instance only:
 
 ```bash
 npm run backup:data
@@ -149,24 +161,23 @@ npm run verify
 
 Do not reopen traffic until verification passes and critical balances, policy versions, presentation versions, payout states, entitlements, lucky-draw token/claim state and audit records are sampled against the backup manifest/date. Record the remote object reference and encrypted archive SHA-256 without recording encryption-key material.
 
-## Deployment order
+## Source-free deployment order
 
-1. Confirm Backend CI, Frontend CI and Release Evidence are green for the exact commit; retain the exact-SHA release-evidence artifact.
-2. Pull the exact release commit on the target-like host and run root `npm run verify`; record the result in `docs/RELEASE-SIGNOFF.md`.
-3. Run `verify:production-config` against the actual production environment with `--check-files` and record the non-secret PASS evidence; add `--require-smtp` if email-based auth will be enabled.
-4. Complete the remaining applicable human/provider/process/recovery/business-owner gates in `docs/GO-LIVE-READINESS.md` and `docs/RELEASE-SIGNOFF.md`.
-5. Take a fresh backup, export it with `backup:export-offhost`, and record the protected off-host object/checksum reference.
-6. Put write traffic into the deployment maintenance procedure used by the hosting environment.
-7. Install exact dependencies from the release artifact/commit.
-8. Run `npx prisma migrate deploy` once from the release artifact.
-9. Start/restart API, admin and member/public applications.
-10. Wait for `/health/ready` to return HTTP 200 with MySQL, Redis and MongoDB `up`.
-11. Run `npm run uat:smoke` from `backend/` against the deployed API. Supply `UAT_ADMIN_TOKEN` and `UAT_MEMBER_TOKEN` when authenticated smoke is required.
-12. Complete the stateful checks in `docs/UAT-CHECKLIST.md` and record final release approval before opening normal traffic.
+1. Confirm Backend CI, Frontend CI and Release Evidence all green for **the exact candidate SHA**; require the source-free `megagoldenclub-runtime-<SHA>` archive, companion SHA256 checksum, and authenticated browser-UAT evidence.
+2. On the local/target-like verification host only, run root `npm run verify`. Validate the real production environment securely from an operator/build machine with `verify:production-config --check-files`; record evidence. **Never git clone or execute `npm run verify` on the production application host.**
+3. Resolve applicable manual visual/stateful UAT, business-owner, domain/TLS, monitoring, provider-operator, retention and off-host recovery gates in `docs/RELEASE-SIGNOFF.md`. Automated green does not authorize public traffic.
+4. Configure **remote** MySQL/MongoDB/Redis with scoped accounts, private networking and encrypted access; verify connection reachability from the application network. Approve remote backups, retention, alerts and a tested isolated restore. No local database container or local DB socket is allowed on the app host.
+5. From a trusted ephemeral migration runner (not the production app host), take/check a remote restore point and run append-only `prisma migrate deploy` **exactly once** with a schema/migration bundle checked out for this SHA. Review migration status, keep credentials out of images/artifacts and revoke short-lived access afterwards.
+6. Verify the archive SHA256, assert its `RELEASE_SHA` matches the approved candidate, then transfer/extract only the compiled runtime onto the production application host. Use unprivileged service identities and immutable release directories, not a repository working tree.
+7. Inject production environment and secrets at runtime. Start `node api/dist/main.js`, `node admin/server.js`, `node member/server.js` in their respective artifact subdirectories, behind HTTPS reverse proxy with the approved ports, domains, health policy and rollback routing. Node 24 Linux target must match the CI release-build architecture.
+8. Confirm `/health/live` and `/health/ready` report healthy remote MySQL, MongoDB and Redis, check admin/member SSR, protected routes, X-Request-Id, response security headers, static assets, monitoring and all relevant release UAT with controlled accounts.
+9. Perform traffic switch only after the named release owner signs the exact SHA, migration/backup checkpoints, real-provider checks and rollout evidence. Retain the previous compatible **compiled** artifact for rollback.
+
+The runtime artifact contains no `prisma` migration CLI/schema and no build tools. If a migration or recovery needs repository tooling, use the approved separate runner; do not weaken production runtime immutability.
 
 ## Rollback
 
-Application code may be rolled back to the previous compatible release artifact. Database migrations are append-only and are not edited or automatically rolled back. If a release requires a compensating schema change, add a new forward migration and validate it through CI/UAT.
+Application code may be rolled back to the previous compatible, checksum-verified source-free release artifact. Database migrations are append-only and are not edited or automatically rolled back. If a release requires a compensating schema change, add a new forward migration and validate it through CI/UAT.
 
 Use data restore only for an actual recovery decision with an identified recovery point. Do not use restore as a routine application rollback mechanism.
 

@@ -90,6 +90,16 @@ jobs:
             exit 1
           fi
 
+          runtime_name="megagoldenclub-runtime-${GITHUB_SHA}"
+          runtime="$(jq -c --arg name "${runtime_name}" '[.artifacts[] | select(.name == $name and (.expired | not))] | first // empty' <<<"${artifacts}")"
+          if [[ -z "${runtime}" ]]; then
+            echo "Required source-free runtime artifact missing from Backend CI run ${backend_id}"
+            exit 1
+          fi
+          runtime_id="$(jq -r '.id' <<<"${runtime}")"
+          runtime_size="$(jq -r '.size_in_bytes' <<<"${runtime}")"
+          runtime_expires="$(jq -r '.expires_at' <<<"${runtime}")"
+
           browser_id="$(jq -r '.id' <<<"${browser}")"
           browser_size="$(jq -r '.size_in_bytes' <<<"${browser}")"
           browser_expires="$(jq -r '.expires_at' <<<"${browser}")"
@@ -102,6 +112,10 @@ jobs:
             --arg collectorUrl "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
             --arg backendUrl "${backend_url}" \
             --arg frontendUrl "${frontend_url}" \
+            --arg runtimeName "${runtime_name}" \
+            --arg runtimeExpires "${runtime_expires}" \
+            --argjson runtimeArtifactId "${runtime_id}" \
+            --argjson runtimeSize "${runtime_size}" \
             --arg browserName "${browser_name}" \
             --arg browserExpires "${browser_expires}" \
             --argjson collectorRunId "${GITHUB_RUN_ID}" \
@@ -133,6 +147,14 @@ jobs:
                     "authenticated desktop/mobile browser UAT"
                   ]
                 },
+                sourceFreeProductionRuntime: {
+                  status: "PASS",
+                  artifactId: $runtimeArtifactId,
+                  artifactName: $runtimeName,
+                  sizeInBytes: $runtimeSize,
+                  expiresAt: $runtimeExpires,
+                  buildAndSmoke: "PASS_VIA_BACKEND_CI"
+                },
                 browserUatEvidence: {
                   status: "PASS",
                   artifactId: $browserArtifactId,
@@ -143,8 +165,8 @@ jobs:
                 }
               },
               manualReleaseGates: [
-                {id: "local-root-verify", status: "REQUIRED", requirement: "Pull this exact commit on the target-like host and run root npm run verify successfully."},
-                {id: "production-config", status: "REQUIRED", requirement: "Run verify:production-config against the actual deployment environment with --check-files; add --require-smtp when email-based auth is enabled."},
+                {id: "local-root-verify", status: "REQUIRED", requirement: "Pull this exact commit on the local/target-like verification machine, not the production runtime host, and run root npm run verify successfully."},
+                {id: "production-config", status: "REQUIRED", requirement: "Validate production secrets/remote service endpoints on a controlled operator/build host with --check-files, not from a production source checkout; add --require-smtp if required."},
                 {id: "human-visual-uat", status: "REQUIRED", requirement: "Review browser-UAT evidence and complete a human interaction/readability pass on supported breakpoints."},
                 {id: "stateful-uat", status: "REQUIRED", requirement: "Complete one coherent controlled-data business journey per docs/RELEASE-SIGNOFF.md."},
                 {id: "provider-process-uat", status: "REQUIRED_IF_USED", requirement: "UAT-approve each real money, email or fulfilment provider/operator process that will be used; N/A is valid only when disabled/not part of the current contract."},
@@ -169,12 +191,13 @@ jobs:
           | Backend CI | PASS | [run ${backend_run_number}](${backend_url}) |
           | Frontend CI | PASS | [run ${frontend_run_number}](${frontend_url}) |
           | Authenticated browser UAT | PASS | Artifact \`${browser_name}\` (ID ${browser_id}) |
+          | Source-free production runtime | PASS | Artifact \`${runtime_name}\` (ID ${runtime_id}) |
           | Production-config contract + recovery/API/auth regressions | PASS via Backend CI | Same exact Backend CI run |
 
           ## Manual/target release gates still required
 
-          - **local-root-verify — REQUIRED:** pull this exact commit on the target-like host and run root \`npm run verify\` successfully.
-          - **production-config — REQUIRED:** run \`verify:production-config\` against the actual production env with \`--check-files\`; add \`--require-smtp\` if email-based auth is enabled.
+          - **local-root-verify — REQUIRED:** run root \`npm run verify\` on the local/target-like verification machine; never checkout source on the production runtime host.
+          - **production-config — REQUIRED:** validate actual external production endpoints and secrets from a trusted operator/build host with \`--check-files\`; add \`--require-smtp\` if email-based auth is enabled.
           - **human-visual-uat — REQUIRED:** review browser-UAT evidence and complete a human interaction/readability pass.
           - **stateful-uat — REQUIRED:** complete the coherent controlled-data journey in \`docs/RELEASE-SIGNOFF.md\`.
           - **provider/process-uat — REQUIRED IF USED:** approve each real money/email/fulfilment process that will be used; use N/A only as allowed by \`docs/GO-LIVE-READINESS.md\`.

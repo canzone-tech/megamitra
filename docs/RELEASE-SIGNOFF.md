@@ -18,18 +18,20 @@ Review `docs/GO-LIVE-READINESS.md` first. It is the finite ledger that separates
 - [ ] Backend CI is `success` for the exact release commit.
 - [ ] Frontend CI is `success` for the exact release commit.
 - [ ] Release Evidence workflow is `success` for the exact release commit.
-- [ ] `release-evidence.json` references the same commit and the expected browser-UAT artifact.
+- [ ] `release-evidence.json` references the same commit, browser-UAT evidence and source-free production runtime artifact.
+- [ ] The source-free runtime archive SHA256 matches the delivered archive, and `RELEASE_SHA` matches this exact commit.
 
 Record run/artifact IDs:
 
 - Backend CI: `<run ID>`
 - Frontend CI: `<run ID>`
 - Browser UAT artifact: `<artifact ID>`
+- Source-free runtime artifact/checksum: `<artifact ID / SHA256>`
 - Release Evidence artifact: `<artifact ID>`
 
-## Target-host verification
+## Local/target-like verification (not production application host)
 
-- [ ] The exact release commit was pulled on the target-like host.
+- [ ] The exact release commit was pulled on the local or target-like verification machine, **not** on the production application host.
 - [ ] Root `npm run verify` completed successfully.
 
 Evidence:
@@ -41,7 +43,7 @@ Evidence:
 
 ## Production configuration gate
 
-Run the production-only validator against the actual deployment environment file. Do not paste the environment file or secret values into this record.
+Run the production-only validator from a trusted operator/build host against the actual **remote** deployment configuration. Do not put the repository or this configuration file on the production runtime host and do not paste secrets into this record.
 
 ```bash
 npm --prefix backend run verify:production-config -- /absolute/path/to/production.env --check-files
@@ -49,7 +51,10 @@ npm --prefix backend run verify:production-config -- /absolute/path/to/productio
 
 Add `--require-smtp` when email-based authentication features will be enabled in the target environment.
 
-- [ ] Production configuration readiness returned `PASS`.
+- [ ] Production configuration readiness returned `PASS` with external MySQL/MongoDB/Redis endpoints and no MySQL root credential on the application host.
+- [ ] Remote datastores use approved encrypted connections, scoped service credentials and private/network-restricted access.
+- [ ] A separate short-lived, approved migration runner applied/status-checked reviewed migrations after a verified remote recovery point.
+- [ ] Production app host contains only the SHA-matched compiled runtime; no source checkout, local database processes/Compose volumes, schema or migrations.
 - [ ] Backup encryption key path was reported `VERIFIED` by `--check-files`.
 - [ ] If email-based auth is enabled, SMTP was required by the validator and real delivery UAT is recorded below.
 
@@ -86,12 +91,12 @@ Use the provider model in `docs/GO-LIVE-READINESS.md`. The current payment contr
 
 Follow `docs/OFFHOST-RECOVERY.md`. Backend CI proves the repository's encrypted export/import/restore regression only; production recovery approval still requires evidence retrieved from the real off-host storage boundary.
 
-- [ ] A fresh local backup was exported through `npm run backup:export-offhost` and its encrypted archive/checksum pair is retained under the operating retention policy.
+- [ ] A fresh production **remote-database** backup/snapshot was taken using the selected providers' secure tools and copied or retained off-host under the approved policy. Local Compose backup scripts are not used for production.
 - [ ] The encryption key is held separately from the repository and off-host backup storage boundary; no key material is present in this sign-off record.
 - [ ] The encrypted archive was retrieved from the real off-host storage boundary into isolated production-like infrastructure.
-- [ ] `npm run backup:import-offhost` validated the encrypted archive checksum, archive contents and inner backup checksums.
+- [ ] The selected remote provider's export/import/restore procedure verified the protected backup integrity and ownership. When the repository archive format is used in an isolated recovery runner, `npm run backup:import-offhost` also validates its checksums.
 - [ ] An operational restore exercise from that imported backup succeeded in isolated production-like infrastructure.
-- [ ] Post-restore root `npm run verify` passed for that exercise.
+- [ ] Post-restore root `npm run verify` passed on the **isolated recovery/verification host**, not on the production runtime host.
 - [ ] Critical wallet/ledger totals, policy versions, payout records, entitlements, lucky-draw token/claim state, audits and presentation version were sampled after restore.
 
 Recovery evidence:
