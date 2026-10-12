@@ -231,7 +231,7 @@ describe('MegaGoldenClub production configuration readiness contract', () => {
       [{ REDIS_PORT: '6379' }, 'REDIS_PORT must be 6381'],
       [{ REDIS_PORT: '6380' }, 'REDIS_PORT must be 6381'],
       [{ MEGAGOLDENCLUB_DATA_TOPOLOGY: 'invalid' }, 'must be remote or local-isolated'],
-      [{ MONGODB_URI: 'mongodb://megagoldenclub_app:pass1234@127.0.0.1:27017/megagoldenclub?authSource=megagoldenclub&tlsAllowInvalidCertificates=true' }, 'must not disable certificate verification'],
+      [{ MONGODB_URI: 'mongodb://megagoldenclub_app:prod-mongo-password-123456789@127.0.0.1:27017/megagoldenclub?authSource=megagoldenclub&tlsAllowInvalidCertificates=true' }, 'must not disable certificate verification'],
     ] as const) {
       await writeFile(envPath, encodeEnv({ ...localIsolatedEnv(), ...patch }));
       const result = run();
