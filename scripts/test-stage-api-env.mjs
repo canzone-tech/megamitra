@@ -18,7 +18,7 @@ for(const s of [built.JWT_ACCESS_SECRET,built.JWT_REFRESH_SECRET,built.CAPTCHA_H
 assert.throws(()=>buildApiEnv({...mysql,MYSQL_PORT:'3307'},mongo,redis),/MySQL MYSQL_PORT/);
 assert.throws(()=>buildApiEnv(mysql,mongo,{...redis,REDIS_PORT:'6379'}),/Redis REDIS_PORT/);
 assert.throws(()=>buildApiEnv(mysql,{MONGODB_URI:mongo.MONGODB_URI.replace(':27019/',':27018/')},redis),/MongoDB port/);
-const root=mkdtempSync(join(tmpdir(),'megamitra-api-staging-test-'));
+const root=mkdtempSync(join(tmpdir(),'megagoldenclub-api-staging-test-'));
 try {
   chmodSync(root,0o750);
   for(const [name,values] of Object.entries({
