@@ -142,6 +142,27 @@ for (const blocked of [
   '127.0.0.1:27018:27017',
   'MONGO_INITDB_ROOT_PASSWORD:',
 ]) assert.ok(!mongoCompose.includes(blocked), `Mongo Compose may not share existing data or a public port: ${blocked}`);
+const mongoRecovery = read('infra/ubuntu-vps/repair-mongo-bootstrap-secret.sh');
+for (const requirement of [
+  "CONTAINER='megagoldenclub-mongo'",
+  "SECRET='/etc/megagoldenclub/mongo/root-password'",
+  "'0:700'",
+  "'0'",
+  '--entrypoint id',
+  'mongo_gid=',
+  'chown "0:$mongo_gid" "$SECRET"',
+  'chmod 0440 "$SECRET"',
+  'test -r /run/secrets/mongodb_root_password',
+  'docker restart "$CONTAINER"',
+  'db.adminCommand({ping:1}).ok',
+]) assert.ok(mongoRecovery.includes(requirement), `Mongo secret recovery must preserve boundary: ${requirement}`);
+for (const forbidden of [
+  'docker compose down',
+  'docker rm',
+  'docker volume rm',
+  'chmod 644',
+  'systemctl restart mongod',
+]) assert.ok(!mongoRecovery.includes(forbidden), `Mongo secret recovery must not affect existing sites: ${forbidden}`);
 const api = read('backend/src/main.ts');
 assert.match(api, /process\.env\.HOST/);
 assert.match(api, /app\.listen\(port, host\)/);

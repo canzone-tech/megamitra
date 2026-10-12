@@ -102,6 +102,9 @@ jobs:
       - name: Validate dedicated MongoDB production Compose configuration
         run: docker compose -f ../infra/ubuntu-vps/megagoldenclub-mongo.compose.yaml config --quiet
 
+      - name: Syntax check dedicated MongoDB recovery script
+        run: bash -n ../infra/ubuntu-vps/repair-mongo-bootstrap-secret.sh
+
       - name: Start CI data services
         run: |
           docker compose -f ../docker-compose.yml up -d --wait --wait-timeout 120

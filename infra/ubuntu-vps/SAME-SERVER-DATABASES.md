@@ -31,8 +31,30 @@ name are unused. Prepare `/etc/megagoldenclub/mongo` as root-owned mode
 0700 and independently generate `root-password` securely (no plaintext
 secrets in commands, Git, Compose environment values, chat or shell history).
 The Docker Compose file secret is mounted into the container and read through
-`MONGO_INITDB_ROOT_PASSWORD_FILE`; ensure the MongoDB UID can read the
-mounted secret while the host parent directory is accessible only to root.
+`MONGO_INITDB_ROOT_PASSWORD_FILE`. **Important official-image detail:** the
+MongoDB entrypoint drops from root to the `mongodb` account *before* reading
+that file; file-backed Docker Compose secrets preserve the host file's
+numeric ownership/mode. Therefore a root:root mode 0600 file fails repeatedly
+with `/run/secrets/mongodb_root_password: Permission denied`. This is **not**
+proof that the MongoDB volume is corrupted.
+
+Use the ops-only
+[`repair-mongo-bootstrap-secret.sh`](repair-mongo-bootstrap-secret.sh)
+on the VPS as root, against **only** the dedicated MongoDB container. It
+verifies expected container/image/mount, root-only directory mode 0700,
+discovers the official image's MongoDB numeric UID/GID, restricts the
+secret to **root + MongoDB group (0440)**, checks the container user can
+read the secret without printing it, restarts **only** the
+`megagoldenclub-mongo` container and waits for the health ping. The host
+secret's parent directory remains root:0700, so unrelated host users
+cannot traverse to read it. The script does **not** delete any volumes,
+change MongoDB credentials, disable authorization or modify another
+Docker/host service.
+
+**Do not use `chmod 644`**, make secrets globally readable, re-run
+`docker compose down -v`, or modify the shared MongoDB on port 27017.
+A newly created bootstrap volume should be preserved and allowed to
+initialize normally after secret permissions are fixed.
 Store a secure **off-host** copy of the bootstrap password, then run Compose
 only for `megagoldenclub-mongo.compose.yaml`; never run any Compose teardown
 against unrelated projects.

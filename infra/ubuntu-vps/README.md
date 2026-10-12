@@ -18,6 +18,7 @@ Only Apache serves port 80/443. Application ports 3200–3202 are local and fire
 ## What the repo contains
 
 - `megagoldenclub-mongo.compose.yaml`: new authenticated Mongo-only instance on 127.0.0.1:27019; old host MongoDB and existing 27018 Docker MongoDB are untouched.
+- `repair-mongo-bootstrap-secret.sh`: safe root-only recovery from the official MongoDB image's **file secret read permission failure**. Applies group-readable 0440 to just the dedicated secret after checking the image's actual numeric MongoDB group; restarts only the dedicated MongoDB container. Never remove the volume or weaken file permissions to world-readable.
 - `megagoldenclub-redis.compose.yaml` + `redis.conf`: optional new Redis-only isolated Compose project for the explicit local-isolated topology; do not run the dev Compose stack on this VPS.
 - `ecosystem.config.cjs`: **ops-only** PM2 manifest defining exactly three MegaGoldenClub processes. Copy to a protected operations configuration path such as `/etc/megagoldenclub/ecosystem.config.cjs`; do not install repository source.
 - `megagoldenclub-http.conf`: four domain-specific Apache port-80 VirtualHosts and Certbot HTTP-01 webroot exception at `/var/lib/letsencrypt`. This is the **bootstrap** stage; it does not require a certificate or start the application.
