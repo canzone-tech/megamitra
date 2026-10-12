@@ -1,0 +1,33 @@
+# Ops-only Docker Compose: ONE new, isolated Redis instance for MegaGoldenClub.
+# This is NOT the dev/test database stack. Never run docker compose down
+# against an existing app's project, nor expose Redis on 0.0.0.0.
+name: megagoldenclub-redis
+services:
+  redis:
+    image: redis:7.4.11-alpine
+    container_name: megagoldenclub-redis
+    user: "10001:10001"
+    command: ["redis-server", "/usr/local/etc/redis/redis.conf"]
+    ports:
+      - "127.0.0.1:6381:6379"
+    volumes:
+      - /etc/megagoldenclub/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
+      - /etc/megagoldenclub/redis/users.acl:/run/redis/users.acl:ro
+      - megagoldenclub-redis-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:noexec,nosuid,size=16m
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    mem_limit: 384m
+    pids_limit: 128
+    logging:
+      driver: json-file
+      options:
+        max-size: "5m"
+        max-file: "3"
+volumes:
+  megagoldenclub-redis-data:

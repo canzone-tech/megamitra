@@ -6,6 +6,11 @@ export const envValidationSchema = Joi.object({
     .default('development'),
 
   PORT: Joi.number().port().default(3000),
+  // Explicit opt-in for a shared VPS with existing loopback-only DB daemons.
+  // Default remains remote for every environment without this selector.
+  MEGAGOLDENCLUB_DATA_TOPOLOGY: Joi.string()
+    .valid('remote', 'local-isolated')
+    .default('remote'),
 
   DATABASE_URL: Joi.string()
     .uri({ scheme: ['mysql'] })
@@ -18,7 +23,15 @@ export const envValidationSchema = Joi.object({
   MYSQL_PASSWORD: Joi.string().required(),
   // Required for remote production databases; optional for local/CI.
   MYSQL_TLS: Joi.boolean()
-    .when('NODE_ENV', { is: 'production', then: Joi.valid(true).required(), otherwise: Joi.optional() })
+    .when('MEGAGOLDENCLUB_DATA_TOPOLOGY', {
+      is: 'local-isolated',
+      then: Joi.optional(),
+      otherwise: Joi.when('NODE_ENV', {
+        is: 'production',
+        then: Joi.valid(true).required(),
+        otherwise: Joi.optional(),
+      }),
+    })
     .default(false),
   MYSQL_TLS_CA_FILE: Joi.string().allow('').default(''),
 
@@ -28,7 +41,15 @@ export const envValidationSchema = Joi.object({
   REDIS_PORT: Joi.number().port().required(),
   REDIS_PASSWORD: Joi.string().allow('').default(''),
   REDIS_TLS: Joi.boolean()
-    .when('NODE_ENV', { is: 'production', then: Joi.valid(true).required(), otherwise: Joi.optional() })
+    .when('MEGAGOLDENCLUB_DATA_TOPOLOGY', {
+      is: 'local-isolated',
+      then: Joi.optional(),
+      otherwise: Joi.when('NODE_ENV', {
+        is: 'production',
+        then: Joi.valid(true).required(),
+        otherwise: Joi.optional(),
+      }),
+    })
     .default(false),
   REDIS_TLS_CA_FILE: Joi.string().allow('').default(''),
 
@@ -57,4 +78,22 @@ export const envValidationSchema = Joi.object({
   SMTP_FROM_EMAIL: Joi.string().email().allow('').default(''),
   SMTP_FROM_NAME: Joi.string().max(120).default('MegaGoldenClub'),
   SMTP_TIMEOUT_MS: Joi.number().integer().min(1000).max(60000).default(10000),
-}).unknown(true);
+}).unknown(true).custom((env, helpers) => {
+  if (env.NODE_ENV !== 'production') return env;
+  if (env.MEGAGOLDENCLUB_DATA_TOPOLOGY === 'local-isolated') {
+    // Enforce the loopback boundary in the actual NestJS startup path, not
+    // only in the separate pre-deployment configuration checker.
+    if (
+      env.MYSQL_HOST !== '127.0.0.1' ||
+      env.MYSQL_PORT !== 3306 ||
+      env.MYSQL_DATABASE !== 'megagoldenclub' ||
+      env.MYSQL_USER !== 'megagoldenclub_app' ||
+      env.REDIS_HOST !== '127.0.0.1' ||
+      env.REDIS_PORT !== 6381 ||
+      !env.REDIS_PASSWORD
+    ) {
+      return helpers.error('any.custom');
+    }
+  }
+  return env;
+});

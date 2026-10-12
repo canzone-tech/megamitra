@@ -1,6 +1,15 @@
 # MegaGoldenClub first production launch — operator-only runbook
 
-This is the **first** MegaGoldenClub launch. The existing shared Ubuntu 24.04.4
+This is the **first** MegaGoldenClub launch.
+
+**2026-10-12 operator decision:** no external cloud database services; same
+shared Ubuntu VPS already runs MySQL 8.0.46, MongoDB 8.0.29 and Docker
+Redis 7.4.11. Use the explicit `local-isolated` profile for dedicated
+loopback DB/users and new Redis-only port 6381, NOT the unrelated databases
+or containers. [Same-server database gate](SAME-SERVER-DATABASES.md)
+**supersedes the remote-provider stages below for this deployment**.
+Do not create cloud accounts or assume existing database admin credentials.
+ The existing shared Ubuntu 24.04.4
 application VPS already serves other websites through Apache and root-owned PM2.
 Do NOT change that existing PM2 daemon, existing apps, their ports 3100/3101,
 their certificates or other Apache VirtualHosts. No application Git checkout,

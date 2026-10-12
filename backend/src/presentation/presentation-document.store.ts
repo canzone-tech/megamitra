@@ -26,18 +26,28 @@ export class PresentationDocumentStore implements OnModuleInit, OnModuleDestroy 
   async onModuleInit() {
     const uri = this.config.getOrThrow<string>('MONGODB_URI');
     if (this.config.get<string>('NODE_ENV') === 'production') {
-      // mongodb+srv:// enables TLS by default. A plain mongodb:// URI must
-      // explicitly request TLS; never accept tls=false for any production URI.
+      const mode = this.config.get<string>('MEGAGOLDENCLUB_DATA_TOPOLOGY') ?? 'remote';
       const parsed = new URL(uri);
       const tls = parsed.searchParams.get('tls') ?? parsed.searchParams.get('ssl');
+      if (mode === 'local-isolated') {
+        if (parsed.protocol !== 'mongodb:' || parsed.hostname !== '127.0.0.1' ||
+            Number(parsed.port || '27017') !== 27017 ||
+            decodeURIComponent(parsed.pathname) !== '/megagoldenclub' ||
+            parsed.searchParams.get('authSource') !== 'megagoldenclub' ||
+            !parsed.username || !parsed.password) {
+          throw new Error('Production local MongoDB must be authenticated on dedicated loopback database');
+        }
+      } else if (
+        (parsed.protocol !== 'mongodb+srv:' && tls !== 'true') || tls === 'false'
+      ) {
+        throw new Error('Production MongoDB must use verified TLS');
+      }
       if (
-        (parsed.protocol !== 'mongodb+srv:' && tls !== 'true') ||
-        tls === 'false' ||
         parsed.searchParams.get('tlsInsecure') === 'true' ||
         parsed.searchParams.get('tlsAllowInvalidCertificates') === 'true' ||
         parsed.searchParams.get('tlsAllowInvalidHostnames') === 'true'
       ) {
-        throw new Error('Production MongoDB must use verified TLS');
+        throw new Error('Production MongoDB must not disable certificate verification');
       }
     }
     this.client = new MongoClient(uri, { serverSelectionTimeoutMS: 5_000 });

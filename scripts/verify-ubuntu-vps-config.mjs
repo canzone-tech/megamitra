@@ -101,6 +101,26 @@ for (const [domain, port] of [
 }
 assert.match(apacheSite('https', 'api.megagoldenclub.com'), /RewriteRule \^\/health\(\?:\/\|\$\) - \[R=404,L\]/);
 assert.doesNotMatch(conf.http + conf.https, /ProxyPass.*:(?:3100|3101|3102)|ProxyPass.*0\.0\.0\.0|ServerAlias\s+\*/);
+// The optional single-host topology creates exactly one NEW, non-root,
+// password-ACL Redis container with no access to existing application ports.
+const redisCompose = read('infra/ubuntu-vps/megagoldenclub-redis.compose.yaml');
+const redisConf = read('infra/ubuntu-vps/redis.conf');
+for (const expected of [
+  'name: megagoldenclub-redis',
+  'container_name: megagoldenclub-redis',
+  'image: redis:7.4.11-alpine',
+  'user: "10001:10001"',
+  '127.0.0.1:6381:6379',
+  'read_only: true',
+  'no-new-privileges:true',
+  'cap_drop:',
+  'users.acl',
+]) assert.ok(redisCompose.includes(expected), `Missing safe Redis Compose setting: ${expected}`);
+for (const blocked of ['0.0.0.0:6381', '127.0.0.1:6380', '127.0.0.1:6379', '27018']) {
+  assert.ok(!redisCompose.includes(blocked), `Redis Compose must not use existing/broad bind: ${blocked}`);
+}
+assert.ok(redisConf.includes('aclfile /run/redis/users.acl'));
+assert.doesNotMatch(redisConf, /requirepass|CHANGE_ME|password=/i);
 const api = read('backend/src/main.ts');
 assert.match(api, /process\.env\.HOST/);
 assert.match(api, /app\.listen\(port, host\)/);

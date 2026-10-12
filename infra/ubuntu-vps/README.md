@@ -2,7 +2,7 @@
 
 **Observed server audit (2026-10-12):** Ubuntu 24.04.4 LTS x86_64, Node.js 24.19.0, npm 11.17.0, PM2 7.0.3, Apache 2.4.58, Certbot 5.8.0. The current root-owned PM2 apps `existing admin process` (`127.0.0.1:3101`) and `existing backend process` (`127.0.0.1:3100`) are online. Apache serves multiple unrelated domains on ports 80/443. There is roughly 5.5 GiB available RAM and 160 GB disk, but capacity and performance must still be confirmed under load. Ports 3200–3202 had no listeners at the audit time; recheck immediately before approved rollout.
 
-**Decision:** reuse existing Node 24, Apache and PM2. **No Caddy, Nginx, another Node installation, Docker stack, local MySQL/MongoDB/Redis or on-server Git checkout.** Do not stop, reload or modify existing Apache sites or root-owned pre-existing unrelated application PM2 processes.
+**Decision (operator-updated 2026-10-12):** reuse existing Node 24, Apache, PM2 and host-installed MySQL 8/MongoDB with dedicated authenticated databases; add a separate Redis-only Docker container on loopback 6381. **No Caddy, Nginx, Node reinstall, app-source Git checkout, second MySQL/Mongo services or modifications to existing containers.** Do not stop, reload or modify existing Apache sites or root-owned pre-existing unrelated application PM2 processes.
 
 ## Production mapping
 
@@ -13,10 +13,11 @@
 | `admin.megagoldenclub.com` | Apache reverse proxy | Admin Next.js standalone | `127.0.0.1:3201` |
 | `api.megagoldenclub.com` | Apache reverse proxy; hide public health endpoints | Compiled NestJS API | `127.0.0.1:3200` |
 
-Only Apache serves port 80/443. Application ports 3200–3202 are local and firewall-blocked. Admin/Member server-side calls use `MEGAGOLDENCLUB_API_URL=http://127.0.0.1:3200`. API queries only **external** MySQL 8 (financial authoritative), MongoDB (CMS/media) and Redis (nonauthoritative). Production **requires** MYSQL_TLS=true, REDIS_TLS=true, MongoDB TLS URI, Prisma migration URL sslaccept=strict, private/restricted network, scoped accounts, provider backups and recovery tests. No MySQL root password on the VPS.
+Only Apache serves port 80/443. Application ports 3200–3202 are local and firewall-blocked. Admin/Member server-side calls use `MEGAGOLDENCLUB_API_URL=http://127.0.0.1:3200`. API uses **operator-selected** production data topology. Default `remote` still requires TLS and external stores; this VPS uses explicit `MEGAGOLDENCLUB_DATA_TOPOLOGY=local-isolated`, restricting MySQL 8/MongoDB/Redis to dedicated authenticated loopback stores (3306/27017/6381 respectively). See [`SAME-SERVER-DATABASES.md`](SAME-SERVER-DATABASES.md) for isolation, grants, backups, migration and recovery gates. MySQL root credentials must never enter PM2 app config.
 
 ## What the repo contains
 
+- `megagoldenclub-redis.compose.yaml` + `redis.conf`: optional new Redis-only isolated Compose project for the explicit local-isolated topology; do not run the dev Compose stack on this VPS.
 - `ecosystem.config.cjs`: **ops-only** PM2 manifest defining exactly three MegaGoldenClub processes. Copy to a protected operations configuration path such as `/etc/megagoldenclub/ecosystem.config.cjs`; do not install repository source.
 - `megagoldenclub-http.conf`: four domain-specific Apache port-80 VirtualHosts and Certbot HTTP-01 webroot exception at `/var/lib/letsencrypt`. This is the **bootstrap** stage; it does not require a certificate or start the application.
 - `megagoldenclub-ssl.conf`: four domain-specific Apache port-443 VirtualHosts, cert paths, permanent apex redirect, backend proxies and public health-status protection. **Never enable until all matching certificate files actually exist.**
@@ -41,9 +42,9 @@ errors. Verify external connectivity and renewal separately without altering
 existing websites.
 
 Before launching any application, follow the staged, first-time checklist:
-[`FIRST-DEPLOYMENT.md`](FIRST-DEPLOYMENT.md). Remote databases, encrypted
-transport, provider backups, audited migration-runner credentials and production
-secrets are not configured or verified yet; do not assume them ready.
+[`FIRST-DEPLOYMENT.md`](FIRST-DEPLOYMENT.md). Dedicated local-isolated database users, authenticated MongoDB, independent
+backups/restore, migration-runner credentials and production secrets are not
+configured or verified yet; do not assume them ready.
 
 ## Release, health and rollback gates
 

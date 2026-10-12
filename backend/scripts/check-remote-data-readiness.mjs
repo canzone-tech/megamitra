@@ -1,9 +1,8 @@
 #!/usr/bin/env node
 // Run only from a trusted, short-lived operator/migration runner, NEVER from
 // the compiled source-free application VPS. Connects read-only to all three
-// remote production datastores and never prints credentials or server URIs.
-// Requires backend npm ci, real remote endpoints, provisioned scoped users,
-// valid CA chains, and the production secret file outside the repository.
+// datastores without exposing credentials. In local-isolated topology the
+// operator runner MUST use SSH loopback tunnels to the VPS, not public DB ports.
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseEnv } from 'node:util';
@@ -20,19 +19,20 @@ try {
   if (!existsSync(filename)) throw new Error('missing production environment file');
   config = parseEnv(readFileSync(filename, 'utf8'));
 } catch {
-  console.error('Remote database readiness: FAIL (production config unavailable or malformed)');
+  console.error('Production database readiness: FAIL (production config unavailable or malformed)');
   process.exit(1);
 }
 const validated = validateProductionConfig(config, { checkFiles: true });
 if (!validated.ok) {
   // The validator's messages contain only setting names / static explanations,
   // never emit connection errors or raw third-party service error text.
-  console.error('Remote database readiness: FAIL (production configuration)');
+  console.error('Production database readiness: FAIL (production configuration)');
   for (const detail of validated.errors) console.error(`- ${detail}`);
   process.exit(1);
 }
 
 const positivePort = (key) => Number(config[key]);
+const localIsolated = config.MEGAGOLDENCLUB_DATA_TOPOLOGY === 'local-isolated';
 function tlsOptions(prefix) {
   const file = config[`${prefix}_TLS_CA_FILE`];
   return {
@@ -59,7 +59,7 @@ try {
     user: config.MYSQL_USER,
     password: config.MYSQL_PASSWORD,
     database: config.MYSQL_DATABASE,
-    ssl: tlsOptions('MYSQL'),
+    ...(config.MYSQL_TLS === 'true' ? { ssl: tlsOptions('MYSQL') } : {}),
     connectTimeout: 5000,
     timezone: '+00:00',
   });
@@ -68,13 +68,15 @@ try {
   if (!/^8\./.test(version) || /mariadb/i.test(version)) {
     throw new Error('MySQL 8 provider required');
   }
-  const sslStatus = await mysql.query("SHOW SESSION STATUS LIKE 'Ssl_cipher'");
-  if (!sslStatus?.[0]?.Value) throw new Error('MySQL negotiated SSL cipher missing');
+  if (!localIsolated || config.MYSQL_TLS === 'true') {
+    const sslStatus = await mysql.query("SHOW SESSION STATUS LIKE 'Ssl_cipher'");
+    if (!sslStatus?.[0]?.Value) throw new Error('MySQL negotiated SSL cipher missing');
+  }
 
   current = 'mongodb';
   mongo = new MongoClient(config.MONGODB_URI, {
     serverSelectionTimeoutMS: 5000,
-    tls: true,
+    ...(!localIsolated ? { tls: true } : {}),
   });
   await mongo.connect();
   if ((await mongo.db().command({ ping: 1 })).ok !== 1) {
@@ -86,7 +88,7 @@ try {
     host: config.REDIS_HOST,
     port: positivePort('REDIS_PORT'),
     password: config.REDIS_PASSWORD,
-    tls: tlsOptions('REDIS'),
+    ...(config.REDIS_TLS === 'true' ? { tls: tlsOptions('REDIS') } : {}),
     lazyConnect: true,
     enableReadyCheck: true,
     connectTimeout: 5000,
@@ -99,13 +101,14 @@ try {
   await redis.connect();
   if ((await redis.ping()) !== 'PONG') throw new Error('Redis ping failed');
 
-  console.log('Remote database readiness: PASS');
-  console.log('mysql=up engine=mysql8 tls=verified');
-  console.log('mongodb=up tls=verified');
-  console.log('redis=up tls=verified');
-  console.log('This is connectivity evidence only, NOT provider backup/restore or migration approval.');
+  console.log('Production database readiness: PASS');
+  console.log(`topology=${localIsolated ? 'local-isolated' : 'remote'}`);
+  console.log(`mysql=up engine=mysql8 transport=${config.MYSQL_TLS === 'true' ? 'tls-verified' : 'loopback'}`);
+  console.log(`mongodb=up transport=${localIsolated ? 'authenticated-loopback' : 'tls-verified'}`);
+  console.log(`redis=up transport=${config.REDIS_TLS === 'true' ? 'tls-verified' : 'authenticated-loopback'}`);
+  console.log('Connectivity only; backups/restore and migration sign-off remain separate.');
 } catch {
-  console.error(`Remote database readiness: FAIL (store=${current}; TLS, network, identity or auth)`);
+  console.error(`Production database readiness: FAIL (store=${current}; TLS, network, identity or auth)`);
   console.error('Inspect provider configuration privately. No connection strings or secrets printed.');
   process.exitCode = 1;
 } finally {

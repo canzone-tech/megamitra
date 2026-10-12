@@ -2,7 +2,20 @@
 
 This runbook covers the immutable source-free production runtime and recovery controls. It does not introduce or redefine business rules.
 
-## Locked production topology: remote data, no source checkout
+## Production topology: default remote OR approved local-isolated, no source checkout
+
+**Update, 2026-10-12:** The operator confirmed preinstalled shared-host MySQL
+8.0.46, MongoDB 8.0.29 and Docker Redis 7.4.11 and selected **no external
+cloud databases**. This is the explicit `MEGAGOLDENCLUB_DATA_TOPOLOGY=local-isolated`
+exception. Use dedicated, authenticated `megagoldenclub` MySQL/Mongo databases
+on loopback, plus a separately owned Redis-only container on 127.0.0.1:6381.
+Never alter existing site databases, 6379/6380 Redis containers or 27018 Mongo
+container. Check existing Mongo auth and MySQL admin access first; record
+off-host backup and tested isolated restore before app or migrations.
+See [same-server deployment policy](../infra/ubuntu-vps/SAME-SERVER-DATABASES.md).
+
+The paragraphs describing remote services below remain the **default remote
+deployment profile** and do not override this approved local-isolated choice.
 
 - **Production application host:** run only the GitHub CI-built, checksum-verified `megagoldenclub-runtime-<SHA>` archive. It contains the compiled NestJS API plus Next.js standalone Admin and Member applications and required runtime dependencies/static assets. Never copy Git metadata, `src/`, TS/TSX, development lockfiles, Prisma schema/migrations, Docker Compose, seed fixtures, unit/integration tests or local data-service volumes to the production runtime host. JavaScript compiled output is required by the Node.js runtime and is not the original TypeScript application source.
 - **Data:** connect the API to separate managed/remote MySQL (financial source of truth), MongoDB (presentation/GridFS) and Redis (non-authoritative). Do **not** start MySQL, MongoDB or Redis containers/processes on the production application host. Use private network access and *enforced, certificate-verified* MySQL/Redis/MongoDB TLS (MYSQL_TLS=true, REDIS_TLS=true, MongoDB TLS URI, Prisma migration sslaccept=strict), authenticate with dedicated least-privilege accounts; never supply the MySQL root credential to the application host.
@@ -20,7 +33,7 @@ www; WWW/Admin/API returned 503 because their PM2 processes are not yet
 started. SSL auto-renewal and external TLS must still be proven; two renewal
 timers reported failures associated with an old, expired server-IP
 certificate. **Do not remove old certs or alter other sites** as part of
-this launch. Production remote MySQL/MongoDB/Redis providers are not
+this launch. Production local-isolated MySQL/Mongo/Redis databases and users are not
 provisioned/verified yet. Follow
 [`infra/ubuntu-vps/FIRST-DEPLOYMENT.md`](../infra/ubuntu-vps/FIRST-DEPLOYMENT.md)
 before running production migration, PM2 or enabling any live feature.
@@ -33,7 +46,7 @@ Use `infra/ubuntu-vps/megagoldenclub-http.conf` for per-host HTTP/ACME and `infr
 
 **Manual DNS/TLS gate:** all four names were observed resolving to `103.228.151.134`, but the server reported only private interface addresses and HTTPS requests to public DNS **timed out from the VPS**; loopback `curl --resolve` returned the existing default Apache site, not MegaGoldenClub. Do not interpret DNS resolution or the default site's HTTP 200 as a working TLS deployment. Before Certbot/Apache activation, verify public edge/NAT/routing from an external machine, domain ownership, inbound TCP 80/443 and a live HTTP-01 challenge from all domains. Reconcile the observed public IP with the hosting-provider NAT mapping; do not assume the server's private interface is public. Do not enable a 443 site referencing missing certificate files. Record certificate issue/renewal, Apache configtest and shared-site smoke evidence in sign-off. SSH access, remote database providers, secret injection and rollout approval remain manual gates.
 
-Verify the portable release archive `.tar.gz.sha256` **after transfer** and the embedded `RELEASE_SHA` against approved CI before atomically staging an immutable release. The PM2 ecosystem and Apache vhost files are **operational configuration only**, transferred separately without an application Git checkout or original TypeScript source. Node.js 24 `--env-file=/etc/megagoldenclub/api.env` is used only by the API child process; protect the file with a dedicated service-user-readable ACL/group (e.g. root:megagoldenclub 0640 and parent directory 0750), and do not place secrets in PM2 ecosystem env or PM2 dump. Do not provision local MySQL/MongoDB/Redis, run migrations or run `npm run verify` on the VPS.
+Verify the portable release archive `.tar.gz.sha256` **after transfer** and the embedded `RELEASE_SHA` against approved CI before atomically staging an immutable release. The PM2 ecosystem and Apache vhost files are **operational configuration only**, transferred separately without an application Git checkout or original TypeScript source. Node.js 24 `--env-file=/etc/megagoldenclub/api.env` is used only by the API child process; protect the file with a dedicated service-user-readable ACL/group (e.g. root:megagoldenclub 0640 and parent directory 0750), and do not place secrets in PM2 ecosystem env or PM2 dump. Do not run migrations, deploy application source, or run `npm run verify` on the VPS. This operator-approved local-isolated variant reuses existing loopback MySQL/Mongo; only the separate ops-only Redis container may be started after authorization.
 
 ## Release gate
 
@@ -76,7 +89,7 @@ Before production sign-off, validate the actual deployment secrets and remote en
 npm --prefix backend run verify:production-config -- /absolute/path/to/production.env --check-files
 ```
 
-The validator does not print secret values. It rejects development/CI placeholders, loopback and local Compose MySQL/MongoDB/Redis endpoints, mismatched MySQL identity between `DATABASE_URL` and `MYSQL_*`, missing Redis authentication, insecure public HTTP/loopback URLs, disabled HSTS/rate limiting, test-only rate limiting, invalid proxy-hop bounds, malformed MongoDB configuration, incomplete/insecure SMTP configuration when present, and a missing/insecure backup-key file when `--check-files` is used. Remote MySQL requires only the application DB user, **not `MYSQL_ROOT_PASSWORD`**. Config syntax checking alone does not prove DNS resolution, encrypted transport, least privilege or backup restore. Add `--require-smtp` when email-based authentication features will be enabled in the target environment.
+The validator does not print secret values. It rejects development/CI placeholders, unauthorized loopback/local endpoints (except the dedicated stores explicitly allowed in local-isolated mode), mismatched MySQL identity between `DATABASE_URL` and `MYSQL_*`, missing Redis authentication, insecure public HTTP/loopback URLs, disabled HSTS/rate limiting, test-only rate limiting, invalid proxy-hop bounds, malformed MongoDB configuration, incomplete/insecure SMTP configuration when present, and a missing/insecure backup-key file when `--check-files` is used. Remote MySQL requires only the application DB user, **not `MYSQL_ROOT_PASSWORD`**. Config syntax checking alone does not prove DNS resolution, encrypted transport, least privilege or backup restore. Add `--require-smtp` when email-based authentication features will be enabled in the target environment.
 
 A validator `PASS` is necessary but not sufficient for production approval: domain/TLS/edge routing, monitoring/alerts, retention controls, provider/process UAT and the real off-host restore exercise remain operational gates.
 
@@ -189,7 +202,7 @@ Do not reopen traffic until verification passes and critical balances, policy ve
 1. Confirm Backend CI, Frontend CI and Release Evidence all green for **the exact candidate SHA**; require the source-free `megagoldenclub-runtime-<SHA>` archive, companion SHA256 checksum, and authenticated browser-UAT evidence.
 2. On the local/target-like verification host only, run root `npm run verify`. Validate the real production environment securely from an operator/build machine with `verify:production-config --check-files`; record evidence. **Never git clone or execute `npm run verify` on the production application host.**
 3. Resolve applicable manual visual/stateful UAT, business-owner, domain/TLS, monitoring, provider-operator, retention and off-host recovery gates in `docs/RELEASE-SIGNOFF.md`. Automated green does not authorize public traffic.
-4. Configure **remote** MySQL/MongoDB/Redis with scoped accounts, private networking and encrypted access; verify connection reachability from the application network. Approve remote backups, retention, alerts and a tested isolated restore. No local database container or local DB socket is allowed on the app host.
+4. Configure the approved data topology: for this shared VPS, dedicated `megagoldenclub` MySQL/Mongo authenticated databases at loopback ports 3306/27017 and new isolated Redis-only container 6381. Do not change other database services. Require independently accessible off-host backups, retention, alerts, isolated restore, and approved MySQL/Mongo admin isolation.
 5. From a trusted ephemeral migration runner (not the production app host), take/check a remote restore point and run append-only `prisma migrate deploy` **exactly once** with a schema/migration bundle checked out for this SHA. Review migration status, keep credentials out of images/artifacts and revoke short-lived access afterwards.
 6. Verify the archive SHA256, assert its `RELEASE_SHA` matches the approved candidate, then transfer/extract only the compiled runtime onto the production application host. Use unprivileged service identities and immutable release directories, not a repository working tree.
 7. Under the separate `megagoldenclub` service account (never the root pre-existing unrelated application PM2), run only the three compiled programs defined in `infra/ubuntu-vps/ecosystem.config.cjs`; their `cwd` values point to the approved, source-free runtime. API child reads `/etc/megagoldenclub/api.env` through Node 24 `--env-file`; Admin/Member never receive those DB credentials. Bind all on localhost ports 3200–3202 and expose via the four specific Apache HTTP/HTTPS VirtualHosts *after* verified external domain routing and valid Certbot certificates. Do not start Caddy or change existing Apache sites/PM2 processes. Target Node 24 x86_64 must match the CI release runtime.

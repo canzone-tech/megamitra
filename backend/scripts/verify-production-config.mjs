@@ -76,7 +76,25 @@ function assertExternalHost(host, label) {
   }
 }
 
-function validateDatabaseIdentity(env) {
+function topology(env) {
+  const selected = value(env, 'MEGAGOLDENCLUB_DATA_TOPOLOGY') || 'remote';
+  if (!['remote', 'local-isolated'].includes(selected)) {
+    fail('MEGAGOLDENCLUB_DATA_TOPOLOGY must be remote or local-isolated');
+  }
+  return selected;
+}
+
+function assertDatastoreHost(host, label, mode) {
+  if (mode === 'local-isolated') {
+    if (normalizeHost(host) !== '127.0.0.1') {
+      fail(`${label} must be 127.0.0.1 for local-isolated topology`);
+    }
+    return;
+  }
+  assertExternalHost(host, label);
+}
+
+function validateDatabaseIdentity(env, mode) {
   const mysqlHost = requireValue(env, 'MYSQL_HOST');
   const mysqlPort = parseInteger(env, 'MYSQL_PORT', 1, 65535);
   const mysqlDatabase = requireValue(env, 'MYSQL_DATABASE');
@@ -91,16 +109,25 @@ function validateDatabaseIdentity(env) {
     fail('DATABASE_URL must be a valid mysql:// URL');
   }
   if (url.protocol !== 'mysql:') fail('DATABASE_URL must use mysql://');
-  if (url.searchParams.get('sslaccept') !== 'strict') {
-    fail('DATABASE_URL must enforce sslaccept=strict for the separate Prisma migration runner');
+  if (mode === 'remote') {
+    if (url.searchParams.get('sslaccept') !== 'strict') {
+      fail('DATABASE_URL must enforce sslaccept=strict for the separate Prisma migration runner');
+    }
+    if (!parseBoolean(env, 'MYSQL_TLS')) fail('MYSQL_TLS must be true in production');
+  } else {
+    if (mysqlPort !== 3306) fail('MYSQL_PORT must be 3306 for local-isolated topology');
+    if (mysqlDatabase !== 'megagoldenclub' || mysqlUser !== 'megagoldenclub_app') {
+      fail('Local-isolated MySQL requires its dedicated megagoldenclub database and app user');
+    }
+    // A host-local loopback TCP connection is never exposed to the external
+    // network. Local TLS is optional; remote TLS remains mandatory.
   }
-  if (!parseBoolean(env, 'MYSQL_TLS')) fail('MYSQL_TLS must be true in production');
   const urlPort = Number(url.port || '3306');
   const urlDatabase = decodeURIComponent(url.pathname.replace(/^\/+/, ''));
   const urlUser = decodeURIComponent(url.username);
   const urlPassword = decodeURIComponent(url.password);
 
-  assertExternalHost(mysqlHost, 'MYSQL_HOST');
+  assertDatastoreHost(mysqlHost, 'MYSQL_HOST', mode);
   if (
     normalizeHost(url.hostname) !== normalizeHost(mysqlHost) ||
     urlPort !== mysqlPort ||
@@ -126,7 +153,7 @@ function validatePublicUrl(env) {
   }
 }
 
-function validateMongo(env) {
+function validateMongo(env, mode) {
   const raw = requireValue(env, 'MONGODB_URI');
   let url;
   try {
@@ -138,9 +165,23 @@ function validateMongo(env) {
     fail('MONGODB_URI must use mongodb:// or mongodb+srv://');
   }
   if (!url.hostname) fail('MONGODB_URI must include a host');
-  assertExternalHost(url.hostname, 'MONGODB_URI');
+  assertDatastoreHost(url.hostname, 'MONGODB_URI', mode);
+  if (mode === 'local-isolated') {
+    if (url.protocol !== 'mongodb:' || Number(url.port || '27017') !== 27017) {
+      fail('Local-isolated MongoDB must use mongodb://127.0.0.1:27017');
+    }
+    if (decodeURIComponent(url.pathname.replace(/^\\/+/, '')) !== 'megagoldenclub' ||
+        url.searchParams.get('authSource') !== 'megagoldenclub') {
+      fail('Local-isolated MongoDB must use its dedicated megagoldenclub database and authSource');
+    }
+    if (decodeURIComponent(url.username) !== 'megagoldenclub_app' ||
+        decodeURIComponent(url.password).length < 16 ||
+        isPlaceholderSecret(decodeURIComponent(url.password))) {
+      fail('Local-isolated MongoDB must authenticate using a dedicated non-placeholder user');
+    }
+  }
   const tls = url.searchParams.get('tls') ?? url.searchParams.get('ssl');
-  if ((url.protocol === 'mongodb:' && tls !== 'true') || tls === 'false') {
+  if (mode === 'remote' && ((url.protocol === 'mongodb:' && tls !== 'true') || tls === 'false')) {
     fail('Production MONGODB_URI must enable TLS (mongodb+srv:// or mongodb://?tls=true)');
   }
   for (const param of ['tlsInsecure', 'tlsAllowInvalidCertificates', 'tlsAllowInvalidHostnames']) {
@@ -216,13 +257,19 @@ export function validateProductionConfig(env, options = {}) {
   if (value(env, 'NODE_ENV') !== 'production') errors.push('NODE_ENV must be production');
   if (value(env, 'MYSQL_ROOT_PASSWORD')) errors.push('MYSQL_ROOT_PASSWORD must not be present on the production runtime host');
 
-  capture(() => validateDatabaseIdentity(env));
-  capture(() => validateMongo(env));
-  capture(() => assertExternalHost(requireValue(env, 'REDIS_HOST'), 'REDIS_HOST'));
-  capture(() => parseInteger(env, 'REDIS_PORT', 1, 65535));
-  capture(() => requireSecret(env, 'REDIS_PASSWORD'));
-  if (capture(() => parseBoolean(env, 'REDIS_TLS')) === false) {
-    errors.push('REDIS_TLS must be true in production');
+  const mode = capture(() => topology(env));
+  if (mode) {
+    capture(() => validateDatabaseIdentity(env, mode));
+    capture(() => validateMongo(env, mode));
+    capture(() => assertDatastoreHost(requireValue(env, 'REDIS_HOST'), 'REDIS_HOST', mode));
+    const redisPort = capture(() => parseInteger(env, 'REDIS_PORT', 1, 65535));
+    if (mode === 'local-isolated' && redisPort !== undefined && redisPort !== 6381) {
+      errors.push('REDIS_PORT must be 6381 for dedicated local-isolated Redis');
+    }
+    capture(() => requireSecret(env, 'REDIS_PASSWORD'));
+    if (mode === 'remote' && capture(() => parseBoolean(env, 'REDIS_TLS')) === false) {
+      errors.push('REDIS_TLS must be true in production');
+    }
   }
   capture(() => validateTlsCaFile(env, 'MYSQL_TLS_CA_FILE', options.checkFiles === true));
   capture(() => validateTlsCaFile(env, 'REDIS_TLS_CA_FILE', options.checkFiles === true));
@@ -302,6 +349,7 @@ async function main() {
   console.log('MegaGoldenClub production configuration readiness: PASS');
   console.log(`smtp=${result.smtp}`);
   console.log(`backupKey=${result.backupKey}`);
+  console.log(`dataTopology=${value(env, 'MEGAGOLDENCLUB_DATA_TOPOLOGY') || 'remote'}`);
   console.log('No secret values were printed.');
 }
 

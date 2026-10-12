@@ -96,6 +96,9 @@ jobs:
               apache2ctl -S 2>&1 | grep -F "namevhost api.megagoldenclub.com"
             '
 
+      - name: Validate isolated optional production Redis Compose configuration
+        run: docker compose -f ../infra/ubuntu-vps/megagoldenclub-redis.compose.yaml config --quiet
+
       - name: Start CI data services
         run: |
           docker compose -f ../docker-compose.yml up -d --wait --wait-timeout 120
