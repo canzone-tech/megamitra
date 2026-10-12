@@ -155,7 +155,7 @@ for (const required of [
   'com.docker.compose.volume',
   'sha256sum',
   'user default reset on #$hash ~* &* +@all',
-  'docker compose -f "$COMPOSE" config --quiet',
+  'docker compose -f "$SRC/megagoldenclub-redis.compose.yaml" config --quiet',
   '--cap-drop ALL --cap-add CHOWN --cap-add FOWNER',
   'chown 10001:10001 /data && chmod 0700 /data',
   'dst=/data,volume-nocopy',
