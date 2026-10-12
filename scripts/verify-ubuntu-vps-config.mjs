@@ -163,6 +163,31 @@ for (const forbidden of [
   'chmod 644',
   'systemctl restart mongod',
 ]) assert.ok(!mongoRecovery.includes(forbidden), `Mongo secret recovery must not affect existing sites: ${forbidden}`);
+// The MySQL password initializer must never rotate a global MySQL user,
+// expose a credential through argv, or overwrite an existing API config.
+const mysqlRotate = read('infra/ubuntu-vps/rotate-mysql-app-credentials.sh');
+for (const expected of [
+  "APP_ACCOUNT='megagoldenclub_app'",
+  "APP_DB='megagoldenclub'",
+  'mysql.credentials.env',
+  'api.env',
+  'openssl rand -hex 32',
+  'chown root:megagoldenclub',
+  'chmod 0640',
+  "'127.0.0.1'",
+  'mysql --protocol=socket --user=root --password',
+  'SELECT CURRENT_USER(), DATABASE();',
+  'runuser -u megagoldenclub -- test -r',
+  'ROTATED=1',
+]) assert.ok(mysqlRotate.includes(expected), `Missing safe MySQL rotation invariant: ${expected}`);
+for (const unsafe of [
+  'mysqladmin password',
+  "ALTER USER 'root'",
+  'CREATE USER',
+  'GRANT ALL',
+  'FLUSH PRIVILEGES',
+  'chmod 777',
+]) assert.ok(!mysqlRotate.includes(unsafe), `Unsafe MySQL credential operation: ${unsafe}`);
 const api = read('backend/src/main.ts');
 assert.match(api, /process\.env\.HOST/);
 assert.match(api, /app\.listen\(port, host\)/);

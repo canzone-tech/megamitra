@@ -105,6 +105,9 @@ jobs:
       - name: Syntax check dedicated MongoDB recovery script
         run: bash -n ../infra/ubuntu-vps/repair-mongo-bootstrap-secret.sh
 
+      - name: Syntax check isolated MySQL password rotation
+        run: bash -n ../infra/ubuntu-vps/rotate-mysql-app-credentials.sh
+
       - name: Start CI data services
         run: |
           docker compose -f ../docker-compose.yml up -d --wait --wait-timeout 120

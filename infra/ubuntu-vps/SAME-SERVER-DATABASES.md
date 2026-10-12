@@ -100,6 +100,48 @@ Confirm that port 6381 and the new container name are free. Record
 separate recoverable backups of existing shared datastores **before any
 account/database administration changes**.
 
+## MySQL application credential rotation + protected VPS storage (2026-10-12)
+
+The operator created dedicated MySQL 8 database `megagoldenclub` and
+principal `megagoldenclub_app`@`127.0.0.1` with ONLY SELECT, INSERT,
+UPDATE, DELETE on `megagoldenclub.*`. An originally generated password
+was displayed in chat and has already been manually rotated; never reuse
+the first password. The operator has now requested server-local storage
+of the scoped username and a fresh password for the compiled API.
+
+Run [`rotate-mysql-app-credentials.sh`](rotate-mysql-app-credentials.sh)
+as VPS root **once**, after exact-SHA CI and local `npm run verify`
+are green. It requires a `root:megagoldenclub` mode 0750 config
+directory, an existing dedicated Unix user, and no existing
+`api.env` or `mysql.credentials.env`. It stages a 64-hex randomly
+generated password in a protected file and prompts privately for the
+existing MySQL root administrator password. It rotates **only**
+`'megagoldenclub_app'@'127.0.0.1'`; it verifies scoped TCP login to
+`megagoldenclub` and commits
+`/etc/megagoldenclub/mysql.credentials.env` (root:megagoldenclub 0640).
+No password is printed or saved to Git, PM2 metadata or terminal
+history. Neither the root password nor another app's database/user
+is modified.
+
+The dedicated **username remains** `megagoldenclub_app`: renaming it
+would invalidate its already-confirmed least-privilege grants. Both
+`MYSQL_USER` and `MYSQL_PASSWORD`, along with host/port/database and
+local `MYSQL_TLS=false`, are saved in the protected file. The script
+refuses to overwrite a potentially live config. If the DB password
+changes but saving the file fails, the script preserves the private
+staged credential and explains how to avoid losing the secret.
+
+This file is an **environment fragment**, not a complete running API
+configuration. During an approved deployment, securely merge it into
+`/etc/megagoldenclub/api.env` with root:megagoldenclub mode 0640.
+Only the compiled backend API child will load that file via Node 24;
+Admin/Member must never receive database secrets. Prisma schema
+migrations require a **separate migration-only principal** because the
+app's DB user deliberately lacks DDL permission. Keep a secure,
+independently recoverable off-host copy; storing credentials on the app
+VPS is necessary for runtime but not a replacement for resilience,
+host security, or off-host backups.
+
 ## Production environment contract
 
 Set `MEGAGOLDENCLUB_DATA_TOPOLOGY=local-isolated` **only** for this VPS.
