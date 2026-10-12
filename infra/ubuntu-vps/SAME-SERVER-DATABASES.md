@@ -213,26 +213,55 @@ MongoDB must enforce authentication **server-side**, not just put a username
 in a URI. Keep secrets out of command history, chat, Compose env vars and
 Git. Never modify an unrelated MongoDB database/user.
 
-## Dedicated Redis operations (not yet applied)
+## Dedicated Redis startup (pending VPS execution)
 
-Ops-only files in the repository:
+MySQL runtime credentials are saved at `/etc/megagoldenclub/mysql.credentials.env`
+and the operator's MongoDB user creation returned **MONGODB APPLICATION
+LOGIN AND CREDENTIAL STORAGE: PASS**, confirming
+`/etc/megagoldenclub/mongo.credentials.env` and
+`/etc/megagoldenclub/mongo/app-password`. Both user accounts have
+been verified as database-scoped. **No Redis changes have yet been applied.**
 
-- `megagoldenclub-redis.compose.yaml`: a new Redis container, **only**
-  `127.0.0.1:6381` published; non-root UID 10001, read-only filesystem,
-  cap drop, dedicated volume, memory/process/log limits.
-- `redis.conf`: no secrets; enables an ACL file and persistence.
+Next, run the ops-only
+[`provision-redis.sh`](provision-redis.sh) after the final SHA's
+Backend CI, Frontend CI, Release Evidence and local root `npm run
+verify` are green. Download exactly the same reviewed commit versions of
+the script, [`megagoldenclub-redis.compose.yaml`](megagoldenclub-redis.compose.yaml)
+and [`redis.conf`](redis.conf) into a temporary root-only directory
+and pass that directory to the script. The script operates **only** on
+`megagoldenclub-redis` (host loopback port 6381); if its name, volume,
+port or credential destination already exists, it stops without
+overwriting data.
 
-Before an authorized deployment, transfer **only these ops config files**
-outside Git onto the VPS. Create `/etc/megagoldenclub/redis/users.acl`
-from a privately generated strong Redis password; file should be owned by
-the container's UID 10001, mode 0400. Redis ACL default user has only
-an authenticated secret. Prepare dedicated Redis data volume, validate Compose
-config, confirm port 6381 remains unused, and **start only this unique
-Compose project**. Never run `docker compose down` against any pre-existing
-Docker project. Validate Docker bind/ACL permissions before use; do not
-publish password-bearing container command arguments or environment values.
+The official Redis 7.4.11 Alpine image runs as a fixed non-root user
+UID/GID `10001:10001`. The script prepares private host config
+`/etc/megagoldenclub/redis` (root:0700), creates
+`users.acl` (10001:10001 mode 0400), and stores **only the SHA-256
+password hash** in the ACL file. A distinct random 64-hex plaintext
+password is saved to server-only
+`/etc/megagoldenclub/redis.credentials.env` (root:megagoldenclub
+0640) along with `REDIS_HOST`, `REDIS_PORT`, and `REDIS_TLS`
+for later secure merge into the compiled API's `api.env`. No
+credentials appear in Compose environment, Git, Docker args, output or
+chat.
 
-Existing containers on 6379/6380/27018 are **never** replaced or recycled.
+The isolated Redis Compose uses an **explicitly external** named
+volume `megagoldenclub-redis_megagoldenclub-redis-data` so the ops
+script can create it once and prepare `/data` ownership for UID 10001
+*before* launching Redis. A default root-owned volume would otherwise
+break AOF persistence in the non-root Redis container. Its Docker
+container has no access to other apps' Mongo/MySQL/Redis volumes or
+configs. The script verifies authenticated CLI access, rejects
+passwordless PING, and checks exact host binding
+`127.0.0.1:6381`.
+
+**No reset/removal**: do not run `docker compose down -v`,
+`docker volume rm`, or modify Redis on ports 6379/6380. If
+startup/verification fails, keep the new files and dedicated
+volume intact for focused troubleshooting; rerunning this
+one-time initializer must stop rather than silently rotate secrets
+or replace containers. Secure independent backups of MySQL/Mongo
+and isolated restore evidence are still required before go-live.
 
 ## Migration, health, recovery
 

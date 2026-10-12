@@ -31,3 +31,5 @@ services:
         max-file: "3"
 volumes:
   megagoldenclub-redis-data:
+    external: true
+    name: megagoldenclub-redis_megagoldenclub-redis-data

@@ -119,6 +119,36 @@ for (const expected of [
 for (const blocked of ['0.0.0.0:6381', '127.0.0.1:6380', '127.0.0.1:6379', '27018']) {
   assert.ok(!redisCompose.includes(blocked), `Redis Compose must not use existing/broad bind: ${blocked}`);
 }
+assert.ok(redisCompose.includes('external: true'));
+assert.ok(redisCompose.includes('name: megagoldenclub-redis_megagoldenclub-redis-data'));
+const redisProvision = read('infra/ubuntu-vps/provision-redis.sh');
+for (const expected of [
+  "CONTAINER='megagoldenclub-redis'",
+  "IMAGE='redis:7.4.11-alpine'",
+  "VOLUME='megagoldenclub-redis_megagoldenclub-redis-data'",
+  'redis.credentials.env',
+  'openssl rand -hex 32',
+  'sha256sum',
+  'user default reset on #%s ~* &* +@all',
+  'chown 10001:10001',
+  'chmod 0400',
+  'chmod 0640',
+  'docker volume create',
+  'docker compose -f "$COMPOSE" up -d --no-deps redis',
+  'redis-cli --raw -x AUTH',
+  'redis-cli --raw PING',
+  'NOAUTH',
+  "'127.0.0.1:6381'",
+]) assert.ok(redisProvision.includes(expected), `Missing isolated Redis provision invariant: ${expected}`);
+for (const forbidden of [
+  'docker compose down',
+  'docker volume rm',
+  'docker rm',
+  'systemctl restart redis',
+  'chmod 777',
+  'chmod 644',
+  'requirepass',
+]) assert.ok(!redisProvision.includes(forbidden), `Unsafe Redis provision command: ${forbidden}`);
 assert.ok(redisConf.includes('aclfile /run/redis/users.acl'));
 assert.doesNotMatch(redisConf, /requirepass|CHANGE_ME|password=/i);
 // Separate MongoDB avoids unsafe changes to the host's existing mongod
