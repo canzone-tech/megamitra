@@ -192,7 +192,7 @@ describe('MegaGoldenClub production configuration readiness contract', () => {
       { cwd: process.cwd(), encoding: 'utf8' },
     );
     expect(result.status).toBe(1);
-    expect(result.stderr).toContain('Remote database readiness: FAIL (production configuration)');
+    expect(result.stderr).toContain('Production database readiness: FAIL (production configuration)');
     expect(result.stderr).toContain('REDIS_TLS must be true');
     expect(result.stderr).not.toContain('prod-redis-password');
     expect(result.stderr).not.toContain('prod-db-password');
