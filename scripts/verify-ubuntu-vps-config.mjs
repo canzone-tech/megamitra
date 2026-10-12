@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 // CI/local static gate for the ACTUAL shared Ubuntu host: Apache + isolated PM2.
 // Never touches running Apache, PM2, or other applications.
+// Root npm run verify must cover the one-time API env staging contract.
+import './test-stage-api-env.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';

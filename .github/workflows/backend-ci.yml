@@ -141,6 +141,9 @@ jobs:
           sudo env GITHUB_ACTIONS=true GITHUB_RUN_ID="$GITHUB_RUN_ID" \
             bash ../scripts/test-redis-recovery.sh "$GITHUB_WORKSPACE/infra/ubuntu-vps"
 
+      - name: Test one-time protected production API environment staging
+        run: node ../scripts/test-stage-api-env.mjs
+
       - name: Start CI data services
         run: |
           docker compose -f ../docker-compose.yml up -d --wait --wait-timeout 120

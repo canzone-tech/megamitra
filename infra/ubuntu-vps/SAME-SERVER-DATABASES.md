@@ -213,25 +213,21 @@ MongoDB must enforce authentication **server-side**, not just put a username
 in a URI. Keep secrets out of command history, chat, Compose env vars and
 Git. Never modify an unrelated MongoDB database/user.
 
-## Dedicated Redis startup (pending VPS execution)
+## Dedicated Redis (VPS recovery verified 2026-10-12)
 
 MySQL runtime credentials are saved at `/etc/megagoldenclub/mysql.credentials.env`
 and the operator's MongoDB user creation returned **MONGODB APPLICATION
 LOGIN AND CREDENTIAL STORAGE: PASS**, confirming
 `/etc/megagoldenclub/mongo.credentials.env` and
 `/etc/megagoldenclub/mongo/app-password`. Both user accounts have
-been verified as database-scoped. **Redis first provisioning was attempted, but failed during dedicated volume chmod; Redis container was not started.**
-
-Next, run the ops-only
-[`provision-redis.sh`](provision-redis.sh) after the final SHA's
-Backend CI, Frontend CI, Release Evidence and local root `npm run
-verify` are green. Download exactly the same reviewed commit versions of
-the script, [`megagoldenclub-redis.compose.yaml`](megagoldenclub-redis.compose.yaml)
-and [`redis.conf`](redis.conf) into a temporary root-only directory
-and pass that directory to the script. The script operates **only** on
-`megagoldenclub-redis` (host loopback port 6381); if its name, volume,
-port or credential destination already exists, it stops without
-overwriting data.
+been verified as database-scoped. **Redis recovered successfully** after the original volume permission failure.
+VPS operator output confirmed `Dedicated Redis volume UID 10001 writable: PASS`,
+`Redis password authentication: PASS`, `Redis anonymous access: DENIED`,
+`Redis host bind: 127.0.0.1:6381` and
+`REDIS STARTUP AND AUTHENTICATION RECOVERY: PASS` (2026-10-12).
+Original credentials, ACL and dedicated volume were retained.
+MySQL, MongoDB and unrelated Redis instances were reported untouched.
+**Never rerun `provision-redis.sh` or `recover-redis-volume.sh` after this PASS.**
 
 The official Redis 7.4.11 Alpine image runs as a fixed non-root user
 UID/GID `10001:10001`. The script prepares private host config

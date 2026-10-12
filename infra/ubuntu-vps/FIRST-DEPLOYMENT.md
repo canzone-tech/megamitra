@@ -97,6 +97,29 @@ connection strings. This probe does **not** create provider accounts, approve
 snapshots, guarantee backup recovery, apply migrations or deploy anything.
 Do not copy this source script to the compiled-only application VPS.
 
+### Ops-only local-isolated API environment staging (not a deployment)
+
+For this VPS, after verifying the protected dedicated MySQL, MongoDB and Redis
+credential files, use the reviewed [`stage-api-env.mjs`](stage-api-env.mjs) from
+the exact approved GitHub commit. Transfer **only this ops script** into a
+private temporary directory on the VPS; never check out application source.
+The root-only script reads existing credentials without evaluating them as
+shell code, verifies the exact dedicated loopback ports/accounts, generates
+three distinct CAPTCHA/JWT signing secrets, then creates
+`/etc/megagoldenclub/api.env` **once** with `root:megagoldenclub 0640`.
+It refuses preexisting files (including symlinks), changed credential file
+modes, or any conflicting service identity. Secrets never appear in console
+output, CLI parameters, PM2 metadata, Git or Docker Compose environments.
+
+This is **configuration staging only**. It does not start PM2, migrate MySQL,
+touch MongoDB/Redis services, perform backups, transfer a runtime artifact or
+approve the release. Production config validation on the separate trusted
+operator/build runner still requires its real recovery-key file and valid
+runtime configuration. The off-host backup encryption key is **not** created
+or copied onto the production application host by this script. Complete a
+real encrypted off-host backup and isolated restore, migration-only approval,
+and release sign-off before launching any applications.
+
 ## Stage 3 — remote backup, migration, artifact staging
 
 Record a recoverable remote MySQL/MongoDB snapshot and a tested **isolated
