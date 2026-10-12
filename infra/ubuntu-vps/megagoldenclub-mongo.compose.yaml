@@ -1,6 +1,6 @@
 # One NEW dedicated MongoDB for MegaGoldenClub only.
 # This project NEVER manages the existing host mongod :27017 or
-# the unrelated fixtradezone-mongo container :27018.
+# the unrelated unrelated existing MongoDB container :27018.
 name: megagoldenclub-mongo
 services:
   mongodb:

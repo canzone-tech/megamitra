@@ -13,7 +13,7 @@ Host MongoDB (127.0.0.1:27017) uses authentication, but `admin` and
 existing MongoDB users, or delete the system MongoDB service.** The
 MegaGoldenClub operator opted instead to create a fresh **Mongo-only Docker
 container** on `127.0.0.1:27019`. Existing
-`fixtradezone-mongo` Docker container on 27018 stays untouched regardless of
+`unrelated existing MongoDB` Docker container on 27018 stays untouched regardless of
 whether any application still uses it. This paragraph supersedes the earlier
 27017 MongoDB references below.
 
