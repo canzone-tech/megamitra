@@ -170,7 +170,7 @@ function validateMongo(env, mode) {
     if (url.protocol !== 'mongodb:' || Number(url.port || '27017') !== 27017) {
       fail('Local-isolated MongoDB must use mongodb://127.0.0.1:27017');
     }
-    if (decodeURIComponent(url.pathname.replace(/^\\/+/, '')) !== 'megagoldenclub' ||
+    if (decodeURIComponent(url.pathname.slice(1)) !== 'megagoldenclub' ||
         url.searchParams.get('authSource') !== 'megagoldenclub') {
       fail('Local-isolated MongoDB must use its dedicated megagoldenclub database and authSource');
     }
