@@ -13,7 +13,13 @@ services:
     volumes:
       - /etc/megagoldenclub/redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
       - /etc/megagoldenclub/redis/users.acl:/run/redis/users.acl:ro
-      - megagoldenclub-redis-data:/data
+      # Avoid Docker copying the image's UID-999 /data into an empty volume:
+      # that copy can undo the offline helper's UID-10001 ownership.
+      - type: volume
+        source: megagoldenclub-redis-data
+        target: /data
+        volume:
+          nocopy: true
     read_only: true
     tmpfs:
       - /tmp:noexec,nosuid,size=16m

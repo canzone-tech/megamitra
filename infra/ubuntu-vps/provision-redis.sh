@@ -114,9 +114,14 @@ docker volume create \
   "$VOLUME" >/dev/null
 docker run --rm --pull=never --network none \
   --user 0:0 --cap-drop ALL --cap-add CHOWN --cap-add FOWNER \
-  --mount "type=volume,src=$VOLUME,dst=/data" \
+  --mount "type=volume,src=$VOLUME,dst=/data,volume-nocopy" \
   --entrypoint sh "$IMAGE" -ec \
   'chown 10001:10001 /data && chmod 0700 /data'
+docker run --rm --pull=never --network none --read-only \
+  --user 10001:10001 --cap-drop ALL \
+  --mount "type=volume,src=$VOLUME,dst=/data,volume-nocopy" \
+  --entrypoint sh "$IMAGE" -ec \
+  'test -w /data && test -x /data && touch /data/.redis-volume-write-test && rm /data/.redis-volume-write-test'
 echo 'Redis data volume ownership: PASS'
 
 echo '=== START ONLY DEDICATED REDIS ==='

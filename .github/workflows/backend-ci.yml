@@ -126,14 +126,14 @@ jobs:
           docker pull redis:7.4.11-alpine >/dev/null
           docker run --rm --pull=never --network none --read-only \
             --user 0:0 --cap-drop ALL --cap-add CHOWN --cap-add FOWNER \
-            --mount "type=volume,src=$volume,dst=/data" \
+            --mount "type=volume,src=$volume,dst=/data,volume-nocopy" \
             --entrypoint sh redis:7.4.11-alpine -ec \
             'id; ls -ldn /data; chown 10001:10001 /data; ls -ldn /data; chmod 0700 /data; ls -ldn /data; echo "Permission repair: PASS"'
           docker run --rm --pull=never --network none --read-only \
             --user 10001:10001 --cap-drop ALL \
-            --mount "type=volume,src=$volume,dst=/data" \
+            --mount "type=volume,src=$volume,dst=/data,volume-nocopy" \
             --entrypoint sh redis:7.4.11-alpine -ec \
-            'id; ls -ldn /data; test -w /data && test -x /data && touch /data/.ci-redis-write-proof && rm /data/.ci-redis-write-proof; echo "Write access: PASS"'
+            'set -e; id; ls -ldn /data; test -w /data; test -x /data; touch /data/.ci-redis-write-proof; rm /data/.ci-redis-write-proof; echo "Write access: PASS"'
           echo 'Dedicated Redis data volume UID10001 write access: PASS'
 
       - name: Start CI data services

@@ -119,6 +119,7 @@ for (const expected of [
 for (const blocked of ['0.0.0.0:6381', '127.0.0.1:6380', '127.0.0.1:6379', '27018']) {
   assert.ok(!redisCompose.includes(blocked), `Redis Compose must not use existing/broad bind: ${blocked}`);
 }
+assert.ok(redisCompose.includes('nocopy: true'));
 assert.ok(redisCompose.includes('external: true'));
 assert.ok(redisCompose.includes('name: megagoldenclub-redis_megagoldenclub-redis-data'));
 const redisProvision = read('infra/ubuntu-vps/provision-redis.sh');
@@ -142,6 +143,8 @@ for (const expected of [
 ]) assert.ok(redisProvision.includes(expected), `Missing isolated Redis provision invariant: ${expected}`);
 assert.ok(redisProvision.includes('--cap-add CHOWN --cap-add FOWNER'));
 assert.ok(redisProvision.includes('chown 10001:10001 /data && chmod 0700 /data'));
+assert.ok(redisProvision.includes('dst=/data,volume-nocopy'));
+assert.ok(redisProvision.includes('test -w /data && test -x /data && touch /data/.redis-volume-write-test'));
 const redisRecovery = read('infra/ubuntu-vps/recover-redis-volume.sh');
 for (const required of [
   "CONTAINER='megagoldenclub-redis'",
@@ -155,6 +158,10 @@ for (const required of [
   'docker compose -f "$COMPOSE" config --quiet',
   '--cap-drop ALL --cap-add CHOWN --cap-add FOWNER',
   'chown 10001:10001 /data && chmod 0700 /data',
+  'dst=/data,volume-nocopy',
+  'nocopy: true',
+  'INSTALL REVIEWED NOCOPY MANIFEST',
+  'test -w /data && test -x /data && touch /data/.redis-volume-write-test',
   '--user 10001:10001 --cap-drop ALL',
   'test -w /data && test -x /data',
   'redis-cli --raw -x AUTH',

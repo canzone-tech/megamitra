@@ -46,10 +46,25 @@ for f in megagoldenclub-redis.compose.yaml redis.conf; do
     echo 'STOP: reviewed Redis config file missing' >&2; exit 1
   fi
 done
-if ! cmp -s "$SRC/megagoldenclub-redis.compose.yaml" "$COMPOSE" ||
-   ! cmp -s "$SRC/redis.conf" "$CONFIG"; then
+# The first attempt saved the OLD short-form volume mount; the reviewed
+# recovery upgrades only this project's Compose template to volume nocopy.
+# Compare the full old template reconstructed from the approved new one;
+# accept the new template as well if a prior recovery stopped mid-way.
+if ! cmp -s "$SRC/redis.conf" "$CONFIG"; then
   echo 'STOP: staged Redis config differs from reviewed release' >&2; exit 1
 fi
+if ! cmp -s "$SRC/megagoldenclub-redis.compose.yaml" "$COMPOSE" &&
+   ! cmp -s "$COMPOSE" <(
+     sed -e '/^      # Avoid Docker copying the image/d' \
+         -e '/^      # that copy can undo/d' \
+         -e '/^      - type: volume$/,/^          nocopy: true$/c\\
+      - megagoldenclub-redis-data:/data' \
+       "$SRC/megagoldenclub-redis.compose.yaml"
+   ); then
+  echo 'STOP: staged Redis Compose differs from original or reviewed nocopy manifest' >&2
+  exit 1
+fi
+grep -Fq 'nocopy: true' "$SRC/megagoldenclub-redis.compose.yaml"
 if docker ps -a --format '{{.Names}}' | grep -Fxq "$CONTAINER"; then
   echo 'STOP: dedicated Redis container already exists; do not recreate' >&2; exit 1
 fi
@@ -98,8 +113,10 @@ hash="$(printf '%s' "$password" | sha256sum | cut -d ' ' -f 1)"
 if [[ "$(cat "$ACL")" != "user default reset on #$hash ~* &* +@all" ]]; then
   echo 'STOP: Redis ACL does not match existing password' >&2; exit 1
 fi
-docker compose -f "$COMPOSE" config --quiet
+docker compose -f "$SRC/megagoldenclub-redis.compose.yaml" config --quiet
 echo 'Redis credentials and ACL: MATCH (secrets hidden)'
+echo '=== INSTALL REVIEWED NOCOPY MANIFEST FOR DEDICATED REDIS ONLY ==='
+install -o root -g root -m 0600 "$SRC/megagoldenclub-redis.compose.yaml" "$COMPOSE"
 
 echo '=== REPAIR DEDICATED DATA VOLUME OWNERSHIP ==='
 # /data is owned by Redis-image account initially, so CAP_CHOWN alone
@@ -107,13 +124,13 @@ echo '=== REPAIR DEDICATED DATA VOLUME OWNERSHIP ==='
 # ephemeral helper; the actual Redis container remains cap_drop ALL.
 docker run --rm --pull=never --network none --read-only \
   --user 0:0 --cap-drop ALL --cap-add CHOWN --cap-add FOWNER \
-  --mount "type=volume,src=$VOLUME,dst=/data" \
+  --mount "type=volume,src=$VOLUME,dst=/data,volume-nocopy" \
   --entrypoint sh "$IMAGE" -ec \
   'chown 10001:10001 /data && chmod 0700 /data'
 docker run --rm --pull=never --network none --read-only \
   --user 10001:10001 --cap-drop ALL \
-  --mount "type=volume,src=$VOLUME,dst=/data" \
-  --entrypoint sh "$IMAGE" -ec 'test -w /data && test -x /data'
+  --mount "type=volume,src=$VOLUME,dst=/data,volume-nocopy" \
+  --entrypoint sh "$IMAGE" -ec 'test -w /data && test -x /data && touch /data/.redis-volume-write-test && rm /data/.redis-volume-write-test'
 echo 'Dedicated Redis volume UID 10001 writable: PASS'
 
 echo '=== START ONLY DEDICATED REDIS ==='

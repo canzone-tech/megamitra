@@ -275,18 +275,29 @@ started the Redis service. **Do not rerun `provision-redis.sh`**:
 the initializer deliberately refuses to overwrite credentials,
 configuration or the volume.
 
-Root cause: the Alpine Redis image's `/data` ownership may belong to
-a different UID. The restricted volume helper had `CAP_CHOWN` but
-not `CAP_FOWNER`; chmod of another UID's inode can fail under
-capability confinement. Future first-time runs have both CHOWN +
-FOWNER **only** on the temporary offline helper. The actual Redis
-container remains non-root UID 10001, cap_drop ALL.
+**Two linked root causes were confirmed by GitHub Docker CI:** the
+Alpine image initializes `/data` with UID 999; a restricted helper
+needs both `CAP_CHOWN` and `CAP_FOWNER` to chown/chmod that inode.
+Moreover, **Docker copies the image's `/data` into an empty named
+volume on every fresh mount with copy enabled**, resetting ownership
+back to UID 999 (observed explicitly across two CI containers) even
+after a successful repair. Therefore CAP_FOWNER alone is insufficient.
+The fixed Compose manifest uses **`volume.nocopy: true`** for Redis
+`/data`, and the helper and write-verification containers mount with
+**`volume-nocopy`**. CI now checks that the 10001:10001 ownership
+survives a separate container and a real file can be written.
+Only the offline helper gets CHOWN+FOWNER; actual Redis remains
+non-root UID 10001, cap_drop ALL.
 
 Run the reviewed
 [`recover-redis-volume.sh`](recover-redis-volume.sh) as VPS root,
 with the exact commit's two Redis template files downloaded
-into a private temporary directory. The recovery requires the
-preexisting root-only staged file modes, exact reviewed templates,
+into a private temporary directory. The recovery verifies that the
+server's original saved Compose equals the exact legacy manifest
+reconstructed from the reviewed new nocopy template, then **upgrades
+only the dedicated Redis Compose file** to `volume.nocopy: true`,
+while preserving ACL, password and volume. It requires the
+preexisting root-only staged file modes, expected reviewed templates,
 an unclaimed 6381 port, absent Redis container, isolated
 Docker volume with expected Compose labels and no container
 mounting it. It parses the **existing** Redis password without
@@ -298,9 +309,10 @@ binding. **No password rotation, MongoDB/MySQL changes,
 Docker teardown or data deletion.** If any invariant differs,
 the recovery stops for investigation.
 
-A GitHub Backend CI ephemeral Docker-volume regression test proves
-the needed CHOWN + FOWNER helper capabilities with Redis's
-non-root UID, in addition to static/script syntax checks.
+A GitHub Backend CI ephemeral Docker-volume regression test checks
+CHOWN + FOWNER, stable ownership across container boundaries via
+volume-nocopy, and non-root UID 10001 file-write permissions, in
+addition to static/script syntax checks.
 This is not proof of VPS success: request the operator's
 `REDIS STARTUP AND AUTHENTICATION RECOVERY: PASS` output.
 
