@@ -163,6 +163,40 @@ for (const forbidden of [
   'chmod 644',
   'systemctl restart mongod',
 ]) assert.ok(!mongoRecovery.includes(forbidden), `Mongo secret recovery must not affect existing sites: ${forbidden}`);
+// Once the dedicated MongoDB container is up, its application user is still
+// absent until this dedicated, password-safe initializer has been executed.
+const mongoUser = read('infra/ubuntu-vps/create-mongo-app-user.sh');
+for (const required of [
+  "CONTAINER='megagoldenclub-mongo'",
+  "IMAGE='mongo:8.0.29-noble'",
+  "APP_DB='megagoldenclub'",
+  "APP_USER='megagoldenclub_app'",
+  'mongo.credentials.env',
+  'app-password',
+  'root-password',
+  'openssl rand -hex 32',
+  'ROOT_PASSWORD',
+  'CREATION_ATTEMPTED=1',
+  'createUser:',
+  'SCRAM-SHA-256',
+  'readWrite',
+  'authSource=',
+  'chmod 0600',
+  'chmod 0640',
+  'MONGODB APPLICATION LOGIN: PASS',
+  'mongosh --quiet --file /dev/stdin',
+]) assert.ok(mongoUser.includes(required), `Mongo app initializer safety invariant missing: ${required}`);
+for (const blocked of [
+  'docker compose down',
+  'docker rm',
+  'docker volume rm',
+  'docker restart',
+  'mongod --noauth',
+  'db.dropUser',
+  'db.dropDatabase',
+  '--password',
+  'chmod 644',
+]) assert.ok(!mongoUser.includes(blocked), `Mongo app initializer must not modify existing services: ${blocked}`);
 // The MySQL password initializer must never rotate a global MySQL user,
 // expose a credential through argv, or overwrite an existing API config.
 const mysqlRotate = read('infra/ubuntu-vps/rotate-mysql-app-credentials.sh');

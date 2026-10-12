@@ -67,6 +67,42 @@ localhost port 27019 with an **interactive password prompt**. In database
 `mongodb://megagoldenclub_app:<URL_ENCODED_PASSWORD>@127.0.0.1:27019/megagoldenclub?authSource=megagoldenclub`.
 Do not put root credentials in the application API environment.
 
+**Verified MongoDB staging status (2026-10-12):** Docker container on
+`127.0.0.1:27019` recovered successfully from its permission-related
+startup loop. A *subsequent authenticated inspection* proved
+`megagoldenclub_app` was **NOT CREATED**, and
+`/etc/megagoldenclub/mongo/app-password` was absent. The earlier
+creation attempt stopped at `STOP: MongoDB not ready` before changing
+the database. Do not label MongoDB application auth complete on the
+basis of the container ping.
+
+Run the one-time ops-only
+[`create-mongo-app-user.sh`](create-mongo-app-user.sh) on the VPS **as
+root**, only after CI green and the operator's root `npm run verify`
+green. The script verifies the exact dedicated MongoDB Docker image
+and its running state, root:0700 secret directory, existing admin root
+password, dedicated Unix service account and that no Mongo app user or
+saved credential file already exists. It stages a fresh 64-hex app
+password before any user change, authenticates against the **dedicated
+MongoDB container only**, creates `megagoldenclub_app` on database
+`megagoldenclub` with only `readWrite` role and SCRAM-SHA-256,
+verifies authentication as the new app user, then atomically saves
+`/etc/megagoldenclub/mongo/app-password` (root 0600) and
+`/etc/megagoldenclub/mongo.credentials.env`
+(root:megagoldenclub 0640; `MONGODB_URI` for API deployment).
+
+Passwords are passed to the MongoDB CLI exclusively via protected
+**STDIN**, never as command-line arguments or printed. If an
+unconfirmed MongoDB error occurs after the create attempt, **private
+staged files are deliberately preserved** to avoid losing the only
+recoverable password: investigate before retrying, do not recreate the
+MongoDB container or delete the database/volume. The script refuses
+to overwrite an existing app user/password or otherwise reset MongoDB
+credentials. Merge the saved Mongo URI env fragment into protected
+`/etc/megagoldenclub/api.env` later, only for the compiled API child.
+Recoverably back up the secret off-VPS; no passwords belong in Git
+or chat.
+
 **MongoDB deletion is not approved**: never stop/remove/disable the host
 MongoDB service or the existing 27018 container without verifying all
 other sites, active connections, backups and explicit operator approval.

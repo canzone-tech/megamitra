@@ -18,6 +18,7 @@ Only Apache serves port 80/443. Application ports 3200–3202 are local and fire
 ## What the repo contains
 
 - `megagoldenclub-mongo.compose.yaml`: new authenticated Mongo-only instance on 127.0.0.1:27019; old host MongoDB and existing 27018 Docker MongoDB are untouched.
+- `create-mongo-app-user.sh`: one-time creation of the missing MongoDB `megagoldenclub_app` database-scoped user in the already-running dedicated container on port 27019. Verifies app auth and stores protected server-only `mongo/app-password` and `mongo.credentials.env` for future API deployment; never reinitializes MongoDB.
 - `rotate-mysql-app-credentials.sh`: one-time secure rotation of only the existing `megagoldenclub_app`@127.0.0.1 MySQL app user; stores `MYSQL_USER`/`MYSQL_PASSWORD` privately in `/etc/megagoldenclub/mysql.credentials.env` for later API deployment. Never commit or print credentials.
 - `repair-mongo-bootstrap-secret.sh`: safe root-only recovery from the official MongoDB image's **file secret read permission failure**. Applies group-readable 0440 to just the dedicated secret after checking the image's actual numeric MongoDB group; restarts only the dedicated MongoDB container. Never remove the volume or weaken file permissions to world-readable.
 - `megagoldenclub-redis.compose.yaml` + `redis.conf`: optional new Redis-only isolated Compose project for the explicit local-isolated topology; do not run the dev Compose stack on this VPS.

@@ -108,6 +108,9 @@ jobs:
       - name: Syntax check isolated MySQL password rotation
         run: bash -n ../infra/ubuntu-vps/rotate-mysql-app-credentials.sh
 
+      - name: Syntax check dedicated MongoDB app-user initializer
+        run: bash -n ../infra/ubuntu-vps/create-mongo-app-user.sh
+
       - name: Start CI data services
         run: |
           docker compose -f ../docker-compose.yml up -d --wait --wait-timeout 120
