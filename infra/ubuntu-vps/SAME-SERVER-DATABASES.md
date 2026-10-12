@@ -220,7 +220,7 @@ and the operator's MongoDB user creation returned **MONGODB APPLICATION
 LOGIN AND CREDENTIAL STORAGE: PASS**, confirming
 `/etc/megagoldenclub/mongo.credentials.env` and
 `/etc/megagoldenclub/mongo/app-password`. Both user accounts have
-been verified as database-scoped. **No Redis changes have yet been applied.**
+been verified as database-scoped. **Redis first provisioning was attempted, but failed during dedicated volume chmod; Redis container was not started.**
 
 Next, run the ops-only
 [`provision-redis.sh`](provision-redis.sh) after the final SHA's
@@ -262,6 +262,47 @@ volume intact for focused troubleshooting; rerunning this
 one-time initializer must stop rather than silently rotate secrets
 or replace containers. Secure independent backups of MySQL/Mongo
 and isolated restore evidence are still required before go-live.
+
+### First Redis attempt: dedicated volume permission failure (2026-10-12)
+
+The operator's first run reached `PREPARE DEDICATED REDIS DATA
+VOLUME FOR NON-ROOT UID` and stopped with `chmod: /data: Operation
+not permitted`. All earlier provisioning phases succeeded: the
+unique Redis config directory, hashed ACL, protected
+`/etc/megagoldenclub/redis.credentials.env` and new named Docker
+volume **already exist**. The failure happened *before* Compose
+started the Redis service. **Do not rerun `provision-redis.sh`**:
+the initializer deliberately refuses to overwrite credentials,
+configuration or the volume.
+
+Root cause: the Alpine Redis image's `/data` ownership may belong to
+a different UID. The restricted volume helper had `CAP_CHOWN` but
+not `CAP_FOWNER`; chmod of another UID's inode can fail under
+capability confinement. Future first-time runs have both CHOWN +
+FOWNER **only** on the temporary offline helper. The actual Redis
+container remains non-root UID 10001, cap_drop ALL.
+
+Run the reviewed
+[`recover-redis-volume.sh`](recover-redis-volume.sh) as VPS root,
+with the exact commit's two Redis template files downloaded
+into a private temporary directory. The recovery requires the
+preexisting root-only staged file modes, exact reviewed templates,
+an unclaimed 6381 port, absent Redis container, isolated
+Docker volume with expected Compose labels and no container
+mounting it. It parses the **existing** Redis password without
+printing it, compares its SHA-256 to the preexisting ACL hash,
+repairs only the dedicated volume, tests actual UID10001
+write access, starts only `megagoldenclub-redis` and verifies
+authentication, unauthenticated denial and `127.0.0.1:6381`
+binding. **No password rotation, MongoDB/MySQL changes,
+Docker teardown or data deletion.** If any invariant differs,
+the recovery stops for investigation.
+
+A GitHub Backend CI ephemeral Docker-volume regression test proves
+the needed CHOWN + FOWNER helper capabilities with Redis's
+non-root UID, in addition to static/script syntax checks.
+This is not proof of VPS success: request the operator's
+`REDIS STARTUP AND AUTHENTICATION RECOVERY: PASS` output.
 
 ## Migration, health, recovery
 

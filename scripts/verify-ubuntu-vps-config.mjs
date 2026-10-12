@@ -140,6 +140,36 @@ for (const expected of [
   'NOAUTH',
   "'127.0.0.1:6381'",
 ]) assert.ok(redisProvision.includes(expected), `Missing isolated Redis provision invariant: ${expected}`);
+assert.ok(redisProvision.includes('--cap-add CHOWN --cap-add FOWNER'));
+assert.ok(redisProvision.includes('chown 10001:10001 /data && chmod 0700 /data'));
+const redisRecovery = read('infra/ubuntu-vps/recover-redis-volume.sh');
+for (const required of [
+  "CONTAINER='megagoldenclub-redis'",
+  "VOLUME='megagoldenclub-redis_megagoldenclub-redis-data'",
+  'redis.credentials.env',
+  'cmp -s',
+  'com.docker.compose.project',
+  'com.docker.compose.volume',
+  'sha256sum',
+  'user default reset on #$hash ~* &* +@all',
+  'docker compose -f "$COMPOSE" config --quiet',
+  '--cap-drop ALL --cap-add CHOWN --cap-add FOWNER',
+  'chown 10001:10001 /data && chmod 0700 /data',
+  '--user 10001:10001 --cap-drop ALL',
+  'test -w /data && test -x /data',
+  'redis-cli --raw -x AUTH',
+  'NOAUTH',
+  "'127.0.0.1:6381'",
+  'REDIS STARTUP AND AUTHENTICATION RECOVERY: PASS',
+]) assert.ok(redisRecovery.includes(required), `Missing safe Redis recovery invariant: ${required}`);
+for (const unsafe of [
+  'docker compose down',
+  'docker volume rm',
+  'docker rm',
+  'openssl rand',
+  'docker volume create',
+  'systemctl restart redis',
+]) assert.ok(!redisRecovery.includes(unsafe), `Unsafe Redis recovery operation: ${unsafe}`);
 for (const forbidden of [
   'docker compose down',
   'docker volume rm',

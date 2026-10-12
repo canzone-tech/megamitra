@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # One-time, fail-closed provisioning for the NEW MegaGoldenClub Redis ONLY.
+# After a partial run, use recover-redis-volume.sh; NEVER rerun this initializer.
 # Requires three exact-commit downloaded repo files in a private temp folder:
 # provision-redis.sh, megagoldenclub-redis.compose.yaml, redis.conf
 # Never modifies existing Docker containers, MySQL, MongoDB, or PM2.
@@ -112,10 +113,10 @@ docker volume create \
   --label com.docker.compose.volume=megagoldenclub-redis-data \
   "$VOLUME" >/dev/null
 docker run --rm --pull=never --network none \
-  --user 0:0 --cap-drop ALL --cap-add CHOWN \
+  --user 0:0 --cap-drop ALL --cap-add CHOWN --cap-add FOWNER \
   --mount "type=volume,src=$VOLUME,dst=/data" \
   --entrypoint sh "$IMAGE" -ec \
-  'chmod 0700 /data && chown 10001:10001 /data'
+  'chown 10001:10001 /data && chmod 0700 /data'
 echo 'Redis data volume ownership: PASS'
 
 echo '=== START ONLY DEDICATED REDIS ==='

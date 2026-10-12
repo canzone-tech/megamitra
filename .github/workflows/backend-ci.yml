@@ -114,6 +114,28 @@ jobs:
       - name: Syntax check dedicated Redis provisioning
         run: bash -n ../infra/ubuntu-vps/provision-redis.sh
 
+      - name: Syntax check dedicated Redis recovery
+        run: bash -n ../infra/ubuntu-vps/recover-redis-volume.sh
+
+      - name: Test restricted Redis volume ownership helper in isolated Docker CI
+        run: |
+          set -euo pipefail
+          volume="megagoldenclub-redis-volume-ci-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT"
+          docker volume create "$volume" >/dev/null
+          trap 'docker volume rm "$volume" >/dev/null 2>&1 || true' EXIT
+          docker pull redis:7.4.11-alpine >/dev/null
+          docker run --rm --pull=never --network none --read-only \
+            --user 0:0 --cap-drop ALL --cap-add CHOWN --cap-add FOWNER \
+            --mount "type=volume,src=$volume,dst=/data" \
+            --entrypoint sh redis:7.4.11-alpine -ec \
+            'chown 10001:10001 /data && chmod 0700 /data'
+          docker run --rm --pull=never --network none --read-only \
+            --user 10001:10001 --cap-drop ALL \
+            --mount "type=volume,src=$volume,dst=/data" \
+            --entrypoint sh redis:7.4.11-alpine -ec \
+            'test -w /data && test -x /data'
+          echo 'Dedicated Redis data volume UID10001 write access: PASS'
+
       - name: Start CI data services
         run: |
           docker compose -f ../docker-compose.yml up -d --wait --wait-timeout 120
