@@ -1,8 +1,8 @@
 # MegaGoldenClub on the existing shared Ubuntu VPS
 
-**Observed server audit (2026-10-12):** Ubuntu 24.04.4 LTS x86_64, Node.js 24.19.0, npm 11.17.0, PM2 7.0.3, Apache 2.4.58, Certbot 5.8.0. The current root-owned PM2 apps `fixtradezone-admin` (`127.0.0.1:3101`) and `fixtradezone-backend` (`127.0.0.1:3100`) are online. Apache serves multiple unrelated domains on ports 80/443. There is roughly 5.5 GiB available RAM and 160 GB disk, but capacity and performance must still be confirmed under load. Ports 3200–3202 had no listeners at the audit time; recheck immediately before approved rollout.
+**Observed server audit (2026-10-12):** Ubuntu 24.04.4 LTS x86_64, Node.js 24.19.0, npm 11.17.0, PM2 7.0.3, Apache 2.4.58, Certbot 5.8.0. The current root-owned PM2 apps `existing admin process` (`127.0.0.1:3101`) and `existing backend process` (`127.0.0.1:3100`) are online. Apache serves multiple unrelated domains on ports 80/443. There is roughly 5.5 GiB available RAM and 160 GB disk, but capacity and performance must still be confirmed under load. Ports 3200–3202 had no listeners at the audit time; recheck immediately before approved rollout.
 
-**Decision:** reuse existing Node 24, Apache and PM2. **No Caddy, Nginx, another Node installation, Docker stack, local MySQL/MongoDB/Redis or on-server Git checkout.** Do not stop, reload or modify existing Apache sites or root-owned FixTradeZone PM2 processes.
+**Decision:** reuse existing Node 24, Apache and PM2. **No Caddy, Nginx, another Node installation, Docker stack, local MySQL/MongoDB/Redis or on-server Git checkout.** Do not stop, reload or modify existing Apache sites or root-owned pre-existing unrelated application PM2 processes.
 
 ## Production mapping
 
@@ -36,7 +36,7 @@ For an approved rollout, the operator must first validate public 80/443 from out
 
 ## Release, health and rollback gates
 
-Before exposing traffic, confirm local `/health/ready` reports MySQL/MongoDB/Redis up, `www` and Admin login pages work through externally valid HTTPS, public API `/health/ready` returns 404, protected unauthenticated API calls return 401, apex redirects to www, and TLS is valid. Check current unrelated domains and the existing FixTradeZone processes are unchanged, and require monitoring/backup restore/operator UAT/sign-off. `npm run verify` is the authoritative gate on the **local or isolated verification host**, never on the production application VPS.
+Before exposing traffic, confirm local `/health/ready` reports MySQL/MongoDB/Redis up, `www` and Admin login pages work through externally valid HTTPS, public API `/health/ready` returns 404, protected unauthenticated API calls return 401, apex redirects to www, and TLS is valid. Check current unrelated domains and the existing pre-existing unrelated application processes are unchanged, and require monitoring/backup restore/operator UAT/sign-off. `npm run verify` is the authoritative gate on the **local or isolated verification host**, never on the production application VPS.
 
 Application rollback means atomically switching to the prior compatible compiled release and restarting **only the three dedicated MegaGoldenClub PM2 names** under the dedicated user. It must not roll back financial database migrations or alter existing unrelated PM2 apps. Live deployment remains pending external DNS/network, remote data providers, credentials, migrations, backup restore and explicit sign-off.
 

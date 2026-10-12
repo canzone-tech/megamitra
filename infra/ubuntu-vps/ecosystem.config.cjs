@@ -3,7 +3,7 @@
 // Operational process metadata only, NOT application source.
 // Deploy to /etc/megagoldenclub/ecosystem.config.cjs under a dedicated
 // unprivileged `megagoldenclub` Unix account and its OWN PM2_HOME. Never
-// install/start these apps under the existing root-owned FixTradeZone PM2.
+// install/start these apps under the existing root-owned pre-existing unrelated application PM2.
 //
 // Node.js 24 --env-file loads API secrets INSIDE the API child process.
 // No secrets appear in ecosystem.config.cjs or PM2's persisted app.env map.
