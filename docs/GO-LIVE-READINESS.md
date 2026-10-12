@@ -11,6 +11,7 @@ A release candidate is technically eligible for production sign-off only when al
 - Release Evidence.
 - root `npm run verify` on the local/target-like verification host, **never on the production runtime host**.
 - `npm --prefix backend run verify:production-config -- /absolute/path/to/production.env --check-files` on a trusted operator/build machine.
+- `npm --prefix backend run verify:remote-data -- /absolute/path/to/production.env` on the same trusted isolated operator/migration network with the actual remote providers, never on the source-free application VPS.
 - authenticated browser UAT artifact from Backend CI.
 - checksum-verified `megagoldenclub-runtime-<SHA>` source-free release artifact and its packaged-runtime smoke result from Backend CI.
 - automated encrypted backup/export/import/restore drill from Backend CI.

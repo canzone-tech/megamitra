@@ -70,6 +70,21 @@ Run production config validation on **trusted operator/build infrastructure**
 Use `--require-smtp` if email features are active. Do not publish the file or
 command output containing credentials.
 
+### Read-only remote connectivity check (trusted operator runner)
+
+After provisioning, from an **isolated operator/build host with backend dependencies
+installed and access to the actual remote secrets**, run:
+
+`npm --prefix backend run verify:remote-data -- /secure/production.env`
+
+The command fails closed if production settings/CA files are invalid, then
+makes **read-only** queries: MySQL 8 server version and negotiated TLS cipher,
+MongoDB TLS-authenticated ping, Redis TLS-authenticated ping. Its output reports
+only status, never credentials, endpoints, server exception messages or raw
+connection strings. This probe does **not** create provider accounts, approve
+snapshots, guarantee backup recovery, apply migrations or deploy anything.
+Do not copy this source script to the compiled-only application VPS.
+
 ## Stage 3 — remote backup, migration, artifact staging
 
 Record a recoverable remote MySQL/MongoDB snapshot and a tested **isolated

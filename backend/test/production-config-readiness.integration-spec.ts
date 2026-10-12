@@ -178,6 +178,26 @@ describe('MegaGoldenClub production configuration readiness contract', () => {
     expect(result.stderr).toContain('MYSQL_TLS_CA_FILE does not exist');
   });
 
+  it('rejects remote connectivity probe before opening connections if TLS is insecure', async () => {
+    await writeFile(
+      envPath,
+      encodeEnv({
+        ...baseEnv(keyPath),
+        REDIS_TLS: 'false',
+      }),
+    );
+    const result = spawnSync(
+      process.execPath,
+      ['scripts/check-remote-data-readiness.mjs', envPath],
+      { cwd: process.cwd(), encoding: 'utf8' },
+    );
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('Remote database readiness: FAIL (production configuration)');
+    expect(result.stderr).toContain('REDIS_TLS must be true');
+    expect(result.stderr).not.toContain('prod-redis-password');
+    expect(result.stderr).not.toContain('prod-db-password');
+  });
+
   it('requires SMTP only when the deployment declares that email features will be enabled', async () => {
     await writeFile(envPath, encodeEnv(baseEnv(keyPath)));
 
