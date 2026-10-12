@@ -1,55 +1,107 @@
 #!/usr/bin/env node
-// Static release gate: the production VPS must have only compiled app processes
-// bound to loopback. MySQL, MongoDB, Redis and migrations live elsewhere.
+// CI/local static gate for the ACTUAL shared Ubuntu host: Apache + isolated PM2.
+// Never touches running Apache, PM2, or other applications.
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { resolve } from 'node:path';
+
 const root = resolve(import.meta.dirname, '..');
-const read = (path) => readFileSync(resolve(root, path), 'utf8');
-const unit = (name) => read(`infra/ubuntu-vps/megagoldenclub-${name}.service`);
-for (const [app, entrypoint, port] of [
-  ['api', 'dist/main.js', '3100'],
-  ['admin', 'server.js', '3101'],
-  ['member', 'server.js', '3102'],
-]) {
-  const config = unit(app);
-  assert.match(config, /^User=megagoldenclub$/m);
-  assert.match(config, /^Group=megagoldenclub$/m);
-  assert.match(config, new RegExp(`^WorkingDirectory=/opt/megagoldenclub/current/${app}$`, 'm'));
-  assert.match(config, new RegExp(`^ExecStart=/usr/bin/node ${entrypoint.replaceAll('.', '\\.')}$`, 'm'));
-  assert.match(config, new RegExp(`^Environment=PORT=${port}$`, 'm'));
-  assert.match(config, /^Environment=NODE_ENV=production$/m);
-  assert.match(config, /^NoNewPrivileges=true$/m);
-  assert.match(config, /^ProtectHome=true$/m);
-  assert.doesNotMatch(config, /docker|mysql.*server|redis-server|mongod|git pull|npm (run|ci)|prisma migrate/i);
+const read = (p) => readFileSync(resolve(root, p), 'utf8');
+const require = createRequire(import.meta.url);
+const pm2 = require(resolve(root, 'infra/ubuntu-vps/ecosystem.config.cjs'));
+assert.equal(pm2.apps.length, 3, 'Exactly three MegaGoldenClub processes');
+const specs = [
+  { name: 'api', port: 3200, script: 'dist/main.js' },
+  { name: 'admin', port: 3201, script: 'server.js' },
+  { name: 'member', port: 3202, script: 'server.js' },
+];
+for (const { name, port, script } of specs) {
+  const app = pm2.apps.find(x => x.name === `megagoldenclub-${name}`);
+  assert.ok(app, `Missing isolated PM2 app: ${name}`);
+  assert.equal(app.cwd, `/opt/megagoldenclub/current/${name}`);
+  assert.equal(app.script, script);
+  assert.equal(app.interpreter, '/usr/bin/node');
+  assert.equal(app.exec_mode, 'fork');
+  assert.equal(app.instances, 1);
+  assert.equal(app.watch, false);
+  assert.equal(app.env.NODE_ENV, 'production');
+  assert.equal(app.env.PORT, String(port));
+  assert.deepEqual(
+    Object.keys(app.env).sort(),
+    name === 'api'
+      ? ['HOST', 'NODE_ENV', 'PORT'].sort()
+      : ['HOSTNAME', 'MEGAGOLDENCLUB_API_URL', 'NODE_ENV', 'PORT'].sort(),
+    'PM2 config may not embed secrets',
+  );
+  if (name === 'api') {
+    assert.equal(app.env.HOST, '127.0.0.1');
+    assert.equal(app.node_args, '--env-file=/etc/megagoldenclub/api.env');
+  } else {
+    assert.equal(app.env.HOSTNAME, '127.0.0.1');
+    assert.equal(app.env.MEGAGOLDENCLUB_API_URL, 'http://127.0.0.1:3200');
+    assert.ok(!app.node_args, 'Web process must not load API secrets');
+  }
 }
-assert.match(unit('api'), /^Environment=HOST=127\.0\.0\.1$/m);
-for (const app of ['admin', 'member']) {
-  assert.match(unit(app), /^Environment=HOSTNAME=127\.0\.0\.1$/m);
-  assert.match(unit(app), /^Environment=MEGAGOLDENCLUB_API_URL=http:\/\/127\.0\.0\.1:3100$/m);
+const conf = {
+  http: read('infra/ubuntu-vps/megagoldenclub-http.conf'),
+  https: read('infra/ubuntu-vps/megagoldenclub-ssl.conf'),
+};
+const allDomains = [
+  'megagoldenclub.com',
+  'www.megagoldenclub.com',
+  'admin.megagoldenclub.com',
+  'api.megagoldenclub.com',
+];
+for (const [scheme, config] of Object.entries(conf)) {
+  const port = scheme === 'http' ? 80 : 443;
+  const blocks = [...config.matchAll(/<VirtualHost \*:(80|443)>\s*([\s\S]*?)<\/VirtualHost>/g)];
+  assert.equal(blocks.length, 4, `Four separate Apache ${scheme} vhosts required`);
+  for (const [, configuredPort, body] of blocks) {
+    assert.equal(Number(configuredPort), port, 'Apache port mismatch');
+    assert.doesNotMatch(body, /^\s*ServerAlias\s+/m, 'No shared-server catchall aliases');
+    assert.match(body, /^\s*ServerName (\S+)$/m);
+  }
+  for (const domain of allDomains) {
+    assert.equal(
+      blocks.filter(([, , body]) => new RegExp(`^\\s*ServerName ${domain.replaceAll('.', '\\.')}$`, 'm').test(body)).length,
+      1,
+      `Missing or duplicated ${scheme} hostname ${domain}`,
+    );
+  }
 }
-assert.match(unit('api'), /^EnvironmentFile=\/etc\/megagoldenclub\/api\.env$/m);
-const caddy = read('infra/ubuntu-vps/Caddyfile.template');
-const site = (domain) => {
-  const escaped = domain.replaceAll('.', '\\.');
-  const regex = new RegExp(`^${escaped} \\{([\\s\\S]*?)^\\}`, 'm');
-  const match = caddy.match(regex);
-  assert.ok(match, `Missing canonical Caddy host: ${domain}`);
+const apacheSite = (scheme, domain) => {
+  const match = [...conf[scheme].matchAll(/<VirtualHost \*:(?:80|443)>\s*([\s\S]*?)<\/VirtualHost>/g)]
+    .find(([, body]) => body.includes(`ServerName ${domain}\n`));
+  assert.ok(match, `Missing Apache ${scheme} ${domain}`);
   return match[1];
 };
-const apex = site('megagoldenclub.com');
-const member = site('www.megagoldenclub.com');
-const admin = site('admin.megagoldenclub.com');
-const apiSite = site('api.megagoldenclub.com');
-assert.match(apex, /redir https:\/\/www\.megagoldenclub\.com\{uri\} permanent/);
-assert.match(member, /reverse_proxy 127\.0\.0\.1:3102/);
-assert.match(admin, /reverse_proxy 127\.0\.0\.1:3101/);
-assert.match(apiSite, /reverse_proxy 127\.0\.0\.1:3100/);
-assert.match(apiSite, /@internalHealth path \/health \/health\/\*/);
-assert.match(apiSite, /respond @internalHealth 404/);
-assert.doesNotMatch(member + admin + apex, /reverse_proxy 127\.0\.0\.1:3100/);
-assert.doesNotMatch(caddy, /reverse_proxy (mysql|mongodb|redis)|0\.0\.0\.0:310[012]/i);
+for (const domain of allDomains) {
+  const http = apacheSite('http', domain);
+  assert.match(http, /Alias "\/\.well-known\/acme-challenge\/" "\/var\/lib\/letsencrypt\/\.well-known\/acme-challenge\/"/);
+  assert.match(http, /RewriteRule \^\/\\\.well-known\/acme-challenge\/ - \[END\]/);
+  assert.match(http, /\[R=301,L,NE\]/);
+  const tls = apacheSite('https', domain);
+  assert.match(tls, /SSLEngine On/);
+  assert.match(tls, /SSLCertificateFile \/etc\/letsencrypt\/live\/[^\s]+\/fullchain.pem/);
+  assert.match(tls, /SSLCertificateKeyFile \/etc\/letsencrypt\/live\/[^\s]+\/privkey.pem/);
+}
+assert.match(apacheSite('https', 'megagoldenclub.com'), /https:\/\/www\.megagoldenclub\.com%\{REQUEST_URI\}/);
+for (const [domain, port] of [
+  ['www.megagoldenclub.com', 3202],
+  ['admin.megagoldenclub.com', 3201],
+  ['api.megagoldenclub.com', 3200],
+]) {
+  const body = apacheSite('https', domain);
+  assert.match(body, /ProxyRequests Off/);
+  assert.match(body, /ProxyPreserveHost On/);
+  assert.match(body, /RequestHeader set X-Forwarded-Proto "https"/);
+  assert.ok(body.includes(`ProxyPass "/" "http://127.0.0.1:${port}/"`));
+  assert.ok(body.includes(`ProxyPassReverse "/" "http://127.0.0.1:${port}/"`));
+}
+assert.match(apacheSite('https', 'api.megagoldenclub.com'), /RewriteRule \^\/health\(\?:\/\|\$\) - \[R=404,L\]/);
+assert.doesNotMatch(conf.http + conf.https, /ProxyPass.*:(?:3100|3101|3102)|ProxyPass.*0\.0\.0\.0|ServerAlias\s+\*/);
 const api = read('backend/src/main.ts');
 assert.match(api, /process\.env\.HOST/);
 assert.match(api, /app\.listen\(port, host\)/);
-console.log('Ubuntu VPS source-free/remote-data service templates: PASS');
+console.log('Shared Ubuntu Apache + isolated PM2 deployment templates: PASS');

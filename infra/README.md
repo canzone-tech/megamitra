@@ -13,3 +13,5 @@ Production reverse proxy supplies HTTPS routing to the compiled API/Admin/Member
 See `docs/PRODUCTION-RUNBOOK.md`, `docs/GO-LIVE-READINESS.md` and `docs/RELEASE-SIGNOFF.md` for deployment order and remaining human/provider gates.
 
 Ubuntu application-host templates, HTTPS proxy routing, and release boundaries: [infra/ubuntu-vps/README.md](ubuntu-vps/README.md).
+
+**Shared VPS implementation (2026-10-12 audit):** Apache 2.4.58 and PM2 7.0.3 already serve FixTradeZone and unrelated domains on this Ubuntu 24.04.4 server. Do not replace Apache with Caddy, restart unrelated apps or reuse occupied FixTradeZone ports 3100/3101. A separate `megagoldenclub` PM2 account and Apache VirtualHosts on localhost 3200/3201/3202 are specified in `infra/ubuntu-vps/`. Public HTTPS routing and real remote datastore connectivity remain unverified operational gates.

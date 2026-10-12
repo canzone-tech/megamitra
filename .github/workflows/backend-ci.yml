@@ -69,11 +69,32 @@ jobs:
       - name: Verify Ubuntu VPS remote-data service templates
         run: node ../scripts/verify-ubuntu-vps-config.mjs
 
-      - name: Validate canonical production Caddy HTTPS routing
+      - name: Check PM2 manifest syntax
+        run: node --check ../infra/ubuntu-vps/ecosystem.config.cjs
+
+      - name: Validate isolated shared-server Apache vhosts in CI
         run: |
-          docker run --rm --network none \
-            -v "${GITHUB_WORKSPACE}/infra/ubuntu-vps/Caddyfile.template:/etc/caddy/Caddyfile:ro" \
-            caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+          docker run --rm \
+            -v "${GITHUB_WORKSPACE}/infra/ubuntu-vps:/megagoldenclub-config:ro" \
+            ubuntu:24.04 bash -euc '
+              export DEBIAN_FRONTEND=noninteractive
+              apt-get update -qq >/dev/null
+              apt-get install -y -qq apache2 openssl >/dev/null
+              a2enmod proxy proxy_http rewrite ssl headers alias >/dev/null
+              mkdir -p /var/lib/letsencrypt/.well-known/acme-challenge
+              openssl req -x509 -nodes -newkey rsa:2048 -days 1 \
+                -keyout /tmp/ci-test-key.pem -out /tmp/ci-test-cert.pem \
+                -subj "/CN=CI-SYNTAX-ONLY" >/dev/null 2>&1
+              for domain in megagoldenclub.com admin.megagoldenclub.com api.megagoldenclub.com; do
+                mkdir -p "/etc/letsencrypt/live/${domain}"
+                cp /tmp/ci-test-cert.pem "/etc/letsencrypt/live/${domain}/fullchain.pem"
+                cp /tmp/ci-test-key.pem "/etc/letsencrypt/live/${domain}/privkey.pem"
+              done
+              cp /megagoldenclub-config/megagoldenclub-http.conf /etc/apache2/sites-enabled/
+              cp /megagoldenclub-config/megagoldenclub-ssl.conf /etc/apache2/sites-enabled/
+              apache2ctl configtest
+              apache2ctl -S 2>&1 | grep -F "namevhost api.megagoldenclub.com"
+            '
 
       - name: Start CI data services
         run: |

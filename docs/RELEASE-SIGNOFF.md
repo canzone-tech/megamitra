@@ -54,7 +54,7 @@ Add `--require-smtp` when email-based authentication features will be enabled in
 - [ ] Production configuration readiness returned `PASS` with external MySQL/MongoDB/Redis endpoints and no MySQL root credential on the application host.
 - [ ] Remote datastores use approved encrypted connections, scoped service credentials and private/network-restricted access.
 - [ ] A separate short-lived, approved migration runner applied/status-checked reviewed migrations after a verified remote recovery point.
-- [ ] Production app host contains only the SHA-matched compiled runtime; no source checkout, local database processes/Compose volumes, schema or migrations.
+- [ ] Production app host contains only the SHA-matched compiled runtime and protected operational Apache/PM2 configuration; no source checkout, local database processes/Compose volumes, schema or migrations.
 - [ ] Backup encryption key path was reported `VERIFIED` by `--check-files`.
 - [ ] If email-based auth is enabled, SMTP was required by the validator and real delivery UAT is recorded below.
 
@@ -121,8 +121,12 @@ Review `docs/STATEFUL-UAT-COVERAGE.md`, `docs/UAT-CHECKLIST.md` and `docs/GO-LIV
 - [ ] Every `PROVIDER`/real-process row is either UAT-approved above or explicitly `N/A` for a reason allowed by `docs/GO-LIVE-READINESS.md`.
 - [ ] Every applicable `OPEN RULE` has an explicit approved business decision or remains a release blocker; no default was invented during UAT.
 - [ ] Canonical DNS A/AAAA resolution, HTTPS certificates and apex-to-www redirect are verified for `megagoldenclub.com`, `www.megagoldenclub.com`, `admin.megagoldenclub.com` and `api.megagoldenclub.com` against the authorized Ubuntu VPS/CDN edge (not assumed from CI).
-- [ ] Public HTTPS API uses authenticated/role-protected endpoints; `/health` and `/health/*` are blocked externally (404), while localhost `/health/ready` succeeds; internal app ports 3100–3102 and all remote data ports are firewalled.
-- [ ] Production `MEGAGOLDENCLUB_PUBLIC_URL` is `https://www.megagoldenclub.com`; Caddy proxy count and cookie boundaries are reviewed.
+- [ ] Verify external routing/NAT for the four names; observed DNS was `103.228.151.134` but local host showed private addresses and public HTTPS timed out during initial audit. Root cause resolved without changing unrelated sites.
+- [ ] Existing root-owned `fixtradezone-backend` and `fixtradezone-admin` PM2 apps, their ports 3100/3101, Apache 80/443 and other unrelated domains continue passing smoke before and after deployment.
+- [ ] MegaGoldenClub PM2 runs as dedicated non-root user, with independent PM2_HOME; Node 24 --env-file supplies backend secrets only to the compiled API child; production env file and permissions audited (secrets not exposed to web process or PM2 dump).
+- [ ] Only after real HTTP-01 and Certbot certificates: MegaGoldenClub Apache HTTPS vhosts enabled, `apache2ctl configtest` successful, certificates and renewal tested, and Apache graceful reload approved.
+- [ ] Apache handles only the four approved MegaGoldenClub hostnames on public 80/443; public `/health` and `/health/*` API requests are blocked (404) but localhost `127.0.0.1:3200/health/ready` succeeds; internal ports 3200–3202 and remote data ports are firewalled.
+- [ ] Production `MEGAGOLDENCLUB_PUBLIC_URL` is `https://www.megagoldenclub.com`; exactly one Apache proxy hop (`TRUST_PROXY_HOPS=1` if applicable) and cookie boundaries are reviewed.
 - [ ] Production domain/TLS/proxy, monitoring/alert routing, retention controls, rollback/recovery owner and release owner are recorded/approved for the target environment.
 - [ ] No unresolved issue is being treated as implicitly approved.
 
