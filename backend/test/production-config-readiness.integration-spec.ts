@@ -12,12 +12,16 @@ function baseEnv(keyPath: string) {
     MYSQL_DATABASE: 'megagoldenclub',
     MYSQL_USER: 'megagoldenclub_app',
     MYSQL_PASSWORD: 'prod-db-password-123456789',
+    MYSQL_TLS: 'true',
+    MYSQL_TLS_CA_FILE: '',
     DATABASE_URL:
-      'mysql://megagoldenclub_app:prod-db-password-123456789@db.internal:3306/megagoldenclub',
-    MONGODB_URI: 'mongodb://mongo.internal:27017/megagoldenclub',
+      'mysql://megagoldenclub_app:prod-db-password-123456789@db.internal:3306/megagoldenclub?sslaccept=strict',
+    MONGODB_URI: 'mongodb://mongo.internal:27017/megagoldenclub?tls=true',
     REDIS_HOST: 'redis.internal',
     REDIS_PORT: '6379',
     REDIS_PASSWORD: 'prod-redis-password-123456789',
+    REDIS_TLS: 'true',
+    REDIS_TLS_CA_FILE: '',
     CAPTCHA_HMAC_SECRET: 'captcha-prod-secret-12345678901234567890',
     JWT_ACCESS_SECRET: 'access-prod-secret-123456789012345678901',
     JWT_REFRESH_SECRET: 'refresh-prod-secret-12345678901234567890',
@@ -88,7 +92,7 @@ describe('MegaGoldenClub production configuration readiness contract', () => {
     expect(env).not.toHaveProperty('MYSQL_ROOT_PASSWORD');
 
     for (const change of [
-      { MYSQL_HOST: '127.0.0.1', DATABASE_URL: 'mysql://megagoldenclub_app:prod-db-password-123456789@127.0.0.1:3306/megagoldenclub' },
+      { MYSQL_HOST: '127.0.0.1', DATABASE_URL: 'mysql://megagoldenclub_app:prod-db-password-123456789@127.0.0.1:3306/megagoldenclub?sslaccept=strict' },
       { MONGODB_URI: 'mongodb://mongodb:27017/megagoldenclub' },
       { REDIS_HOST: 'localhost' },
     ]) {
@@ -134,7 +138,7 @@ describe('MegaGoldenClub production configuration readiness contract', () => {
       encodeEnv({
         ...baseEnv(keyPath),
         DATABASE_URL:
-          'mysql://megagoldenclub_app:prod-db-password-123456789@different-db.internal:3306/megagoldenclub',
+          'mysql://megagoldenclub_app:prod-db-password-123456789@different-db.internal:3306/megagoldenclub?sslaccept=strict',
       }),
     );
 
@@ -142,6 +146,36 @@ describe('MegaGoldenClub production configuration readiness contract', () => {
 
     expect(result.status).toBe(1);
     expect(result.stderr).toContain('DATABASE_URL must target the same host');
+  });
+
+  it('fails closed when remote database TLS is missing or accepts untrusted certificates', async () => {
+    for (const [patch, failure] of [
+      [{ MYSQL_TLS: 'false' }, 'MYSQL_TLS must be true'],
+      [{ REDIS_TLS: 'false' }, 'REDIS_TLS must be true'],
+      [{
+        DATABASE_URL: 'mysql://megagoldenclub_app:prod-db-password-123456789@db.internal:3306/megagoldenclub',
+      }, 'sslaccept=strict'],
+      [{ MONGODB_URI: 'mongodb://mongo.internal:27017/megagoldenclub' }, 'MONGODB_URI must enable TLS'],
+      [{ MONGODB_URI: 'mongodb+srv://mongo.internal/megagoldenclub?tls=false' }, 'MONGODB_URI must enable TLS'],
+      [{
+        MONGODB_URI: 'mongodb://mongo.internal:27017/megagoldenclub?tls=true&tlsAllowInvalidCertificates=true',
+      }, 'must not disable certificate verification'],
+    ] as const) {
+      await writeFile(envPath, encodeEnv({ ...baseEnv(keyPath), ...patch }));
+      const result = run();
+      expect(result.status).toBe(1);
+      expect(result.stderr).toContain(failure);
+    }
+  });
+
+  it('requires external provider CA paths to exist when checking production files', async () => {
+    await writeFile(envPath, encodeEnv({
+      ...baseEnv(keyPath),
+      MYSQL_TLS_CA_FILE: '/does-not-exist/mysql-ca.pem',
+    }));
+    const result = run(['--check-files']);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain('MYSQL_TLS_CA_FILE does not exist');
   });
 
   it('requires SMTP only when the deployment declares that email features will be enabled', async () => {

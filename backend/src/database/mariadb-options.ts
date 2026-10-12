@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+
 export function mariaDbUtcConnectionOptions() {
   return {
     host: process.env.MYSQL_HOST ?? '127.0.0.1',
@@ -9,6 +11,19 @@ export function mariaDbUtcConnectionOptions() {
     // Use an explicit numeric offset supported by MariaDB Connector/Node.js so
     // Date parameter serialization and session time functions share one clock.
     timezone: '+00:00',
+    // Production MySQL is remote. Use certificate/hostname verification for
+    // BOTH the Prisma MariaDB adapter and the direct financial ledger pool.
+    // A provider's private CA can be installed outside the release artifact.
+    ...(process.env.MYSQL_TLS === 'true'
+      ? {
+          ssl: {
+            rejectUnauthorized: true,
+            ...(process.env.MYSQL_TLS_CA_FILE
+              ? { ca: readFileSync(process.env.MYSQL_TLS_CA_FILE, 'utf8') }
+              : {}),
+          },
+        }
+      : {}),
     connectTimeout: 5000,
     acquireTimeout: 10000,
   };

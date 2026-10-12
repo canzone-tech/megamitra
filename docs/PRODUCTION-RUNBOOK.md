@@ -5,12 +5,25 @@ This runbook covers the immutable source-free production runtime and recovery co
 ## Locked production topology: remote data, no source checkout
 
 - **Production application host:** run only the GitHub CI-built, checksum-verified `megagoldenclub-runtime-<SHA>` archive. It contains the compiled NestJS API plus Next.js standalone Admin and Member applications and required runtime dependencies/static assets. Never copy Git metadata, `src/`, TS/TSX, development lockfiles, Prisma schema/migrations, Docker Compose, seed fixtures, unit/integration tests or local data-service volumes to the production runtime host. JavaScript compiled output is required by the Node.js runtime and is not the original TypeScript application source.
-- **Data:** connect the API to separate managed/remote MySQL (financial source of truth), MongoDB (presentation/GridFS) and Redis (non-authoritative). Do **not** start MySQL, MongoDB or Redis containers/processes on the production application host. Use private network access and provider-supported encrypted transport, authenticate with dedicated least-privilege accounts; never supply the MySQL root credential to the application host.
+- **Data:** connect the API to separate managed/remote MySQL (financial source of truth), MongoDB (presentation/GridFS) and Redis (non-authoritative). Do **not** start MySQL, MongoDB or Redis containers/processes on the production application host. Use private network access and *enforced, certificate-verified* MySQL/Redis/MongoDB TLS (MYSQL_TLS=true, REDIS_TLS=true, MongoDB TLS URI, Prisma migration sslaccept=strict), authenticate with dedicated least-privilege accounts; never supply the MySQL root credential to the application host.
 - **Build and verification:** source code, `npm run verify`, packaging, Prisma schema/migration files and test-only Docker Compose services stay on trusted local/CI/build infrastructure. They are never installed on the production runtime host.
 - **Schema changes:** run the reviewed append-only `prisma migrate deploy` from a separately authorized, short-lived build/release runner with secure network access to the remote authoritative MySQL. Take and verify a recoverable remote backup first. Never run migrations on application startup or from the source-free runtime host.
 - **Secrets:** inject at runtime via the hosting platform/secret manager; do not embed real connection strings, JWT secrets, backup keys or admin credentials in CI artifacts. Apply per-service process isolation, non-root execution, minimal write permissions, network egress controls and TLS at the HTTPS edge.
 - **Recovery:** use the remote providers' verified, encrypted, off-host backup/snapshot and isolated remote restore facilities. Local Compose backup/restore scripts below remain development/CI drills, not production backup procedures.
 
+
+## First-deployment checkpoint
+
+The shared-VPS HTTPS Apache vhosts and Snap Certbot certificates were
+activated on 2026-10-12 (expire 2027-01-10). Apex HTTPS redirected 301 to
+www; WWW/Admin/API returned 503 because their PM2 processes are not yet
+started. SSL auto-renewal and external TLS must still be proven; two renewal
+timers reported failures associated with an old, expired server-IP
+certificate. **Do not remove old certs or alter other sites** as part of
+this launch. Production remote MySQL/MongoDB/Redis providers are not
+provisioned/verified yet. Follow
+[`infra/ubuntu-vps/FIRST-DEPLOYMENT.md`](../infra/ubuntu-vps/FIRST-DEPLOYMENT.md)
+before running production migration, PM2 or enabling any live feature.
 
 ## Ubuntu VPS implementation reference
 

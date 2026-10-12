@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import Redis from 'ioredis';
+import { readFileSync } from 'node:fs';
 
 @Injectable()
 export class RedisService implements OnModuleInit, OnApplicationShutdown {
@@ -22,6 +23,23 @@ export class RedisService implements OnModuleInit, OnApplicationShutdown {
       host,
       port,
       password,
+      // ioredis requires an explicit TLS option. Keep local/CI unchanged,
+      // but the production schema and preflight require REDIS_TLS=true.
+      ...(this.configService.get<boolean>('REDIS_TLS') === true
+        ? {
+            tls: {
+              rejectUnauthorized: true,
+              ...(this.configService.get<string>('REDIS_TLS_CA_FILE')
+                ? {
+                    ca: readFileSync(
+                      this.configService.getOrThrow<string>('REDIS_TLS_CA_FILE'),
+                      'utf8',
+                    ),
+                  }
+                : {}),
+            },
+          }
+        : {}),
       lazyConnect: true,
       enableReadyCheck: true,
       maxRetriesPerRequest: 2,

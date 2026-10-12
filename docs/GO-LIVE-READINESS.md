@@ -15,7 +15,7 @@ A release candidate is technically eligible for production sign-off only when al
 - checksum-verified `megagoldenclub-runtime-<SHA>` source-free release artifact and its packaged-runtime smoke result from Backend CI.
 - automated encrypted backup/export/import/restore drill from Backend CI.
 
-The production-config command validates production-only invariants without printing secret values: production mode, external (non-loopback/non-local-Compose) MySQL/MongoDB/Redis endpoint identity, MySQL identity consistency between `DATABASE_URL` and `MYSQL_*`, non-placeholder infrastructure/signing secrets, Redis authentication, HTTPS public URL, HSTS, rate limiting, proxy-hop bounds, SMTP completeness when configured, and the declared backup-key boundary. The source-free runtime requires only a least-privilege MySQL application user, never the MySQL root credential. Use `--require-smtp` when email-based authentication features will be enabled in the target environment.
+The production-config command validates production-only invariants without printing secret values: production mode, external (non-loopback/non-local-Compose) MySQL/MongoDB/Redis endpoint identity, MySQL identity consistency between `DATABASE_URL` and `MYSQL_*`, non-placeholder infrastructure/signing secrets, Redis authentication, verified TLS required for remote MySQL/Redis/MongoDB (and Prisma migration URL sslaccept=strict), HTTPS public URL, HSTS, rate limiting, proxy-hop bounds, SMTP completeness when configured, and the declared backup-key boundary. The source-free runtime requires only a least-privilege MySQL application user, never the MySQL root credential. Use `--require-smtp` when email-based authentication features will be enabled in the target environment.
 
 ## Current provider model
 
@@ -35,7 +35,7 @@ These are intentionally not auto-approved:
 1. Human interaction/readability review of admin, member and public receipt surfaces on supported breakpoints.
 2. One coherent stateful UAT journey using controlled test data, including paid E-PIN registration, installment submission/review, same-receipt transition, five-digit token issuance, draw participation/winner handling and downstream KYC/fulfilment or entitlement state where applicable.
 3. A real encrypted off-host backup retrieved from the actual remote storage boundary and restored into isolated production-like infrastructure, followed by root `npm run verify` and critical-record sampling.
-4. Production domain/TLS/edge-proxy configuration, monitoring/alert routing, retention controls and named release/rollback/recovery owners.
+4. Production domain/TLS/edge-proxy configuration (Apache + PM2 on the shared host; the first three HTTPS certs were issued 2026-10-12 but live apps still return 503), reliable Certbot renewal, monitoring/alert routing, retention controls and named release/rollback/recovery owners.
 5. A separate, authorized remote-MySQL migration runner and a remotely hosted database topology; zero local database processes on the production application host and zero repository source checkout there.
 6. Real operator UAT for any provider/process that will move actual money, send actual email, or hand off actual fulfilment.
 

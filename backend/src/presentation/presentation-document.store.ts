@@ -25,6 +25,21 @@ export class PresentationDocumentStore implements OnModuleInit, OnModuleDestroy 
 
   async onModuleInit() {
     const uri = this.config.getOrThrow<string>('MONGODB_URI');
+    if (this.config.get<string>('NODE_ENV') === 'production') {
+      // mongodb+srv:// enables TLS by default. A plain mongodb:// URI must
+      // explicitly request TLS; never accept tls=false for any production URI.
+      const parsed = new URL(uri);
+      const tls = parsed.searchParams.get('tls') ?? parsed.searchParams.get('ssl');
+      if (
+        (parsed.protocol !== 'mongodb+srv:' && tls !== 'true') ||
+        tls === 'false' ||
+        parsed.searchParams.get('tlsInsecure') === 'true' ||
+        parsed.searchParams.get('tlsAllowInvalidCertificates') === 'true' ||
+        parsed.searchParams.get('tlsAllowInvalidHostnames') === 'true'
+      ) {
+        throw new Error('Production MongoDB must use verified TLS');
+      }
+    }
     this.client = new MongoClient(uri, { serverSelectionTimeoutMS: 5_000 });
     await this.client.connect();
     this.collection = this.client.db().collection<PresentationDocument>('presentation_documents');

@@ -53,6 +53,8 @@ Add `--require-smtp` when email-based authentication features will be enabled in
 
 - [ ] Production configuration readiness returned `PASS` with external MySQL/MongoDB/Redis endpoints and no MySQL root credential on the application host.
 - [ ] Remote datastores use approved encrypted connections, scoped service credentials and private/network-restricted access.
+- [ ] Enforced driver TLS is active for `MYSQL_TLS=true` (Prisma adapter + ledger pool), `REDIS_TLS=true`, and a verified MongoDB TLS URI; Prisma migration runner `DATABASE_URL` has `sslaccept=strict`. Provider TLS/CA verification and connection tests are evidenced; no certificate bypass flags.
+- [ ] Three independently hosted remote providers have been activated with non-secret identities and owners recorded; none of the providers or databases run on the application VPS.
 - [ ] A separate short-lived, approved migration runner applied/status-checked reviewed migrations after a verified remote recovery point.
 - [ ] Production app host contains only the SHA-matched compiled runtime and protected operational Apache/PM2 configuration; no source checkout, local database processes/Compose volumes, schema or migrations.
 - [ ] Backup encryption key path was reported `VERIFIED` by `--check-files`.

@@ -16,12 +16,21 @@ export const envValidationSchema = Joi.object({
   MYSQL_DATABASE: Joi.string().min(1).required(),
   MYSQL_USER: Joi.string().min(1).required(),
   MYSQL_PASSWORD: Joi.string().required(),
+  // Required for remote production databases; optional for local/CI.
+  MYSQL_TLS: Joi.boolean()
+    .when('NODE_ENV', { is: 'production', then: Joi.valid(true).required(), otherwise: Joi.optional() })
+    .default(false),
+  MYSQL_TLS_CA_FILE: Joi.string().allow('').default(''),
 
   MONGODB_URI: Joi.string().required(),
 
   REDIS_HOST: Joi.string().required(),
   REDIS_PORT: Joi.number().port().required(),
   REDIS_PASSWORD: Joi.string().allow('').default(''),
+  REDIS_TLS: Joi.boolean()
+    .when('NODE_ENV', { is: 'production', then: Joi.valid(true).required(), otherwise: Joi.optional() })
+    .default(false),
+  REDIS_TLS_CA_FILE: Joi.string().allow('').default(''),
 
   CAPTCHA_HMAC_SECRET: Joi.string().min(32).required(),
   JWT_ACCESS_SECRET: Joi.string().min(32).required(),

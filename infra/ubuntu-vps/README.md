@@ -13,7 +13,7 @@
 | `admin.megagoldenclub.com` | Apache reverse proxy | Admin Next.js standalone | `127.0.0.1:3201` |
 | `api.megagoldenclub.com` | Apache reverse proxy; hide public health endpoints | Compiled NestJS API | `127.0.0.1:3200` |
 
-Only Apache serves port 80/443. Application ports 3200–3202 are local and firewall-blocked. Admin/Member server-side calls use `MEGAGOLDENCLUB_API_URL=http://127.0.0.1:3200`. API queries only **external** MySQL 8 (financial authoritative), MongoDB (CMS/media) and Redis (nonauthoritative); use private/restricted network, approved encrypted transport, least-privilege accounts, provider backups and recovery tests. No MySQL root password on the VPS.
+Only Apache serves port 80/443. Application ports 3200–3202 are local and firewall-blocked. Admin/Member server-side calls use `MEGAGOLDENCLUB_API_URL=http://127.0.0.1:3200`. API queries only **external** MySQL 8 (financial authoritative), MongoDB (CMS/media) and Redis (nonauthoritative). Production **requires** MYSQL_TLS=true, REDIS_TLS=true, MongoDB TLS URI, Prisma migration URL sslaccept=strict, private/restricted network, scoped accounts, provider backups and recovery tests. No MySQL root password on the VPS.
 
 ## What the repo contains
 
@@ -28,11 +28,22 @@ Create a dedicated non-root `megagoldenclub` Unix account with its **own** home 
 
 Stage only the exact SHA256-verified `megagoldenclub-runtime-<SHA>` precompiled GitHub artifact (`api/`, `admin/`, `member/` plus RELEASE_SHA) under immutable `/opt/megagoldenclub/releases/<SHA>`; switch the `current` symlink only on signed-off deployment. The VPS never receives the original app TS/TSX, Prisma migrations, repository, test fixtures or local Compose volumes. A trusted separate migration runner handles remote MySQL migration *after* verified remote recovery point.
 
-## DNS and certificate blockers observed
+## HTTPS activation completed; application still pending
 
-All four MegaGoldenClub names resolved to `103.228.151.134` in the operator's VPS session, while `hostname -I` showed `10.200.5.11` plus Docker bridge addresses. Public HTTPS requests to each hostname **timed out from inside that VPS**, but HTTPS loopback with `--resolve <host>:443:127.0.0.1` returned HTTP 200 from the **existing default Apache site**. Neither proves those domains are correctly hosted. The provider/NAT edge mapping, real external access, Apache vhost ownership and certificates still need verification; do not assume an IP assignment or auto-enable a site.
+On 2026-10-12, four Apache port-80 and port-443 VirtualHosts were enabled and
+Apache `configtest` returned `Syntax OK`. Snap Certbot successfully issued
+apex + www, admin and api certificates, expiring 2027-01-10. Local HTTPS
+checks showed apex `301` to www; www/admin/api returned `503` because the
+MegaGoldenClub PM2 processes have not been deployed yet. Successful issuance
+does **not** prove renewal or public HTTPS health: the expired server-IP
+certificate remains in an unrelated vhost and both old renewal timers logged
+errors. Verify external connectivity and renewal separately without altering
+existing websites.
 
-For an approved rollout, the operator must first validate public 80/443 from outside the VPS, enable the HTTP-only dedicated vhosts after Apache `configtest`, verify actual HTTP-01 access, then issue real Certbot certificates using webroot (apex+www as one SAN cert; admin and api as independent certs). Only afterward enable the HTTPS vhosts and run Apache `configtest` before a graceful reload. Certbot renewal must be tested and its Apache reload hook reviewed. Do not use Certbot's automatic Apache rewriter against unrelated vhosts. This file documents the sequence, **not authorization for execution**.
+Before launching any application, follow the staged, first-time checklist:
+[`FIRST-DEPLOYMENT.md`](FIRST-DEPLOYMENT.md). Remote databases, encrypted
+transport, provider backups, audited migration-runner credentials and production
+secrets are not configured or verified yet; do not assume them ready.
 
 ## Release, health and rollback gates
 

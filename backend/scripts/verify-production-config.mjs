@@ -91,6 +91,10 @@ function validateDatabaseIdentity(env) {
     fail('DATABASE_URL must be a valid mysql:// URL');
   }
   if (url.protocol !== 'mysql:') fail('DATABASE_URL must use mysql://');
+  if (url.searchParams.get('sslaccept') !== 'strict') {
+    fail('DATABASE_URL must enforce sslaccept=strict for the separate Prisma migration runner');
+  }
+  if (!parseBoolean(env, 'MYSQL_TLS')) fail('MYSQL_TLS must be true in production');
   const urlPort = Number(url.port || '3306');
   const urlDatabase = decodeURIComponent(url.pathname.replace(/^\/+/, ''));
   const urlUser = decodeURIComponent(url.username);
@@ -135,6 +139,15 @@ function validateMongo(env) {
   }
   if (!url.hostname) fail('MONGODB_URI must include a host');
   assertExternalHost(url.hostname, 'MONGODB_URI');
+  const tls = url.searchParams.get('tls') ?? url.searchParams.get('ssl');
+  if ((url.protocol === 'mongodb:' && tls !== 'true') || tls === 'false') {
+    fail('Production MONGODB_URI must enable TLS (mongodb+srv:// or mongodb://?tls=true)');
+  }
+  for (const param of ['tlsInsecure', 'tlsAllowInvalidCertificates', 'tlsAllowInvalidHostnames']) {
+    if (url.searchParams.get(param) === 'true') {
+      fail(`Production MONGODB_URI must not disable certificate verification (${param})`);
+    }
+  }
 }
 
 function validateSmtp(env, requireSmtp) {
@@ -162,6 +175,16 @@ function validateSmtp(env, requireSmtp) {
     fail('SMTP_PASSWORD must be a non-placeholder secret of at least 12 characters');
   }
   return 'CONFIGURED';
+}
+
+function validateTlsCaFile(env, key, checkFiles) {
+  const file = value(env, key);
+  if (!file) return;
+  if (!file.startsWith('/')) fail(`${key} must be an absolute path`);
+  if (!checkFiles) return;
+  if (!existsSync(file)) fail(`${key} does not exist on this host`);
+  const stat = statSync(file);
+  if (!stat.isFile() || stat.size === 0) fail(`${key} must be a non-empty file`);
 }
 
 function validateBackupKey(env, checkFiles) {
@@ -198,6 +221,11 @@ export function validateProductionConfig(env, options = {}) {
   capture(() => assertExternalHost(requireValue(env, 'REDIS_HOST'), 'REDIS_HOST'));
   capture(() => parseInteger(env, 'REDIS_PORT', 1, 65535));
   capture(() => requireSecret(env, 'REDIS_PASSWORD'));
+  if (capture(() => parseBoolean(env, 'REDIS_TLS')) === false) {
+    errors.push('REDIS_TLS must be true in production');
+  }
+  capture(() => validateTlsCaFile(env, 'MYSQL_TLS_CA_FILE', options.checkFiles === true));
+  capture(() => validateTlsCaFile(env, 'REDIS_TLS_CA_FILE', options.checkFiles === true));
 
   const captcha = capture(() => requireSecret(env, 'CAPTCHA_HMAC_SECRET', 32));
   const access = capture(() => requireSecret(env, 'JWT_ACCESS_SECRET', 32));
