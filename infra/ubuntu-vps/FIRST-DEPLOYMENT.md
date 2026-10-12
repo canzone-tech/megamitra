@@ -4,8 +4,11 @@ This is the **first** MegaGoldenClub launch.
 
 **2026-10-12 operator decision:** no external cloud database services; same
 shared Ubuntu VPS already runs MySQL 8.0.46, MongoDB 8.0.29 and Docker
-Redis 7.4.11. Use the explicit `local-isolated` profile for dedicated
-loopback DB/users and new Redis-only port 6381, NOT the unrelated databases
+Redis 7.4.11. MySQL admin access is verified and the dedicated app database/user
+have been created. Host Mongo administrator login was unsuccessful; therefore
+use the explicit `local-isolated` profile with a **new independent MongoDB
+Docker instance at 27019** and an isolated Redis-only instance at 6381,
+without changing either existing MongoDB process/container., NOT the unrelated databases
 or containers. [Same-server database gate](SAME-SERVER-DATABASES.md)
 **supersedes the remote-provider stages below for this deployment**.
 Do not create cloud accounts or assume existing database admin credentials.

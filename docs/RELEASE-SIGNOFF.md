@@ -51,10 +51,10 @@ npm --prefix backend run verify:production-config -- /absolute/path/to/productio
 
 Add `--require-smtp` when email-based authentication features will be enabled in the target environment.
 
-- [ ] Production configuration readiness returned `PASS` for the operator-approved topology: default `remote` with verified TLS OR explicit `local-isolated` with dedicated authenticated loopback MySQL/MongoDB and Redis-only Docker port 6381; no MySQL root credential in the application runtime.
+- [ ] Production configuration readiness returned `PASS` for the operator-approved topology: default `remote` with verified TLS OR explicit `local-isolated` with dedicated MySQL 3306, dedicated authenticated MongoDB Docker 27019 and Redis Docker 6381 (all loopback); no MySQL root credential in the application runtime.
 - [ ] Datastores use verified TLS for remote mode OR authenticated, protected loopback-only connections for the approved local-isolated mode; scoped service credentials and independent off-host recovery are mandatory.
 - [ ] Enforced driver TLS is active for `MYSQL_TLS=true` (Prisma adapter + ledger pool), `REDIS_TLS=true`, and a verified MongoDB TLS URI; Prisma migration runner `DATABASE_URL` has `sslaccept=strict`. Provider TLS/CA verification and connection tests are evidenced; no certificate bypass flags.
-- [ ] Actual database/service identities and owners recorded. For local-isolated: MySQL/Mongo `megagoldenclub` databases, dedicated limited users, Redis-only separate container/ACL/volume on 6381; no impact on unrelated stores.
+- [ ] Actual database/service identities and owners recorded. For local-isolated: MySQL `megagoldenclub` scoped app user, new Mongo Docker 27019 with scoped DB/app user, Redis Docker 6381 with ACL and independent volume; no impact on unrelated stores.
 - [ ] The isolated operator-runner `verify:remote-data` gate independently reported MySQL 8 + verified TLS cipher, MongoDB verified TLS + ping and Redis verified TLS + ping. This is connectivity evidence only and does not replace provider recovery verification.
 - [ ] A separate short-lived, approved migration runner applied/status-checked reviewed migrations after a verified remote recovery point.
 - [ ] Production app host contains only the SHA-matched compiled runtime and protected operational Apache/PM2 configuration; no source checkout, local database processes/Compose volumes, schema or migrations.

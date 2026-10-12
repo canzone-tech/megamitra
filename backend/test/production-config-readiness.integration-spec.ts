@@ -206,7 +206,7 @@ describe('MegaGoldenClub production configuration readiness contract', () => {
       MYSQL_PORT: '3306',
       MYSQL_TLS: 'false',
       DATABASE_URL: 'mysql://megagoldenclub_app:prod-db-password-123456789@127.0.0.1:3306/megagoldenclub',
-      MONGODB_URI: 'mongodb://megagoldenclub_app:prod-mongo-password-123456789@127.0.0.1:27017/megagoldenclub?authSource=megagoldenclub',
+      MONGODB_URI: 'mongodb://megagoldenclub_app:prod-mongo-password-123456789@127.0.0.1:27019/megagoldenclub?authSource=megagoldenclub',
       REDIS_HOST: '127.0.0.1',
       REDIS_PORT: '6381',
       REDIS_TLS: 'false',
@@ -225,13 +225,14 @@ describe('MegaGoldenClub production configuration readiness contract', () => {
     for (const [patch, failure] of [
       [{ MYSQL_HOST: '10.200.5.11' }, 'MYSQL_HOST must be 127.0.0.1'],
       [{ MYSQL_DATABASE: 'another_app' }, 'dedicated megagoldenclub database'],
-      [{ MONGODB_URI: 'mongodb://127.0.0.1:27017/megagoldenclub?authSource=megagoldenclub' }, 'must authenticate using a dedicated'],
-      [{ MONGODB_URI: 'mongodb://megagoldenclub_app:pass1234@127.0.0.1:27018/megagoldenclub?authSource=megagoldenclub' }, 'mongodb://127.0.0.1:27017'],
+      [{ MONGODB_URI: 'mongodb://127.0.0.1:27019/megagoldenclub?authSource=megagoldenclub' }, 'must authenticate using a dedicated'],
+      [{ MONGODB_URI: 'mongodb://megagoldenclub_app:pass1234@127.0.0.1:27018/megagoldenclub?authSource=megagoldenclub' }, 'mongodb://127.0.0.1:27019'],
+      [{ MONGODB_URI: 'mongodb://megagoldenclub_app:prod-mongo-password-123456789@127.0.0.1:27017/megagoldenclub?authSource=megagoldenclub' }, 'mongodb://127.0.0.1:27019'],
       [{ REDIS_HOST: '0.0.0.0' }, 'REDIS_HOST must be 127.0.0.1'],
       [{ REDIS_PORT: '6379' }, 'REDIS_PORT must be 6381'],
       [{ REDIS_PORT: '6380' }, 'REDIS_PORT must be 6381'],
       [{ MEGAGOLDENCLUB_DATA_TOPOLOGY: 'invalid' }, 'must be remote or local-isolated'],
-      [{ MONGODB_URI: 'mongodb://megagoldenclub_app:prod-mongo-password-123456789@127.0.0.1:27017/megagoldenclub?authSource=megagoldenclub&tlsAllowInvalidCertificates=true' }, 'must not disable certificate verification'],
+      [{ MONGODB_URI: 'mongodb://megagoldenclub_app:prod-mongo-password-123456789@127.0.0.1:27019/megagoldenclub?authSource=megagoldenclub&tlsAllowInvalidCertificates=true' }, 'must not disable certificate verification'],
     ] as const) {
       await writeFile(envPath, encodeEnv({ ...localIsolatedEnv(), ...patch }));
       const result = run();
@@ -243,7 +244,7 @@ describe('MegaGoldenClub production configuration readiness contract', () => {
   it('rejects local-isolated configuration if the datastore password is a placeholder', async () => {
     await writeFile(envPath, encodeEnv({
       ...localIsolatedEnv(),
-      MONGODB_URI: 'mongodb://megagoldenclub_app:CHANGE_ME@127.0.0.1:27017/megagoldenclub?authSource=megagoldenclub',
+      MONGODB_URI: 'mongodb://megagoldenclub_app:CHANGE_ME@127.0.0.1:27019/megagoldenclub?authSource=megagoldenclub',
     }));
     expect(run().stderr).toContain('non-placeholder user');
   });

@@ -167,8 +167,8 @@ function validateMongo(env, mode) {
   if (!url.hostname) fail('MONGODB_URI must include a host');
   assertDatastoreHost(url.hostname, 'MONGODB_URI', mode);
   if (mode === 'local-isolated') {
-    if (url.protocol !== 'mongodb:' || Number(url.port || '27017') !== 27017) {
-      fail('Local-isolated MongoDB must use mongodb://127.0.0.1:27017');
+    if (url.protocol !== 'mongodb:' || Number(url.port || '27017') !== 27019) {
+      fail('Local-isolated MongoDB must use dedicated Docker endpoint mongodb://127.0.0.1:27019');
     }
     if (decodeURIComponent(url.pathname.slice(1)) !== 'megagoldenclub' ||
         url.searchParams.get('authSource') !== 'megagoldenclub') {

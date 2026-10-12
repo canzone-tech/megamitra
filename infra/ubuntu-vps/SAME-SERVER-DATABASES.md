@@ -6,6 +6,51 @@ production sites, so the migration is intentionally staged and never assumes
 administrator database credentials are known. Do not touch existing databases,
 Docker containers, PM2 processes, Apache sites or MySQL/MongoDB auth settings.
 
+## MongoDB administrator credentials unavailable — approved isolated replacement (2026-10-12)
+
+Host MongoDB (127.0.0.1:27017) uses authentication, but `admin` and
+`root` logins were unsuccessful. **Never disable authentication, change
+existing MongoDB users, or delete the system MongoDB service.** The
+MegaGoldenClub operator opted instead to create a fresh **Mongo-only Docker
+container** on `127.0.0.1:27019`. Existing
+`fixtradezone-mongo` Docker container on 27018 stays untouched regardless of
+whether any application still uses it. This paragraph supersedes the earlier
+27017 MongoDB references below.
+
+The ops-only manifest is
+[`megagoldenclub-mongo.compose.yaml`](megagoldenclub-mongo.compose.yaml).
+It uses a dedicated Compose project/container/volume, fixed MongoDB 8.0.29
+image, authenticated root bootstrap via a file-mounted secret, bounded
+1 GiB memory/0.25 GiB WiredTiger cache, localhost-only published port and
+bounded Docker logs. The official Mongo image runs its entrypoint as root
+to adjust the dedicated DB volume before dropping to its MongoDB account;
+do not drop the CHOWN capability before this initialization.
+
+Provisioning prerequisites: confirm 27019 and the unique container/project
+name are unused. Prepare `/etc/megagoldenclub/mongo` as root-owned mode
+0700 and independently generate `root-password` securely (no plaintext
+secrets in commands, Git, Compose environment values, chat or shell history).
+The Docker Compose file secret is mounted into the container and read through
+`MONGO_INITDB_ROOT_PASSWORD_FILE`; ensure the MongoDB UID can read the
+mounted secret while the host parent directory is accessible only to root.
+Store a secure **off-host** copy of the bootstrap password, then run Compose
+only for `megagoldenclub-mongo.compose.yaml`; never run any Compose teardown
+against unrelated projects.
+
+Once the new container is healthy, authenticate as `megagoldenclub_root` on
+localhost port 27019 with an **interactive password prompt**. In database
+`megagoldenclub`, create only user `megagoldenclub_app` with scoped
+`readWrite` role and a separate strong password entered via
+`passwordPrompt()`. Use application URI
+`mongodb://megagoldenclub_app:<URL_ENCODED_PASSWORD>@127.0.0.1:27019/megagoldenclub?authSource=megagoldenclub`.
+Do not put root credentials in the application API environment.
+
+**MongoDB deletion is not approved**: never stop/remove/disable the host
+MongoDB service or the existing 27018 container without verifying all
+other sites, active connections, backups and explicit operator approval.
+This safe separate-instance plan is intentionally reversible without
+touching unrelated production MongoDB data.
+
 ## Verified inventory (2026-10-12)
 
 - MySQL **8.0.46**, system service on `127.0.0.1:3306`.
@@ -22,16 +67,13 @@ Docker containers, PM2 processes, Apache sites or MySQL/MongoDB auth settings.
 | Component | Allowed bind | Separate ownership |
 | --- | --- | --- |
 | Financial MySQL 8 | `127.0.0.1:3306` | Database `megagoldenclub`, app principal `megagoldenclub_app` scoped to this DB; a distinct approved migration principal for DDL |
-| CMS MongoDB 8 | `127.0.0.1:27017` | Database `megagoldenclub`, dedicated `megagoldenclub_app` user scoped to that DB and authenticated via `authSource=megagoldenclub` |
+| CMS MongoDB 8 | `127.0.0.1:27019` | **New isolated Docker container**, dedicated volume; authenticated `megagoldenclub_app` scoped to `megagoldenclub` |
 | Cache Redis 7.4 | `127.0.0.1:6381` | **New** `megagoldenclub-redis` container with its own ACL, volume, memory limit and Compose project |
 
 **Safety gates before provisioning:** Verify authenticated administrative access
-to MySQL without disclosing credentials. Verify host MongoDB
-`security.authorization: enabled` and that the host instance has
-appropriately protected unrelated databases. If host MongoDB authorization
-is disabled, **STOP**: enabling auth or rewriting its config could break
-other sites. Decide on a separately authenticated Mongo container instead,
-then update/verify the topology contract in GitHub before deploying.
+to MySQL without disclosing credentials. Host MongoDB authentication is enabled but administrator credentials are
+not available. The project therefore uses the **new dedicated MongoDB
+container** at 27019 instead; leave existing host auth and data unchanged.
 Confirm that port 6381 and the new container name are free. Record
 separate recoverable backups of existing shared datastores **before any
 account/database administration changes**.
@@ -41,7 +83,7 @@ account/database administration changes**.
 Set `MEGAGOLDENCLUB_DATA_TOPOLOGY=local-isolated` **only** for this VPS.
 `remote` remains the default and continues to require certificate-verified
 transport. The local-isolated profile locks MySQL/Mongo/Redis to
-`127.0.0.1` at ports 3306, 27017 and 6381, rejects other existing app
+`127.0.0.1` at ports 3306, 27019 and 6381, rejects other existing app
 databases/ports, and requires non-placeholder credentials.
 
 Runtime configuration concept (VALUES ARE NOT CREDENTIALS):
@@ -54,7 +96,7 @@ MYSQL_PORT=3306
 MYSQL_DATABASE=megagoldenclub
 MYSQL_USER=megagoldenclub_app
 MYSQL_TLS=false
-MONGODB_URI=mongodb://megagoldenclub_app:<URL_ENCODED_SECRET>@127.0.0.1:27017/megagoldenclub?authSource=megagoldenclub
+MONGODB_URI=mongodb://megagoldenclub_app:<URL_ENCODED_SECRET>@127.0.0.1:27019/megagoldenclub?authSource=megagoldenclub
 REDIS_HOST=127.0.0.1
 REDIS_PORT=6381
 REDIS_TLS=false
@@ -96,7 +138,7 @@ Existing containers on 6379/6380/27018 are **never** replaced or recycled.
 
 Execute production config validation from the operator/build side. For
 `local-isolated` connectivity checks, a trusted isolated runner can use
-SSH loopback forwards to this host's 3306/27017/6381; never expose the DB
+SSH loopback forwards to this host's 3306/27019/6381; never expose the DB
 ports publicly. Do not place Prisma schemas, migrations, local dev Compose,
 or Git checkout on the application VPS.
 

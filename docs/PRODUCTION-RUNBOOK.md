@@ -7,10 +7,11 @@ This runbook covers the immutable source-free production runtime and recovery co
 **Update, 2026-10-12:** The operator confirmed preinstalled shared-host MySQL
 8.0.46, MongoDB 8.0.29 and Docker Redis 7.4.11 and selected **no external
 cloud databases**. This is the explicit `MEGAGOLDENCLUB_DATA_TOPOLOGY=local-isolated`
-exception. Use dedicated, authenticated `megagoldenclub` MySQL/Mongo databases
-on loopback, plus a separately owned Redis-only container on 127.0.0.1:6381.
-Never alter existing site databases, 6379/6380 Redis containers or 27018 Mongo
-container. Check existing Mongo auth and MySQL admin access first; record
+exception. Reuse dedicated MySQL database on host port 3306. Because the host
+MongoDB admin credentials are unavailable, use a **new, separate authenticated
+MongoDB Docker container at 127.0.0.1:27019** and a separately owned Redis-only
+container on 127.0.0.1:6381. Never alter existing host MongoDB 27017,
+other Mongo container 27018, existing Redis 6379/6380, or other sites. Check existing Mongo auth and MySQL admin access first; record
 off-host backup and tested isolated restore before app or migrations.
 See [same-server deployment policy](../infra/ubuntu-vps/SAME-SERVER-DATABASES.md).
 
@@ -202,7 +203,7 @@ Do not reopen traffic until verification passes and critical balances, policy ve
 1. Confirm Backend CI, Frontend CI and Release Evidence all green for **the exact candidate SHA**; require the source-free `megagoldenclub-runtime-<SHA>` archive, companion SHA256 checksum, and authenticated browser-UAT evidence.
 2. On the local/target-like verification host only, run root `npm run verify`. Validate the real production environment securely from an operator/build machine with `verify:production-config --check-files`; record evidence. **Never git clone or execute `npm run verify` on the production application host.**
 3. Resolve applicable manual visual/stateful UAT, business-owner, domain/TLS, monitoring, provider-operator, retention and off-host recovery gates in `docs/RELEASE-SIGNOFF.md`. Automated green does not authorize public traffic.
-4. Configure the approved data topology: for this shared VPS, dedicated `megagoldenclub` MySQL/Mongo authenticated databases at loopback ports 3306/27017 and new isolated Redis-only container 6381. Do not change other database services. Require independently accessible off-host backups, retention, alerts, isolated restore, and approved MySQL/Mongo admin isolation.
+4. Configure the approved data topology: for this shared VPS, dedicated `megagoldenclub` host MySQL database on port 3306, new authenticated MongoDB Docker on port 27019 and new isolated Redis Docker on port 6381. Do not change other database services. Require independently accessible off-host backups, retention, alerts, isolated restore, and approved MySQL/Mongo admin isolation.
 5. From a trusted ephemeral migration runner (not the production app host), take/check a remote restore point and run append-only `prisma migrate deploy` **exactly once** with a schema/migration bundle checked out for this SHA. Review migration status, keep credentials out of images/artifacts and revoke short-lived access afterwards.
 6. Verify the archive SHA256, assert its `RELEASE_SHA` matches the approved candidate, then transfer/extract only the compiled runtime onto the production application host. Use unprivileged service identities and immutable release directories, not a repository working tree.
 7. Under the separate `megagoldenclub` service account (never the root pre-existing unrelated application PM2), run only the three compiled programs defined in `infra/ubuntu-vps/ecosystem.config.cjs`; their `cwd` values point to the approved, source-free runtime. API child reads `/etc/megagoldenclub/api.env` through Node 24 `--env-file`; Admin/Member never receive those DB credentials. Bind all on localhost ports 3200–3202 and expose via the four specific Apache HTTP/HTTPS VirtualHosts *after* verified external domain routing and valid Certbot certificates. Do not start Caddy or change existing Apache sites/PM2 processes. Target Node 24 x86_64 must match the CI release runtime.

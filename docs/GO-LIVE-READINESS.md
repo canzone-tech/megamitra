@@ -37,7 +37,7 @@ These are intentionally not auto-approved:
 2. One coherent stateful UAT journey using controlled test data, including paid E-PIN registration, installment submission/review, same-receipt transition, five-digit token issuance, draw participation/winner handling and downstream KYC/fulfilment or entitlement state where applicable.
 3. A real encrypted off-host backup retrieved from the actual remote storage boundary and restored into isolated production-like infrastructure, followed by root `npm run verify` and critical-record sampling.
 4. Production domain/TLS/edge-proxy configuration (Apache + PM2 on the shared host; HTTPS certs issued 2026-10-12, live app 503 pending database+PM2; see [same-server DB gate](../infra/ubuntu-vps/SAME-SERVER-DATABASES.md)), reliable Certbot renewal, monitoring/alert routing, retention controls and named release/rollback/recovery owners.
-5. A separate approved schema migration runner and data-topology sign-off: default remotely hosted databases OR explicitly selected same-server `local-isolated` with dedicated authenticated MySQL/MongoDB databases and isolated Redis-only container; never a production repository checkout.
+5. A separate approved schema migration runner and data-topology sign-off: default remotely hosted databases OR explicitly selected same-server `local-isolated` with dedicated MySQL database and new authenticated isolated MongoDB/Redis Docker containers; never a production repository checkout.
 6. Real operator UAT for any provider/process that will move actual money, send actual email, or hand off actual fulfilment.
 
 Evidence for these gates belongs in `docs/RELEASE-SIGNOFF.md`.

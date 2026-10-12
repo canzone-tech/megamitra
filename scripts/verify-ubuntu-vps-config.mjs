@@ -121,6 +121,27 @@ for (const blocked of ['0.0.0.0:6381', '127.0.0.1:6380', '127.0.0.1:6379', '2701
 }
 assert.ok(redisConf.includes('aclfile /run/redis/users.acl'));
 assert.doesNotMatch(redisConf, /requirepass|CHANGE_ME|password=/i);
+// Separate MongoDB avoids unsafe changes to the host's existing mongod
+// and unrelated :27018 Docker mongo; never publish Mongo to the internet.
+const mongoCompose = read('infra/ubuntu-vps/megagoldenclub-mongo.compose.yaml');
+for (const expected of [
+  'name: megagoldenclub-mongo',
+  'container_name: megagoldenclub-mongo',
+  'image: mongo:8.0.29-noble',
+  '127.0.0.1:27019:27017',
+  'MONGO_INITDB_ROOT_PASSWORD_FILE: /run/secrets/mongodb_root_password',
+  'file: /etc/megagoldenclub/mongo/root-password',
+  'megagoldenclub-mongo-data:/data/db',
+  '--auth',
+  'restart: unless-stopped',
+  'mem_limit: 1024m',
+]) assert.ok(mongoCompose.includes(expected), `Missing safe Mongo Compose setting: ${expected}`);
+for (const blocked of [
+  '0.0.0.0:27019',
+  '127.0.0.1:27017:27017',
+  '127.0.0.1:27018:27017',
+  'MONGO_INITDB_ROOT_PASSWORD:',
+]) assert.ok(!mongoCompose.includes(blocked), `Mongo Compose may not share existing data or a public port: ${blocked}`);
 const api = read('backend/src/main.ts');
 assert.match(api, /process\.env\.HOST/);
 assert.match(api, /app\.listen\(port, host\)/);

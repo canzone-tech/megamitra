@@ -31,10 +31,11 @@ export class PresentationDocumentStore implements OnModuleInit, OnModuleDestroy 
       const tls = parsed.searchParams.get('tls') ?? parsed.searchParams.get('ssl');
       if (mode === 'local-isolated') {
         if (parsed.protocol !== 'mongodb:' || parsed.hostname !== '127.0.0.1' ||
-            Number(parsed.port || '27017') !== 27017 ||
+            Number(parsed.port || '27017') !== 27019 ||
             decodeURIComponent(parsed.pathname) !== '/megagoldenclub' ||
             parsed.searchParams.get('authSource') !== 'megagoldenclub' ||
-            !parsed.username || !parsed.password) {
+            decodeURIComponent(parsed.username) !== 'megagoldenclub_app' ||
+            decodeURIComponent(parsed.password).length < 16) {
           throw new Error('Production local MongoDB must be authenticated on dedicated loopback database');
         }
       } else if (
