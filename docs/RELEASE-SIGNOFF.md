@@ -120,6 +120,9 @@ Review `docs/STATEFUL-UAT-COVERAGE.md`, `docs/UAT-CHECKLIST.md` and `docs/GO-LIV
 - [ ] Every `AUTOMATED + HUMAN` matrix row applicable to this release has a human evidence reference.
 - [ ] Every `PROVIDER`/real-process row is either UAT-approved above or explicitly `N/A` for a reason allowed by `docs/GO-LIVE-READINESS.md`.
 - [ ] Every applicable `OPEN RULE` has an explicit approved business decision or remains a release blocker; no default was invented during UAT.
+- [ ] Canonical DNS A/AAAA resolution, HTTPS certificates and apex-to-www redirect are verified for `megagoldenclub.com`, `www.megagoldenclub.com`, `admin.megagoldenclub.com` and `api.megagoldenclub.com` against the authorized Ubuntu VPS/CDN edge (not assumed from CI).
+- [ ] Public HTTPS API uses authenticated/role-protected endpoints; `/health` and `/health/*` are blocked externally (404), while localhost `/health/ready` succeeds; internal app ports 3100–3102 and all remote data ports are firewalled.
+- [ ] Production `MEGAGOLDENCLUB_PUBLIC_URL` is `https://www.megagoldenclub.com`; Caddy proxy count and cookie boundaries are reviewed.
 - [ ] Production domain/TLS/proxy, monitoring/alert routing, retention controls, rollback/recovery owner and release owner are recorded/approved for the target environment.
 - [ ] No unresolved issue is being treated as implicitly approved.
 

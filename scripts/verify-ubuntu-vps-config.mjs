@@ -30,11 +30,25 @@ for (const app of ['admin', 'member']) {
 }
 assert.match(unit('api'), /^EnvironmentFile=\/etc\/megagoldenclub\/api\.env$/m);
 const caddy = read('infra/ubuntu-vps/Caddyfile.template');
-assert.match(caddy, /\{\$ADMIN_DOMAIN\}/);
-assert.match(caddy, /\{\$MEMBER_DOMAIN\}/);
-assert.match(caddy, /reverse_proxy 127\.0\.0\.1:3101/);
-assert.match(caddy, /reverse_proxy 127\.0\.0\.1:3102/);
-assert.doesNotMatch(caddy, /:3100|mysql|mongodb|redis/i);
+const site = (domain) => {
+  const escaped = domain.replaceAll('.', '\\.');
+  const regex = new RegExp(`^${escaped} \\{([\\s\\S]*?)^\\}`, 'm');
+  const match = caddy.match(regex);
+  assert.ok(match, `Missing canonical Caddy host: ${domain}`);
+  return match[1];
+};
+const apex = site('megagoldenclub.com');
+const member = site('www.megagoldenclub.com');
+const admin = site('admin.megagoldenclub.com');
+const apiSite = site('api.megagoldenclub.com');
+assert.match(apex, /redir https:\/\/www\.megagoldenclub\.com\{uri\} permanent/);
+assert.match(member, /reverse_proxy 127\.0\.0\.1:3102/);
+assert.match(admin, /reverse_proxy 127\.0\.0\.1:3101/);
+assert.match(apiSite, /reverse_proxy 127\.0\.0\.1:3100/);
+assert.match(apiSite, /@internalHealth path \/health \/health\/\*/);
+assert.match(apiSite, /respond @internalHealth 404/);
+assert.doesNotMatch(member + admin + apex, /reverse_proxy 127\.0\.0\.1:3100/);
+assert.doesNotMatch(caddy, /reverse_proxy (mysql|mongodb|redis)|0\.0\.0\.0:310[012]/i);
 const api = read('backend/src/main.ts');
 assert.match(api, /process\.env\.HOST/);
 assert.match(api, /app\.listen\(port, host\)/);

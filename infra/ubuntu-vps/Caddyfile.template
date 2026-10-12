@@ -1,14 +1,29 @@
-# Set ADMIN_DOMAIN and MEMBER_DOMAIN in Caddy's systemd environment.
-# Domain records must point to the VPS and ports 80/443 must be reachable
-# before Caddy can obtain the public TLS certificates automatically.
-# Keep API port 3100 private; Next.js server-side routes proxy it.
+# MegaGoldenClub canonical production domains.
+# Caddy obtains/renews HTTPS certificates automatically once public DNS A/AAAA
+# resolve to the Ubuntu VPS and inbound TCP 80/443 are reachable.
+# Ports 3100/3101/3102 bind to 127.0.0.1; never publish them in the firewall.
+# Do NOT host MySQL, MongoDB or Redis on the application VPS.
 
-{$ADMIN_DOMAIN} {
+megagoldenclub.com {
+  redir https://www.megagoldenclub.com{uri} permanent
+}
+
+www.megagoldenclub.com {
+  encode zstd gzip
+  reverse_proxy 127.0.0.1:3102
+}
+
+admin.megagoldenclub.com {
   encode zstd gzip
   reverse_proxy 127.0.0.1:3101
 }
 
-{$MEMBER_DOMAIN} {
+api.megagoldenclub.com {
+  # The API hostname is public HTTPS, but internal health/ready endpoints must
+  # not disclose infrastructure status externally. Local 127.0.0.1 checks work.
+  @internalHealth path /health /health/*
+  respond @internalHealth 404
+
   encode zstd gzip
-  reverse_proxy 127.0.0.1:3102
+  reverse_proxy 127.0.0.1:3100
 }

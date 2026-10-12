@@ -69,6 +69,12 @@ jobs:
       - name: Verify Ubuntu VPS remote-data service templates
         run: node ../scripts/verify-ubuntu-vps-config.mjs
 
+      - name: Validate canonical production Caddy HTTPS routing
+        run: |
+          docker run --rm --network none \
+            -v "${GITHUB_WORKSPACE}/infra/ubuntu-vps/Caddyfile.template:/etc/caddy/Caddyfile:ro" \
+            caddy:2-alpine caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+
       - name: Start CI data services
         run: |
           docker compose -f ../docker-compose.yml up -d --wait --wait-timeout 120
