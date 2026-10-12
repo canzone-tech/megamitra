@@ -57,8 +57,7 @@ if ! cmp -s "$SRC/megagoldenclub-redis.compose.yaml" "$COMPOSE" &&
    ! cmp -s "$COMPOSE" <(
      sed -e '/^      # Avoid Docker copying the image/d' \
          -e '/^      # that copy can undo/d' \
-         -e '/^      - type: volume$/,/^          nocopy: true$/c\\
-      - megagoldenclub-redis-data:/data' \
+         -e '/^      - type: volume$/,/^          nocopy: true$/c\      - megagoldenclub-redis-data:/data' \
        "$SRC/megagoldenclub-redis.compose.yaml"
    ); then
   echo 'STOP: staged Redis Compose differs from original or reviewed nocopy manifest' >&2

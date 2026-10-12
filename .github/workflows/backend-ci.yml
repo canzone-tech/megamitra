@@ -136,6 +136,11 @@ jobs:
             'set -e; id; ls -ldn /data; test -w /data; test -x /data; touch /data/.ci-redis-write-proof; rm /data/.ci-redis-write-proof; echo "Write access: PASS"'
           echo 'Dedicated Redis data volume UID10001 write access: PASS'
 
+      - name: Regression test partial-setup Redis recovery on disposable CI runner
+        run: |
+          sudo env GITHUB_ACTIONS=true GITHUB_RUN_ID="$GITHUB_RUN_ID" \
+            bash ../scripts/test-redis-recovery.sh "$GITHUB_WORKSPACE/infra/ubuntu-vps"
+
       - name: Start CI data services
         run: |
           docker compose -f ../docker-compose.yml up -d --wait --wait-timeout 120
