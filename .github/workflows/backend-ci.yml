@@ -371,6 +371,10 @@ jobs:
         working-directory: .
         run: bash scripts/verify-production-artifact.sh "${RUNNER_TEMP}/megagoldenclub-runtime"
 
+      - name: Verify real packaged archive is readable by dedicated service group
+        working-directory: .
+        run: python3 scripts/test-packaged-runtime-permissions.py "${RUNNER_TEMP}/megagoldenclub-runtime.tar.gz" "${GITHUB_SHA}"
+
       - name: Upload source-free production runtime
         uses: actions/upload-artifact@v4
         with:
