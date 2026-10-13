@@ -63,8 +63,8 @@ if verify_pristine_pm2_home "$HOME_FIXTURE" "$PM2_FIXTURE" "$UID_NOW" "$((UID_NO
   echo 'STOP: unexpected ownership incorrectly accepted' >&2; exit 1
 fi
 
-# Existing manifest left by a failed pre-start attempt must be reused only if
-# identical to the pinned reviewed ops file with protected root file identity.
+# Existing bootstrap manifest must be reused if its bytes are identical,
+# root-owned, and safely readable. Refuse altered/linked/world-writable files.
 awk '/^verify_existing_ecosystem\(\) \{/{copy=1} copy{print} copy && /^}/{exit}' \
   infra/ubuntu-vps/launch-dedicated-runtime.sh > "$TMP/ecosystem-validator.sh"
 source "$TMP/ecosystem-validator.sh"
@@ -72,24 +72,40 @@ OPS_FIXTURE="$TMP/reviewed-ops.cjs"
 EXISTING_FIXTURE="$TMP/existing-ops.cjs"
 printf '%s\n' "module.exports = { apps: [] };" > "$OPS_FIXTURE"
 cp "$OPS_FIXTURE" "$EXISTING_FIXTURE"
+for MODE in 600 640 644; do
+  chmod "$MODE" "$EXISTING_FIXTURE"
+  verify_existing_ecosystem "$EXISTING_FIXTURE" "$OPS_FIXTURE" "$UID_NOW" "$GID_NOW" "$GID_NOW"
+  # Simulate root:megagoldenclub 0640: noncanonical group, but dedicated
+  # service group is authorized. No chown or real production accounts in CI.
+  verify_existing_ecosystem "$EXISTING_FIXTURE" "$OPS_FIXTURE" "$UID_NOW" "$((GID_NOW+1))" "$GID_NOW"
+done
 chmod 0644 "$EXISTING_FIXTURE"
-verify_existing_ecosystem "$EXISTING_FIXTURE" "$OPS_FIXTURE" "$UID_NOW" "$GID_NOW"
 printf '%s\n' "module.exports = { apps: ['different'] };" > "$EXISTING_FIXTURE"
-if verify_existing_ecosystem "$EXISTING_FIXTURE" "$OPS_FIXTURE" "$UID_NOW" "$GID_NOW"; then
+if verify_existing_ecosystem "$EXISTING_FIXTURE" "$OPS_FIXTURE" "$UID_NOW" "$GID_NOW" "$GID_NOW"; then
   echo 'STOP: changed PM2 manifest incorrectly accepted' >&2; exit 1
 fi
 cp "$OPS_FIXTURE" "$EXISTING_FIXTURE"
-chmod 0600 "$EXISTING_FIXTURE"
-if verify_existing_ecosystem "$EXISTING_FIXTURE" "$OPS_FIXTURE" "$UID_NOW" "$GID_NOW"; then
-  echo 'STOP: wrong PM2 manifest permissions incorrectly accepted' >&2; exit 1
-fi
+for MODE in 660 664 666 777 755; do
+  chmod "$MODE" "$EXISTING_FIXTURE"
+  if verify_existing_ecosystem "$EXISTING_FIXTURE" "$OPS_FIXTURE" "$UID_NOW" "$GID_NOW" "$GID_NOW"; then
+    echo "STOP: unsafe PM2 manifest mode $MODE incorrectly accepted" >&2; exit 1
+  fi
+done
 chmod 0644 "$EXISTING_FIXTURE"
-if verify_existing_ecosystem "$EXISTING_FIXTURE" "$OPS_FIXTURE" "$((UID_NOW+1))" "$GID_NOW"; then
-  echo 'STOP: wrong PM2 manifest owner incorrectly accepted' >&2; exit 1
+if verify_existing_ecosystem "$EXISTING_FIXTURE" "$OPS_FIXTURE" "$((UID_NOW+1))" "$GID_NOW" "$GID_NOW"; then
+  echo 'STOP: unexpected PM2 manifest owner incorrectly accepted' >&2; exit 1
 fi
+if verify_existing_ecosystem "$EXISTING_FIXTURE" "$OPS_FIXTURE" "$UID_NOW" "$((GID_NOW+1))" "$((GID_NOW+2))"; then
+  echo 'STOP: foreign PM2 manifest group incorrectly accepted' >&2; exit 1
+fi
+ln "$EXISTING_FIXTURE" "$TMP/linked-manifest.cjs"
+if verify_existing_ecosystem "$EXISTING_FIXTURE" "$OPS_FIXTURE" "$UID_NOW" "$GID_NOW" "$GID_NOW"; then
+  echo 'STOP: hardlinked PM2 manifest incorrectly accepted' >&2; exit 1
+fi
+rm "$TMP/linked-manifest.cjs"
 rm "$EXISTING_FIXTURE"
 ln -s "$OPS_FIXTURE" "$EXISTING_FIXTURE"
-if verify_existing_ecosystem "$EXISTING_FIXTURE" "$OPS_FIXTURE" "$UID_NOW" "$GID_NOW"; then
+if verify_existing_ecosystem "$EXISTING_FIXTURE" "$OPS_FIXTURE" "$UID_NOW" "$GID_NOW" "$GID_NOW"; then
   echo 'STOP: symlink PM2 manifest incorrectly accepted' >&2; exit 1
 fi
 

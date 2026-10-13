@@ -65,15 +65,26 @@ fi
 # identical to this exact reviewed GitHub manifest. Never silently overwrite.
 # The pure verifier is tested on isolated fixture files in Backend CI.
 verify_existing_ecosystem() {
-  local existing="$1" reviewed="$2" uid="$3" gid="$4"
+  local existing="$1" reviewed="$2" owner_uid="$3" root_gid="$4" service_gid="$5"
+  local uid gid mode links
   if [[ -L "$existing" || ! -f "$existing" ]]; then
     echo 'STOP: existing PM2 manifest is not a regular non-symlink file' >&2
     return 1
   fi
-  if [[ "$(stat -c '%u:%g:%a' -- "$existing")" != "$uid:$gid:644" ]]; then
-    echo 'STOP: existing PM2 manifest has unexpected ownership or permissions' >&2
+  IFS=: read -r uid gid mode links < <(stat -c '%u:%g:%a:%h' -- "$existing")
+  if [[ "$uid" != "$owner_uid" ||
+        ( "$gid" != "$root_gid" && "$gid" != "$service_gid" ) ||
+        "$links" != 1 ]]; then
+    echo 'STOP: existing PM2 manifest ownership or hardlink boundary unexpected' >&2
     return 1
   fi
+  # Bootstrap tools may have created root:megagoldenclub 0640 or root:root
+  # 0600; both are safe if the bytes are identical. Group/world-writable
+  # files, symlinks, arbitrary owners and unexpected modes still fail closed.
+  case "$mode" in
+    600|640|644) ;;
+    *) echo 'STOP: existing PM2 manifest permissions unsafe' >&2; return 1 ;;
+  esac
   if ! cmp -s -- "$existing" "$reviewed"; then
     echo 'STOP: existing PM2 manifest differs from pinned reviewed version' >&2
     return 1
@@ -81,7 +92,7 @@ verify_existing_ecosystem() {
 }
 ECOSYSTEM_PRESENT=0
 if [[ -e "$ECOSYSTEM" || -L "$ECOSYSTEM" ]]; then
-  verify_existing_ecosystem "$ECOSYSTEM" "$OPS" 0 0
+  verify_existing_ecosystem "$ECOSYSTEM" "$OPS" 0 0 "$(id -g "$SERVICE")"
   ECOSYSTEM_PRESENT=1
   echo 'Existing protected PM2 manifest: IDENTICAL / REUSABLE'
 fi
@@ -177,6 +188,16 @@ echo 'Dedicated account, reserved ports and secrets-free PM2 config: PASS'
 echo '=== CONFIGURE ONLY MEGAGOLDENCLUB OPS FILES ==='
 if [[ "$ECOSYSTEM_PRESENT" == 0 ]]; then
   install -o root -g root -m 0644 "$OPS" "$ECOSYSTEM"
+else
+  # Only metadata normalization on a root-owned, byte-identical checked file.
+  # Never rewrite its contents or change an unrelated PM2 configuration.
+  chown 0:0 -- "$ECOSYSTEM"
+  chmod 0644 -- "$ECOSYSTEM"
+  if [[ "$(stat -c '%u:%g:%a:%h' -- "$ECOSYSTEM")" != '0:0:644:1' ]] ||
+     ! cmp -s -- "$ECOSYSTEM" "$OPS"; then
+    echo 'STOP: existing manifest changed during safe metadata normalization' >&2
+    exit 1
+  fi
 fi
 install -d -o "$SERVICE" -g "$SERVICE" -m 0700 "$HOME_DIR"
 install -d -o "$SERVICE" -g "$SERVICE" -m 0700 "$PM2_HOME_DIR"
