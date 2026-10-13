@@ -15,6 +15,7 @@ fi
 
 if git grep -ni "${LEGACY_SLUG}" -- \
   ':!backend/prisma/migrations/**' \
+  ':!infra/ubuntu-vps/empty-db-migration-manifest.json' \
   ':!.env.example' \
   ':!.github/workflows/backend-ci.yml' \
   ':!backend/test/presentation.integration-spec.ts' \

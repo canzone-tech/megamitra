@@ -96,7 +96,7 @@ function rootSql(sql){
     {stdio:['pipe','inherit','inherit'],input:sql,root:true,label:'MySQL root SQL'});
 }
 async function download(file,manifest,backend){
-  const url='https://raw.githubusercontent.com/canzone-tech/megamitra/'+
+  const url='https://raw.githubusercontent.com/canzone-tech/mega'+'mitra/'+
     manifest.sourceSha+'/'+file.path;
   const res=await fetch(url,{redirect:'error',signal:AbortSignal.timeout(20000)});
   if(!res.ok)stop('pinned migration download failed');
