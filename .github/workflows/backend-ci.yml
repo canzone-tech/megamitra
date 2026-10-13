@@ -144,6 +144,9 @@ jobs:
       - name: Test one-time protected production API environment staging
         run: node ../scripts/test-stage-api-env.mjs
 
+      - name: Test ops-only dedicated MySQL schema inventory classification
+        run: node ../scripts/test-inspect-mysql-schema.mjs
+
       - name: Start CI data services
         run: |
           docker compose -f ../docker-compose.yml up -d --wait --wait-timeout 120

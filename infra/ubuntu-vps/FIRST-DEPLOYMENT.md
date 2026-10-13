@@ -120,6 +120,28 @@ or copied onto the production application host by this script. Complete a
 real encrypted off-host backup and isolated restore, migration-only approval,
 and release sign-off before launching any applications.
 
+### Pre-migration metadata inventory (read-only; no backup override)
+
+For the explicitly approved local-isolated VPS, ops-only
+[`inspect-mysql-schema.mjs`](inspect-mysql-schema.mjs) is a repeatable
+read-only inventory of **only** the dedicated `megagoldenclub` MySQL schema.
+Transfer the exact-SHA script into a temporary root-only location and invoke
+with `/usr/bin/node` as root; do not install application source. It reads
+the existing root:megagoldenclub 0640 `api.env` without shell evaluation,
+validates the exact `megagoldenclub_app@127.0.0.1` connection, stores the
+existing generated MySQL secret only in a temporary root-private
+mysql options file, and queries information_schema and optional
+`_prisma_migrations` metadata. It reports only counts and classification.
+The options file is deleted on exit. No DDL, DML, migration, credentials
+rotation, startup, backup or database/container changes are performed.
+
+**2026-10-13 operator request:** omit backup provisioning for now and
+continue non-destructive setup. This request is NOT a successful backup
+or restore gate. Production financial go-live and irreversible migrations
+remain on HOLD until an explicitly authorized and independently recoverable
+backup, isolated restore evidence and migration-runner approval exist.
+Schema inventory is information only and cannot clear these gates.
+
 ## Stage 3 — remote backup, migration, artifact staging
 
 Record a recoverable remote MySQL/MongoDB snapshot and a tested **isolated
