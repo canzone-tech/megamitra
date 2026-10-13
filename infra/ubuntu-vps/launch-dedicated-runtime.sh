@@ -230,8 +230,14 @@ for(const [name,port] of [['api','3200'],['admin','3201'],['member','3202']]){
 JS
 echo 'Dedicated account, reserved ports and secrets-free PM2 config: PASS'
 
-echo '=== RECONCILE OLD STAGED RELEASE PARENT TRAVERSAL ONLY ==='
+echo '=== RECONCILE ENTIRE VERIFIED COMPILED RELEASE ACCESS ==='
 ensure_staged_runtime_traversal "$BASE" "$RELEASE" 0 0 "$SERVICE_GID"
+RECONCILER="$(dirname -- "$OPS")/reconcile-staged-runtime.py"
+if [[ ! -f "$RECONCILER" || -L "$RECONCILER" ]]; then
+  echo 'STOP: pinned compiled-tree permission reconciler missing' >&2
+  exit 1
+fi
+/usr/bin/python3 "$RECONCILER" "$SHA"
 for entry in api/dist/main.js admin/server.js member/server.js; do
   if ! runuser -u "$SERVICE" -- test -r "$RELEASE/$entry"; then
     echo "STOP: release file $entry remains unreadable after dedicated-only reconciliation" >&2

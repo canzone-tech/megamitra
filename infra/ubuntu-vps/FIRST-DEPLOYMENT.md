@@ -198,6 +198,20 @@ only the API service account/group; Node.js 24 `--env-file` loads the
 secrets in the API child, while Admin/Member receive only the localhost
 API URL. **Do not store application secrets in PM2 env metadata.**
 
+### Existing staged-runtime permission reconciliation
+
+The original Python tar extraction under operator umask 077 can leave
+**nested** standalone API/Next.js files and directories root-only, even
+when the release root is traversable. The reviewed ops-only
+[`reconcile-staged-runtime.py`](reconcile-staged-runtime.py) validates the
+pinned SHA, all release boundaries and every nested filesystem entry first,
+then grants read/traverse permissions **only to the dedicated Unix group**.
+It never follows symlinks, changes unrelated paths, touches databases or
+alters an active PM2 process. CI tests nested files, executable binaries,
+internal/external symlinks, foreign ownership and hardlinks. The first-launch
+script invokes it before starting any PM2 process, and the service account
+then verifies it can read each compiled entrypoint.
+
 ### Source-free runtime staging and first PM2 launch
 
 Use only the exact-SHA CI artifact ZIP named `megagoldenclub-runtime-<SHA>`

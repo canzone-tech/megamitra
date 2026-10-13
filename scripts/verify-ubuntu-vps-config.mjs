@@ -324,6 +324,17 @@ for (const needle of [
     'Missing protected runtime staging invariant: ' + needle,
   );
 }
+const runtimeReconciler = read('infra/ubuntu-vps/reconcile-staged-runtime.py');
+for (const needle of [
+  'grp.getgrnam',
+  'expected_uid',
+  'os.walk',
+  'followlinks=False',
+  'st_nlink',
+  'RELEASE_SHA',
+  'api/dist/main.js',
+]) assert.ok(runtimeReconciler.includes(needle),
+  'Dedicated runtime reconciliation must prove isolation and full-tree integrity: ' + needle);
 const launchRuntime = read('infra/ubuntu-vps/launch-dedicated-runtime.sh');
 for (const needle of [
   'PM2_HOME_DIR=',

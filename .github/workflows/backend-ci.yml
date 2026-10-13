@@ -154,6 +154,10 @@ jobs:
         working-directory: .
         run: python3 scripts/test-stage-runtime.py
 
+      - name: Test whole compiled runtime tree ownership and nested permissions
+        working-directory: .
+        run: python3 scripts/test-reconcile-staged-runtime.py
+
       - name: Test isolated PM2 launch static safety boundaries
         working-directory: .
         run: bash scripts/test-launch-runtime.sh
