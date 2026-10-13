@@ -159,4 +159,40 @@ if ensure_staged_runtime_traversal "$FIX_BASE" "$FIX_RELEASE" "$UID_NOW" "$GID_N
 fi
 echo 'Root-private staged-release traversal reconciliation regression: PASS'
 
+# Exercise the actual PM2 wrapper without running the production PM2 daemon.
+# The launch command is typically invoked from a root-only directory; PM2
+# must enter the dedicated service home BEFORE the privilege drop.
+awk '/^pm2_isolated\(\) \{/{copy=1} copy{print} copy && /^}/{exit}' \
+  infra/ubuntu-vps/launch-dedicated-runtime.sh > "$TMP/pm2-wrapper.sh"
+source "$TMP/pm2-wrapper.sh"
+HOME_DIR="$TMP/dedicated-runtime-home"
+PM2_HOME_DIR="$HOME_DIR/.pm2"
+SERVICE='fixture-service'
+PM2_BIN="$TMP/fake-pm2"
+mkdir -p "$PM2_HOME_DIR" "$TMP/private-root"
+chmod 0700 "$TMP/private-root"
+cat > "$PM2_BIN" <<'FAKE_PM2'
+#!/usr/bin/env bash
+set -euo pipefail
+[[ "$#" == 2 && "$1" == start && "$2" == test-ecosystem.cjs ]]
+[[ "$(pwd -P)" == "$HOME" ]]
+[[ "$PM2_HOME" == "$HOME/.pm2" ]]
+printf 'CWD_CORRECT\n' > "$PM2_TEST_OUTPUT"
+FAKE_PM2
+chmod 0700 "$PM2_BIN"
+# Function override replaces only runuser in disposable fixture. It validates
+# the desired privilege-boundary invocation and executes the fake PM2 script.
+runuser() {
+  [[ "$1" == -u && "$2" == "$SERVICE" && "$3" == -- && "$4" == env ]]
+  shift 4
+  env "$@"
+}
+export PM2_TEST_OUTPUT="$TMP/pm2-cwd.result"
+(
+  cd "$TMP/private-root"
+  pm2_isolated start test-ecosystem.cjs
+)
+[[ "$(<"$PM2_TEST_OUTPUT")" == CWD_CORRECT ]]
+echo 'PM2 child process working directory isolation regression: PASS'
+
 echo 'Isolated first-deployment PM2 contract static regression: PASS'

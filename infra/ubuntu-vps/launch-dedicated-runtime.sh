@@ -24,7 +24,14 @@ LINKED=0
 SUCCESS=0
 
 pm2_isolated() {
-  runuser -u "$SERVICE" -- env "HOME=$HOME_DIR" "PM2_HOME=$PM2_HOME_DIR" "$PM2_BIN" "$@"
+  # Running this script from a root login leaves cwd=/root. PM2 inherits cwd
+  # and its daemon subprocess then fails with "spawn /usr/bin/node EACCES"
+  # even when the Node binary itself is executable. Never spawn from /root;
+  # use the dedicated service-owned working directory for every PM2 action.
+  (
+    cd -- "$HOME_DIR" || return 1
+    runuser -u "$SERVICE" -- env "HOME=$HOME_DIR" "PM2_HOME=$PM2_HOME_DIR" "$PM2_BIN" "$@"
+  )
 }
 cleanup() {
   if [[ "$SUCCESS" != 1 ]]; then
