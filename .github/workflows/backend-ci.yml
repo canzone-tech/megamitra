@@ -158,6 +158,10 @@ jobs:
         working-directory: .
         run: python3 scripts/test-reconcile-staged-runtime.py
 
+      - name: Verify read-only dedicated Node executable diagnostic
+        working-directory: .
+        run: bash scripts/test-inspect-node-execution.sh
+
       - name: Test isolated PM2 launch static safety boundaries
         working-directory: .
         run: bash scripts/test-launch-runtime.sh

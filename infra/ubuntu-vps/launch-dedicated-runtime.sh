@@ -197,6 +197,14 @@ fi
 id "$SERVICE" >/dev/null
 runuser -u "$SERVICE" -- test -r "$ROOT/api.env"
 test "$(/usr/bin/node -p 'process.versions.node.split(".")[0]')" = 24
+# Root can execute Node but a locked-down /usr/bin/node symlink or one of
+# its ancestors may return EACCES under the dedicated service account.
+# Test the EXACT interpreter PM2 will spawn, before installing PM2 state.
+if ! runuser -u "$SERVICE" -- /usr/bin/node --version >/dev/null 2>&1; then
+  echo 'STOP: megagoldenclub user cannot execute /usr/bin/node; inspect with dedicated read-only Node diagnostic, DO NOT restart PM2' >&2
+  exit 1
+fi
+echo 'Dedicated service-user /usr/bin/node execution: PASS'
 for port in 3200 3201 3202; do
   if ss -ltnH "( sport = :$port )" | grep -q .; then
     echo "STOP: reserved port $port already in use" >&2; exit 1

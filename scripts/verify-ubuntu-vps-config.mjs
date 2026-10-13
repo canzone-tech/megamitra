@@ -335,6 +335,14 @@ for (const needle of [
   'api/dist/main.js',
 ]) assert.ok(runtimeReconciler.includes(needle),
   'Dedicated runtime reconciliation must prove isolation and full-tree integrity: ' + needle);
+const nodeExecInspector = read('infra/ubuntu-vps/inspect-node-execution.sh');
+for (const needle of [
+  'runuser -u "$SERVICE" -- "$NODE" --version',
+  'namei -l',
+  'findmnt -T',
+  'DEDICATED NODE/PM2 DIAGNOSTIC: COMPLETE',
+]) assert.ok(nodeExecInspector.includes(needle),
+  'Dedicated PM2 node execution must be diagnosed read-only: ' + needle);
 const launchRuntime = read('infra/ubuntu-vps/launch-dedicated-runtime.sh');
 for (const needle of [
   'PM2_HOME_DIR=',
