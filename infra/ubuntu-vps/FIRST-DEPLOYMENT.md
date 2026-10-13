@@ -198,6 +198,39 @@ only the API service account/group; Node.js 24 `--env-file` loads the
 secrets in the API child, while Admin/Member receive only the localhost
 API URL. **Do not store application secrets in PM2 env metadata.**
 
+### Source-free runtime staging and first PM2 launch
+
+Use only the exact-SHA CI artifact ZIP named `megagoldenclub-runtime-<SHA>`
+(the download contains `megagoldenclub-runtime.tar.gz` plus `.sha256`).
+The deployment uses **ops-only** [`stage-runtime.py`](stage-runtime.py)
+to verify the inner tarball SHA-256, safe extracted tar members,
+the embedded `RELEASE_SHA`, forbidden source/secrets, and API/Admin/Member
+standalone entrypoints. Stage under immutable `/opt/megagoldenclub/releases/<SHA>`.
+No passwords, migration schemas, original application source, or Git
+checkout belong in this artifact. The full artifact is downloaded from the
+successful GitHub Backend CI run and transferred using the operator's
+trusted SSH transport (not uploaded into a public web directory).
+
+After staging, the first-use [`launch-dedicated-runtime.sh`](launch-dedicated-runtime.sh)
+verifies the unchanged root:megagoldenclub protected API env, all three
+unclaimed localhost ports, an absent prior MegaGoldenClub release symlink,
+an absent separate PM2 home and a reviewed secret-free PM2 manifest.
+It creates only the dedicated account's PM2 home and a `current` symlink,
+starts exactly `megagoldenclub-api`, `megagoldenclub-admin`,
+`megagoldenclub-member` as the dedicated **non-root** Unix user, and
+checks API MySQL/MongoDB/Redis health plus two local frontend HTTP responses.
+On a failed readiness check, it attempts to stop only those three dedicated
+PM2 processes and removes only the newly-created symlink; it leaves the
+source-free staged release in place for investigation. Existing root PM2
+apps, Docker databases, Apache sites and original certificates are untouched.
+
+**Important:** starting these apps makes the already-proxied public sites
+reachable. It is technical deployment, NOT business/finance approval;
+the operator-deferred backup, real restore, TLS auto-renewal, provider/UAT
+and unrelated-site regression gates remain open. Do not enable real-money
+transactions merely because local health checks pass. PM2 startup-on-reboot
+still needs a separate dedicated-user systemd assessment.
+
 ## Stage 4 — live verification + approval
 
 - Reconfirm port 3200/3201/3202 available and bound **only** to 127.0.0.1.

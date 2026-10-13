@@ -295,6 +295,37 @@ for (const unsafe of [
   'FLUSH PRIVILEGES',
   'chmod 777',
 ]) assert.ok(!mysqlRotate.includes(unsafe), `Unsafe MySQL credential operation: ${unsafe}`);
+// Source-free runtime deploy is a separate production-only ops procedure.
+// Root npm run verify checks safety invariants without touching host PM2.
+const stageRuntime = read('infra/ubuntu-vps/stage-runtime.py');
+for (const needle of [
+  'megagoldenclub-runtime.tar.gz',
+  'SHA256',
+  'RELEASE_SHA',
+  'tarfile.open',
+  'filter="data"',
+  'refusing overwrite',
+]) {
+  // Deliberately static only: full archive extraction is exercised in Backend CI.
+  assert.ok(
+    stageRuntime.toLowerCase().includes(needle.toLowerCase()),
+    'Missing protected runtime staging invariant: ' + needle,
+  );
+}
+const launchRuntime = read('infra/ubuntu-vps/launch-dedicated-runtime.sh');
+for (const needle of [
+  'PM2_HOME_DIR=',
+  'runuser -u',
+  '/health/ready',
+  '127.0.0.1:',
+  'api.env',
+  'DEDICATED SOURCE-FREE DEPLOYMENT: PASS',
+]) assert.ok(launchRuntime.includes(needle),
+  'Missing isolated runtime launch invariant: ' + needle);
+for (const forbidden of ['pm2 kill', 'systemctl restart apache', 'docker compose down', 'docker volume rm']) {
+  assert.ok(!launchRuntime.includes(forbidden), 'Unsafe runtime launch operation: ' + forbidden);
+}
+
 const api = read('backend/src/main.ts');
 assert.match(api, /process\.env\.HOST/);
 assert.match(api, /app\.listen\(port, host\)/);
