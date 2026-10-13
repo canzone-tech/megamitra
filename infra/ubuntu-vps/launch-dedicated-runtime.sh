@@ -147,6 +147,45 @@ verify_pristine_pm2_home() {
     fi
   fi
 }
+# Root-owned dedicated archive parents were originally created under a
+# restrictive umask (0700) by the first runtime stager. The tarball itself
+# contains world-readable compiled files, but service users cannot traverse
+# those parent directories. Reconcile ONLY three exact dedicated directories
+# after the pinned SHA check; never recurse, chown or modify /opt itself.
+ensure_staged_runtime_traversal() {
+  local base="$1" release="$2" approved_uid="$3" root_gid="$4" service_gid="$5"
+  local target owner gid mode
+  local paths=("$base" "$base/releases" "$release")
+  for target in "${paths[@]}"; do
+    if [[ -L "$target" || ! -d "$target" ]]; then
+      echo 'STOP: dedicated release directory is missing or a symlink' >&2
+      return 1
+    fi
+    IFS=: read -r owner gid mode < <(stat -c '%u:%g:%a' -- "$target")
+    if [[ "$owner" != "$approved_uid" ||
+          ( "$gid" != "$root_gid" && "$gid" != "$service_gid" ) ]]; then
+      echo 'STOP: dedicated release directory has foreign ownership' >&2
+      return 1
+    fi
+    case "$mode" in
+      700|750|755) ;;
+      *) echo 'STOP: dedicated release directory permissions unsafe' >&2; return 1 ;;
+    esac
+  done
+  # All boundaries validated BEFORE the first chmod. Only the dedicated
+  # release path gets adjusted, making the already-reviewed bundle accessible.
+  for target in "${paths[@]}"; do
+    if [[ "$(stat -c '%a' -- "$target")" != 755 ]]; then
+      chmod 0755 -- "$target"
+    fi
+  done
+  for target in "${paths[@]}"; do
+    if [[ "$(stat -c '%u:%a' -- "$target")" != "$approved_uid:755" ]]; then
+      echo 'STOP: dedicated runtime traversal normalization failed' >&2
+      return 1
+    fi
+  done
+}
 SERVICE_UID="$(id -u "$SERVICE")"
 SERVICE_GID="$(id -g "$SERVICE")"
 verify_pristine_pm2_home "$HOME_DIR" "$PM2_HOME_DIR" "$SERVICE_UID" "$SERVICE_GID"
@@ -157,12 +196,6 @@ if [[ "$(stat -c '%U:%G:%a' "$ROOT")" != 'root:megagoldenclub:750' ||
 fi
 id "$SERVICE" >/dev/null
 runuser -u "$SERVICE" -- test -r "$ROOT/api.env"
-for entry in api/dist/main.js admin/server.js member/server.js; do
-  if ! runuser -u "$SERVICE" -- test -r "$RELEASE/$entry"; then
-    echo "STOP: dedicated service user cannot read source-free runtime $entry" >&2
-    exit 1
-  fi
-done
 test "$(/usr/bin/node -p 'process.versions.node.split(".")[0]')" = 24
 for port in 3200 3201 3202; do
   if ss -ltnH "( sport = :$port )" | grep -q .; then
@@ -196,6 +229,16 @@ for(const [name,port] of [['api','3200'],['admin','3201'],['member','3202']]){
 }
 JS
 echo 'Dedicated account, reserved ports and secrets-free PM2 config: PASS'
+
+echo '=== RECONCILE OLD STAGED RELEASE PARENT TRAVERSAL ONLY ==='
+ensure_staged_runtime_traversal "$BASE" "$RELEASE" 0 0 "$SERVICE_GID"
+for entry in api/dist/main.js admin/server.js member/server.js; do
+  if ! runuser -u "$SERVICE" -- test -r "$RELEASE/$entry"; then
+    echo "STOP: release file $entry remains unreadable after dedicated-only reconciliation" >&2
+    exit 1
+  fi
+done
+echo 'Dedicated pre-staged runtime readable by service account: PASS'
 
 echo '=== CONFIGURE ONLY MEGAGOLDENCLUB OPS FILES ==='
 if [[ "$ECOSYSTEM_PRESENT" == 0 ]]; then

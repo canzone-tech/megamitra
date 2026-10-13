@@ -125,4 +125,38 @@ if verify_existing_ecosystem "$EXISTING_FIXTURE" "$OPS_FIXTURE" "$UID_NOW" "$GID
   echo 'STOP: symlink PM2 manifest incorrectly accepted' >&2; exit 1
 fi
 
+# Prove old root-private staging dirs can be reconciled without recursion,
+# after validating ALL boundaries. Fixture owned by this CI runner.
+awk '/^ensure_staged_runtime_traversal\(\) \{/{copy=1} copy{print} copy && /^}/{exit}' \
+  infra/ubuntu-vps/launch-dedicated-runtime.sh > "$TMP/release-validator.sh"
+source "$TMP/release-validator.sh"
+FIX_BASE="$TMP/megagoldenclub"
+FIX_RELEASE="$FIX_BASE/releases/ba4750b6bf0880ebb8b3a76c6af3bc14acb8e4a4"
+mkdir -p "$FIX_RELEASE/api/dist"
+chmod 0700 "$FIX_BASE" "$FIX_BASE/releases" "$FIX_RELEASE"
+printf 'compiled\n' > "$FIX_RELEASE/api/dist/main.js"
+chmod 0644 "$FIX_RELEASE/api/dist/main.js"
+ensure_staged_runtime_traversal "$FIX_BASE" "$FIX_RELEASE" "$UID_NOW" "$GID_NOW" "$GID_NOW"
+for DIRECTORY in "$FIX_BASE" "$FIX_BASE/releases" "$FIX_RELEASE"; do
+  [[ "$(stat -c %a "$DIRECTORY")" == 755 ]]
+done
+[[ "$(stat -c %a "$FIX_RELEASE/api/dist/main.js")" == 644 ]]
+chmod 0700 "$FIX_BASE" "$FIX_BASE/releases" "$FIX_RELEASE"
+chmod 0777 "$FIX_RELEASE"
+if ensure_staged_runtime_traversal "$FIX_BASE" "$FIX_RELEASE" "$UID_NOW" "$GID_NOW" "$GID_NOW"; then
+  echo 'STOP: unsafe release root was incorrectly accepted' >&2; exit 1
+fi
+[[ "$(stat -c %a "$FIX_BASE")" == 700 ]]
+[[ "$(stat -c %a "$FIX_BASE/releases")" == 700 ]]
+chmod 0700 "$FIX_RELEASE"
+if ensure_staged_runtime_traversal "$FIX_BASE" "$FIX_RELEASE" "$((UID_NOW+1))" "$GID_NOW" "$GID_NOW"; then
+  echo 'STOP: foreign release owner was incorrectly accepted' >&2; exit 1
+fi
+mv "$FIX_RELEASE" "$FIX_BASE/releases/actual"
+ln -s "$FIX_BASE/releases/actual" "$FIX_RELEASE"
+if ensure_staged_runtime_traversal "$FIX_BASE" "$FIX_RELEASE" "$UID_NOW" "$GID_NOW" "$GID_NOW"; then
+  echo 'STOP: symlink release root was incorrectly accepted' >&2; exit 1
+fi
+echo 'Root-private staged-release traversal reconciliation regression: PASS'
+
 echo 'Isolated first-deployment PM2 contract static regression: PASS'
