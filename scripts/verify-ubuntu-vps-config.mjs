@@ -297,6 +297,18 @@ for (const unsafe of [
 ]) assert.ok(!mysqlRotate.includes(unsafe), `Unsafe MySQL credential operation: ${unsafe}`);
 // Source-free runtime deploy is a separate production-only ops procedure.
 // Root npm run verify checks safety invariants without touching host PM2.
+const releaseWorkflow = read('.github/workflows/publish-reviewed-runtime.yml');
+for (const token of [
+  'SOURCE_SHA: ba4750b6bf0880ebb8b3a76c6af3bc14acb8e4a4',
+  'BACKEND_RUN:',
+  'FRONTEND_RUN:',
+  'EVIDENCE_RUN:',
+  'actions/download-artifact@v4',
+  'sha256sum --check --status',
+  'gh release create',
+  '--prerelease',
+]) assert.ok(releaseWorkflow.includes(token),
+  'Published binary must prove approved same-SHA CI provenance: ' + token);
 const stageRuntime = read('infra/ubuntu-vps/stage-runtime.py');
 for (const needle of [
   'megagoldenclub-runtime.tar.gz',

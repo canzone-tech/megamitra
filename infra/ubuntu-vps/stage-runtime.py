@@ -23,9 +23,18 @@ def verify_and_stage(zip_file: Path, sha: str, releases: Path = RELEASE_ROOT) ->
     zip_file = Path(zip_file)
     if not zip_file.is_file() or zip_file.is_symlink():
         raise RuntimeError("Artifact ZIP must be a regular file, not a symlink")
-    if releases.exists() and (releases.is_symlink() or not releases.is_dir()):
-        raise RuntimeError("Release directory identity invalid")
-    releases.mkdir(parents=True, exist_ok=True, mode=0o755)
+    # The operator stages with umask 077, but dedicated PM2 requires
+    # traversal of newly created release directories (mode 0755).
+    # Do not change modes on any existing host directory.
+    for directory in (releases.parent, releases):
+        if directory.is_symlink():
+            raise RuntimeError("Release directory boundary is a symlink")
+        if directory.exists():
+            if not directory.is_dir():
+                raise RuntimeError("Release directory identity invalid")
+        else:
+            directory.mkdir(mode=0o755)
+            directory.chmod(0o755)
     if releases.is_symlink():
         raise RuntimeError("Release directory is a symlink")
     target = releases / sha

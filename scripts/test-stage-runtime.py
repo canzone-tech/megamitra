@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """No external secrets or VPS operations: synthetic source-free fixtures."""
 import hashlib
+import os
 from importlib.machinery import SourceFileLoader
 import io
 from pathlib import Path
@@ -42,7 +43,13 @@ with tempfile.TemporaryDirectory(prefix="megagoldenclub-runtime-ci-") as temp:
     path = temp / "artifact.zip"
     releases = temp / "releases"
     make_zip(path)
-    stage = module.verify_and_stage(path, SHA, releases)
+    previous_umask = os.umask(0o077)
+    try:
+        stage = module.verify_and_stage(path, SHA, releases)
+    finally:
+        os.umask(previous_umask)
+    assert releases.stat().st_mode & 0o777 == 0o755
+    assert stage.stat().st_mode & 0o777 == 0o755
     assert (stage / "RELEASE_SHA").read_text().strip() == SHA
     assert (stage / "api/dist/main.js").exists()
     try:

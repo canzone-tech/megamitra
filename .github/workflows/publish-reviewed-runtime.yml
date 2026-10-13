@@ -1,0 +1,95 @@
+name: Publish reviewed source-free runtime for direct VPS download
+
+on:
+  push:
+    branches:
+      - dev/local-foundation
+    paths:
+      - '.github/workflows/publish-reviewed-runtime.yml'
+      - 'infra/ubuntu-vps/stage-runtime.py'
+      - 'scripts/test-stage-runtime.py'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: write
+
+jobs:
+  publish-reviewed-runtime:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      SOURCE_SHA: ba4750b6bf0880ebb8b3a76c6af3bc14acb8e4a4
+      BACKEND_RUN: '38354590022'
+      FRONTEND_RUN: '38354589875'
+      EVIDENCE_RUN: '38354589868'
+      RELEASE_TAG: runtime-ba4750b6bf0880ebb8b3a76c6af3bc14acb8e4a4
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - name: Verify all three reviewed candidate CI runs succeeded
+        shell: bash
+        run: |
+          set -euo pipefail
+          for run in "$BACKEND_RUN" "$FRONTEND_RUN" "$EVIDENCE_RUN"; do
+            result="$(gh api \
+              "repos/$GITHUB_REPOSITORY/actions/runs/$run" \
+              --jq '[.head_sha,.conclusion,.status] | join(" ")')"
+            if [[ "$result" != "$SOURCE_SHA success completed" ]]; then
+              echo "STOP: reviewed CI run $run is not successful on pinned SHA"
+              exit 1
+            fi
+          done
+          echo 'Pinned Backend CI, Frontend CI, Release Evidence: PASS'
+
+      - name: Download only pinned successful Backend CI runtime
+        uses: actions/download-artifact@v4
+        with:
+          name: megagoldenclub-runtime-${{ env.SOURCE_SHA }}
+          run-id: ${{ env.BACKEND_RUN }}
+          github-token: ${{ github.token }}
+          path: runtime
+
+      - name: Verify source-free ZIP contents and embedded release identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd runtime
+          test -s megagoldenclub-runtime.tar.gz
+          test -s megagoldenclub-runtime.tar.gz.sha256
+          sha256sum --check --status megagoldenclub-runtime.tar.gz.sha256
+          embedded="$(tar -xOzf megagoldenclub-runtime.tar.gz ./RELEASE_SHA)"
+          test "$embedded" = "$SOURCE_SHA"
+          zip -q -j ../megagoldenclub-runtime.zip \
+            megagoldenclub-runtime.tar.gz \
+            megagoldenclub-runtime.tar.gz.sha256
+          test -s ../megagoldenclub-runtime.zip
+          python3 - <<'PY'
+          import zipfile
+          with zipfile.ZipFile('megagoldenclub-runtime.zip') as z:
+              expected = {'megagoldenclub-runtime.tar.gz',
+                          'megagoldenclub-runtime.tar.gz.sha256'}
+              assert set(z.namelist()) == expected, 'unexpected runtime ZIP contents'
+          PY
+          echo 'Source-free runtime SHA256, embedded commit and ZIP: PASS'
+
+      - name: Publish immutable pre-release ZIP on GitHub Releases
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo 'STOP: pinned release tag already exists; refusing overwrite'
+            exit 1
+          fi
+          gh release create "$RELEASE_TAG" \
+            ./megagoldenclub-runtime.zip \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$SOURCE_SHA" \
+            --title "Compiled MegaGoldenClub runtime $SOURCE_SHA" \
+            --notes "Source-free, SHA256-verified runtime artifact from all-green Backend CI, Frontend CI and Release Evidence. Technical staging only: backup and finance sign-off are NOT verified." \
+            --prerelease
+          gh release view "$RELEASE_TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --json assets --jq '.assets[].name' |
+            grep -Fxq 'megagoldenclub-runtime.zip'
+          echo 'GITHUB PUBLIC DIRECT-DOWNLOAD RUNTIME: PASS'
