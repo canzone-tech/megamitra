@@ -1,0 +1,178 @@
+{
+  "sourceSha": "64cb93c323854f03e60d1da1f38e8c9f5ea39aaf",
+  "expectedMigrations": 41,
+  "files": [
+    {
+      "path": "backend/prisma/schema.prisma",
+      "blobSha": "07f16f8ecc7f9d7708f2a9f72ce51fb2d2e8d9d0"
+    },
+    {
+      "path": "backend/prisma.config.ts",
+      "blobSha": "62a8e60d6d4afbb97847a6cc8b2a95541fa80109"
+    },
+    {
+      "path": "backend/prisma/migrations/0001_megamitra_identity_rbac/migration.sql",
+      "blobSha": "f627dedfe6ecacfedcdb0162d70a252e7ee33208"
+    },
+    {
+      "path": "backend/prisma/migrations/0002_megamitra_auth_sessions/migration.sql",
+      "blobSha": "6cc9299f7fe3706a278eef3248a2bb0585c8e52a"
+    },
+    {
+      "path": "backend/prisma/migrations/0003_megamitra_auth_security_config/migration.sql",
+      "blobSha": "94dd80a82c91a47030a03d2dc4c6d1919445e339"
+    },
+    {
+      "path": "backend/prisma/migrations/0004_megamitra_identity_policy_support/migration.sql",
+      "blobSha": "0eb8ca3a32f6497d61587dd287cd8cd43dbcb305"
+    },
+    {
+      "path": "backend/prisma/migrations/0005_megamitra_session_policy_enforcement/migration.sql",
+      "blobSha": "0b0dddab110b7c0f81d38d5bd7fb4306bcc9cd43"
+    },
+    {
+      "path": "backend/prisma/migrations/0006_megamitra_binary_domain_foundation/migration.sql",
+      "blobSha": "c18208f8eb9f6506ebbb988b563a300cef6cbc52"
+    },
+    {
+      "path": "backend/prisma/migrations/0007_megamitra_pair_settlement_ledger/migration.sql",
+      "blobSha": "04e51be67550efbc176a5a4fba9d0dcf27e80726"
+    },
+    {
+      "path": "backend/prisma/migrations/0008_megamitra_explicit_binary_pair_matching/migration.sql",
+      "blobSha": "c9a926d8aca06efc7ab89ee07e9482e29891a0d7"
+    },
+    {
+      "path": "backend/prisma/migrations/0009_megamitra_referral_reward_policy/migration.sql",
+      "blobSha": "b34aed2bce39fdc3858b40140b7508cbbb75ef1b"
+    },
+    {
+      "path": "backend/prisma/migrations/0010_megamitra_program_enrollment_payments/migration.sql",
+      "blobSha": "c60aa7dfd35c9a3da6163a5151295834a517235b"
+    },
+    {
+      "path": "backend/prisma/migrations/0011_megamitra_program_event_orchestration/migration.sql",
+      "blobSha": "9da8693a5916b7617ece9872652df83b223e86e9"
+    },
+    {
+      "path": "backend/prisma/migrations/0012_megamitra_referral_handoff_refund_reconciliation/migration.sql",
+      "blobSha": "434ecf018031275c1b550678034c718595cdec51"
+    },
+    {
+      "path": "backend/prisma/migrations/0013_megamitra_lucky_draw_foundation/migration.sql",
+      "blobSha": "e34c6754b3e49a280e782bf387e9d666f9a4452a"
+    },
+    {
+      "path": "backend/prisma/migrations/0014_megamitra_lucky_draw_prize_fulfillment/migration.sql",
+      "blobSha": "19b3803efca387a90e8e28cbc412716864b64eb8"
+    },
+    {
+      "path": "backend/prisma/migrations/0015_megamitra_operational_read_models/migration.sql",
+      "blobSha": "7a603e7c795aa4d6e95b1930b798ad760f6b5597"
+    },
+    {
+      "path": "backend/prisma/migrations/0016_megamitra_auth_recovery_email/migration.sql",
+      "blobSha": "44303b71923c69f4f60578b871470f9bd66fe61d"
+    },
+    {
+      "path": "backend/prisma/migrations/0017_megamitra_kyc_foundation/migration.sql",
+      "blobSha": "70ef350241ccfebff6479743eab3562b58a1b54d"
+    },
+    {
+      "path": "backend/prisma/migrations/0018_megamitra_withdrawal_payout_foundation/migration.sql",
+      "blobSha": "0b8322ff6fbbb2290a3d258e2ff7126154362579"
+    },
+    {
+      "path": "backend/prisma/migrations/0019_megamitra_product_entitlement_foundation/migration.sql",
+      "blobSha": "c0c2d04675b7f698625c0e3d37ba481278a6383b"
+    },
+    {
+      "path": "backend/prisma/migrations/0020_megamitra_entitlement_orchestration/migration.sql",
+      "blobSha": "4deb16f2402d5fccedfe8f63adb64cbf742e6dfa"
+    },
+    {
+      "path": "backend/prisma/migrations/0021_megamitra_presentation_configuration/migration.sql",
+      "blobSha": "cce76927271e7e0a98e2bbeabf9ebc69de68894f"
+    },
+    {
+      "path": "backend/prisma/migrations/0022_megagoldenclub_brand_transition/migration.sql",
+      "blobSha": "b1c191ed8b67206ae56c39456bc606f1ef3fa407"
+    },
+    {
+      "path": "backend/prisma/migrations/0023_owner_management_portal/migration.sql",
+      "blobSha": "81a4226646580b1df4ff2353fc21f86f32b23e62"
+    },
+    {
+      "path": "backend/prisma/migrations/0024_owner_winner_verification/migration.sql",
+      "blobSha": "837c5d6caf75ecdb72d7cdb47686eecd569da29c"
+    },
+    {
+      "path": "backend/prisma/migrations/0025_binary_1_4_slots/migration.sql",
+      "blobSha": "db99b9ec800fd745468a98bfe47fbf614397c635"
+    },
+    {
+      "path": "backend/prisma/migrations/0026_owner_lucky_draw_schedule/migration.sql",
+      "blobSha": "ee02569e0b9543024259de1070cb8159ef760cbe"
+    },
+    {
+      "path": "backend/prisma/migrations/0027_account_roles_and_member_profile_compat/migration.sql",
+      "blobSha": "9d3d81f0d397c71da96f43d51edca3b84f255d0e"
+    },
+    {
+      "path": "backend/prisma/migrations/0028_member_payment_receipts_epin_lifecycle/migration.sql",
+      "blobSha": "821d87cc6a1b520238585583e4c7e510c4f27659"
+    },
+    {
+      "path": "backend/prisma/migrations/0029_global_lucky_draw_tokens/migration.sql",
+      "blobSha": "47f98b0dde4e32eb4fb092f9be6ea8e0711a190c"
+    },
+    {
+      "path": "backend/prisma/migrations/0030_retire_owner_season_draw_day/migration.sql",
+      "blobSha": "7804313413a5868476b63d6bb1d25a1700ec3e4e"
+    },
+    {
+      "path": "backend/prisma/migrations/0031_owner_draw_token_eligibility/migration.sql",
+      "blobSha": "cf70d45b4fbf21b3a190e46e7e92b0df5be22fc2"
+    },
+    {
+      "path": "backend/prisma/migrations/0032_owner_prize_media/migration.sql",
+      "blobSha": "8279dcff261ceab0d3768df44561208bb7b1cd8a"
+    },
+    {
+      "path": "backend/prisma/migrations/0033_owner_external_draw_mode/migration.sql",
+      "blobSha": "182ccc3039a34c76ebe66bd1fd37a6e0cceeca15"
+    },
+    {
+      "path": "backend/prisma/migrations/0034_season_scoped_lucky_draw_tokens/migration.sql",
+      "blobSha": "cf70c7a8e709e5b6fb0becfa99f90958644ea5e8"
+    },
+    {
+      "path": "backend/prisma/migrations/0035_typed_catchup_epins/migration.sql",
+      "blobSha": "25e29957f1fbfffa1d3d6cba6a58f3282c6f0942"
+    },
+    {
+      "path": "backend/prisma/migrations/0036_owner_prize_long_description/migration.sql",
+      "blobSha": "b773262c1548b5d1eb72bb139dc83fac55e8f6dd"
+    },
+    {
+      "path": "backend/prisma/migrations/0037_member_profile_postal_code/migration.sql",
+      "blobSha": "f12fad3dfaa7bced965964d0c3f8fffd08a58bad"
+    },
+    {
+      "path": "backend/prisma/migrations/0038_rank_achievement_rewards/migration.sql",
+      "blobSha": "1c3848d1a7747454762f7a2157c5b2da449ca8c0"
+    },
+    {
+      "path": "backend/prisma/migrations/0039_owner_auth_code_encryption/migration.sql",
+      "blobSha": "a0eb996d1461b4e2cf040fae7cf2a146993b9b9a"
+    },
+    {
+      "path": "backend/prisma/migrations/0040_withdrawal_tds_service_charge_breakdown/migration.sql",
+      "blobSha": "c929dc8019c231414ccf87750bb58d145fdb8577"
+    },
+    {
+      "path": "backend/prisma/migrations/0041_installment_income_recovery/migration.sql",
+      "blobSha": "0c3457937e33426356595afe8f7d53a5fbbd2d4a"
+    }
+  ]
+}

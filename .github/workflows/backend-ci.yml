@@ -147,6 +147,9 @@ jobs:
       - name: Test ops-only dedicated MySQL schema inventory classification
         run: node ../scripts/test-inspect-mysql-schema.mjs
 
+      - name: Verify pinned temporary Prisma migration runner and SQL blob hashes
+        run: node ../scripts/test-empty-db-migration-runner.mjs
+
       - name: Start CI data services
         run: |
           docker compose -f ../docker-compose.yml up -d --wait --wait-timeout 120

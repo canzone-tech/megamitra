@@ -142,6 +142,39 @@ remain on HOLD until an explicitly authorized and independently recoverable
 backup, isolated restore evidence and migration-runner approval exist.
 Schema inventory is information only and cannot clear these gates.
 
+### Explicit one-time empty-DB migration exception (2026-10-13)
+
+The operator specifically authorized a **temporary migration runner on the
+existing VPS** after a read-only identity check confirmed exactly zero
+tables and no migration history in the dedicated `megagoldenclub` database.
+Backups are intentionally deferred by operator choice; this DOES NOT approve
+financial transactions, withdrawals or production go-live.
+
+The ops-only [`migrate-empty-mysql.mjs`](migrate-empty-mysql.mjs) and
+[`empty-db-migration-manifest.json`](empty-db-migration-manifest.json) are
+downloaded together from a CI-green reviewed SHA, without a Git checkout.
+The manifest pins all 41 SQL migrations, `schema.prisma` and
+`prisma.config.ts` by Git blob checksum to the earlier reviewed migration
+source SHA. The script verifies each downloaded file, installs the exact
+Prisma CLI 7.10.0 and dotenv 17.4.1 into root-private temporary storage,
+and repeats the **empty schema** and exact application account check
+immediately before using a temporary migration-only MySQL account.
+
+The operator enters their existing MySQL root password at local MySQL
+interactive prompts; the root credential is never put into an environment,
+file or argv by this runner. Temporary SQL credentials are generated
+privately and granted DDL rights on **only** `megagoldenclub.*`; successful
+`prisma migrate deploy` and `prisma migrate status` are followed by an
+attempt to DROP the temporary migration account. The app account never
+receives DDL permissions. Check `_prisma_migrations` for exactly 41
+completed migrations, and stop on any discrepancy. If migration fails or
+account removal is not confirmed, **do not blindly rerun**: inspect the
+partial ledger and revoke/drop temporary access before continuing.
+
+**This exception is not a reusable VPS migration policy.** It does not
+restore the independent backup/restore gate, start PM2, copy application
+source, touch another database, or authorize real financial transactions.
+
 ## Stage 3 — remote backup, migration, artifact staging
 
 Record a recoverable remote MySQL/MongoDB snapshot and a tested **isolated

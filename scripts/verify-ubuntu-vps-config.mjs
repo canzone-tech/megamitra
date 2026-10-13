@@ -3,6 +3,8 @@
 // Never touches running Apache, PM2, or other applications.
 // Root npm run verify also tests the read-only dedicated MySQL inventory.
 import './test-inspect-mysql-schema.mjs';
+// One-time empty-DB runner is checksum-tied to all 41 reviewed SQL migrations.
+import './test-empty-db-migration-runner.mjs';
 // Root npm run verify must cover the one-time API env staging contract.
 import './test-stage-api-env.mjs';
 import assert from 'node:assert/strict';
