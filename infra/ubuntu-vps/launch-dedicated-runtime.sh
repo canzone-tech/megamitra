@@ -16,7 +16,10 @@ CURRENT="$BASE/current"
 ROOT='/etc/megagoldenclub'
 ECOSYSTEM="$ROOT/ecosystem.config.cjs"
 HOME_DIR='/var/lib/megagoldenclub'
-PM2_HOME_DIR="$HOME_DIR/.pm2"
+# Earlier unsuccessful PM2 bootstrap populated .pm2 without a working daemon.
+# Never delete or reuse that state. The actual application manager uses one
+# separate stable PM2_HOME dedicated to MegaGoldenClub only.
+PM2_HOME_DIR="$HOME_DIR/.pm2-runtime"
 PM2_BIN="$(command -v pm2 || true)"
 SERVICE='megagoldenclub'
 STARTED=0
@@ -276,7 +279,7 @@ else
   fi
 fi
 install -d -o "$SERVICE" -g "$SERVICE" -m 0700 "$HOME_DIR"
-# Preflight proved any existing PM2_HOME is an empty real directory,
+# Preflight proved the new dedicated .pm2-runtime is an empty real directory,
 # owned by root or this service, with no writable/special permissions.
 # Only this dedicated directory is normalized. Never touch root PM2_HOME.
 install -d -o "$SERVICE" -g "$SERVICE" -m 0700 "$PM2_HOME_DIR"

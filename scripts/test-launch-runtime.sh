@@ -79,6 +79,26 @@ if verify_pristine_pm2_home "$HOME_FIXTURE" "$PM2_FIXTURE" "$UID_NOW" "$((UID_NO
   echo 'STOP: unexpected ownership incorrectly accepted' >&2; exit 1
 fi
 
+# Real VPS observation: a prior failed attempt left legacy .pm2 with
+# module_conf.json, logs/, modules/, pids/, pm2.log, touch. A future first
+# launch must NOT delete it, nor treat it as the application PM2_HOME.
+LEGACY_HOME="$TMP/legacy-service-home"
+mkdir -p "$LEGACY_HOME/.pm2/logs" "$LEGACY_HOME/.pm2/modules" \
+  "$LEGACY_HOME/.pm2/pids"
+chmod 0700 "$LEGACY_HOME" "$LEGACY_HOME/.pm2"
+touch "$LEGACY_HOME/.pm2/module_conf.json" "$LEGACY_HOME/.pm2/pm2.log"
+verify_pristine_pm2_home "$LEGACY_HOME" "$LEGACY_HOME/.pm2-runtime" "$UID_NOW" "$GID_NOW"
+mkdir "$LEGACY_HOME/.pm2-runtime"
+chmod 0700 "$LEGACY_HOME/.pm2-runtime"
+verify_pristine_pm2_home "$LEGACY_HOME" "$LEGACY_HOME/.pm2-runtime" "$UID_NOW" "$GID_NOW"
+touch "$LEGACY_HOME/.pm2-runtime/dump.pm2"
+if verify_pristine_pm2_home "$LEGACY_HOME" "$LEGACY_HOME/.pm2-runtime" "$UID_NOW" "$GID_NOW"; then
+  echo 'STOP: active runtime PM2_HOME incorrectly accepted' >&2
+  exit 1
+fi
+test -f "$LEGACY_HOME/.pm2/module_conf.json"
+echo 'Preserve legacy PM2 bootstrap state and use clean runtime PM2_HOME: PASS'
+
 # Existing bootstrap manifest must be reused if its bytes are identical,
 # root-owned, and safely readable. Refuse altered/linked/world-writable files.
 awk '/^verify_existing_ecosystem\(\) \{/{copy=1} copy{print} copy && /^}/{exit}' \
@@ -166,7 +186,7 @@ awk '/^pm2_isolated\(\) \{/{copy=1} copy{print} copy && /^}/{exit}' \
   infra/ubuntu-vps/launch-dedicated-runtime.sh > "$TMP/pm2-wrapper.sh"
 source "$TMP/pm2-wrapper.sh"
 HOME_DIR="$TMP/dedicated-runtime-home"
-PM2_HOME_DIR="$HOME_DIR/.pm2"
+PM2_HOME_DIR="$HOME_DIR/.pm2-runtime"
 SERVICE='fixture-service'
 PM2_BIN="$TMP/fake-pm2"
 mkdir -p "$PM2_HOME_DIR" "$TMP/private-root"
@@ -176,7 +196,7 @@ cat > "$PM2_BIN" <<'FAKE_PM2'
 set -euo pipefail
 [[ "$#" == 2 && "$1" == start && "$2" == test-ecosystem.cjs ]]
 [[ "$(pwd -P)" == "$HOME" ]]
-[[ "$PM2_HOME" == "$HOME/.pm2" ]]
+[[ "$PM2_HOME" == "$HOME/.pm2-runtime" ]]
 printf 'CWD_CORRECT\n' > "$PM2_TEST_OUTPUT"
 FAKE_PM2
 chmod 0700 "$PM2_BIN"

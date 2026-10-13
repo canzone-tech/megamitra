@@ -212,6 +212,20 @@ internal/external symlinks, foreign ownership and hardlinks. The first-launch
 script invokes it before starting any PM2 process, and the service account
 then verifies it can read each compiled entrypoint.
 
+### Isolated PM2 startup after failed initial launch
+
+The first failed PM2 bootstrap left benign-looking files in the dedicated
+account's old `/var/lib/megagoldenclub/.pm2`. No dedicated user process was
+running in the read-only diagnostic, and `/usr/bin/node` was executable as
+the service user. **Do not delete or chmod those historical files.**
+
+The new launch script invokes PM2 from the accessible dedicated user home,
+not the operator's `/root` current directory. For the application it uses
+a new stable `/var/lib/megagoldenclub/.pm2-runtime` PM2_HOME and requires
+that directory to be initially absent or empty and safe. The old `.pm2`
+state is preserved and never used for application startup. Other PM2 homes
+and root-owned PM2 processes remain untouched.
+
 ### Source-free runtime staging and first PM2 launch
 
 Use only the exact-SHA CI artifact ZIP named `megagoldenclub-runtime-<SHA>`
