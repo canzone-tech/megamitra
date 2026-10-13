@@ -75,6 +75,7 @@ export function OwnerManagementShell({
         <header className={styles.topbar}>
           <div className={styles.crumb}><b>{title}</b><span>MegaGoldenClub • Professional management portal</span></div>
           <div className={styles.actions}>
+            <Link className={classNames(styles.logout, styles.outline, styles.linkButton)} href="/change-password">CHANGE PASSWORD</Link>
             <button className={styles.logout} type="button" onClick={logout} disabled={busy}>LOG OUT</button>
           </div>
         </header>
@@ -102,6 +103,7 @@ export function OwnerManagementShell({
               <span aria-hidden="true">{item.symbol}</span><span>{item.label}</span>
             </Link>
           ))}
+          <Link className={classNames(styles.button, styles.outline, styles.linkButton)} href="/change-password" onClick={() => setMobileMore(false)}>CHANGE PASSWORD</Link>
           <button className={classNames(styles.button, styles.dark)} type="button" onClick={logout}>LOG OUT</button>
         </div>
       </> : null}

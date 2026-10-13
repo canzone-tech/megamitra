@@ -149,6 +149,12 @@ export function SettingsGovernancePortal() {
         {activeTab === 'account' ? <section style={{ display: 'grid', gap: 18 }}>
           <div className={styles.sectionHead}><div className={styles.sectionTitle}><span className={styles.sectionIcon}>👤</span><h2>SuperAdmin Account</h2></div><small>Account-specific actions stay separate from platform policy</small></div>
           <section className="mm-card">
+            <div className="mm-card-head"><div><h2>Account password</h2><p className="mm-note">Change your signed-in account password. Your current password is required.</p></div><span className="mm-chip warning">ACCOUNT SECURITY</span></div>
+            <div className="mm-card-body">
+              <Link className={classNames(styles.button, styles.linkButton)} href="/change-password">CHANGE PASSWORD</Link>
+            </div>
+          </section>
+          <section className="mm-card">
             <div className="mm-card-head"><div><h2>SuperAdmin account email</h2><p className="mm-note">Change the signed-in SuperAdmin email without mixing this action into registration policy.</p></div><span className="mm-chip warning">ACCOUNT ACTION</span></div>
             <div className="mm-card-body"><AdminEmailChangeForm /></div>
           </section>
