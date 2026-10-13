@@ -36,7 +36,11 @@ cleanup() {
     if [[ "$LINKED" == 1 && -L "$CURRENT" && "$(readlink "$CURRENT")" == "$RELEASE" ]]; then
       rm -f -- "$CURRENT"
     fi
-    echo 'DEPLOYMENT NOT VERIFIED; dedicated PM2 apps stopped if launched' >&2
+    if [[ "$STARTED" == 1 || "$LINKED" == 1 ]]; then
+      echo 'DEPLOYMENT NOT VERIFIED; only dedicated release/PM2 state was rolled back' >&2
+    else
+      echo 'FIRST-LAUNCH PREFLIGHT STOP: no service started or modified' >&2
+    fi
   fi
 }
 trap cleanup EXIT
@@ -52,17 +56,69 @@ if [[ ! -d "$RELEASE" || -L "$RELEASE" || ! -f "$RELEASE/RELEASE_SHA" ||
       ! -f "$RELEASE/member/server.js" ]]; then
   echo 'STOP: expected immutable compiled release missing' >&2; exit 1
 fi
-if [[ -e "$CURRENT" || -L "$CURRENT" || -e "$ECOSYSTEM" ||
-      -L "$ECOSYSTEM" || -e "$HOME_DIR" || -L "$HOME_DIR" ]]; then
-  echo 'STOP: existing deployment/PM2 state present; refusing overwrite' >&2
+if [[ -e "$CURRENT" || -L "$CURRENT" ]]; then
+  echo 'STOP: current release already exists; first launch refuses overwrite' >&2
   exit 1
 fi
+if [[ -e "$ECOSYSTEM" || -L "$ECOSYSTEM" ]]; then
+  echo 'STOP: dedicated PM2 ecosystem manifest already exists; refusing overwrite' >&2
+  exit 1
+fi
+
+# The dedicated Unix user may have an existing home created by useradd.
+# Treat that as normal only if it belongs to the dedicated identity, is not
+# writable by others and has no pre-existing PM2 process state.
+# Keep this pure function independently regression-tested on disposable CI dirs.
+verify_pristine_pm2_home() {
+  local home="$1" pm2_home="$2" uid="$3" gid="$4"
+  local attrs mode
+  if [[ -e "$home" || -L "$home" ]]; then
+    if [[ -L "$home" || ! -d "$home" ]]; then
+      echo 'STOP: dedicated service home is a symlink or not a directory' >&2
+      return 1
+    fi
+    attrs="$(stat -c '%u:%g:%a' -- "$home")"
+    if [[ "${attrs%%:*}" != "$uid" || "${attrs#*:}" != "$gid:"* ]]; then
+      echo 'STOP: dedicated home belongs to an unexpected Unix identity' >&2
+      return 1
+    fi
+    mode="${attrs##*:}"
+    if (( (8#$mode & 0022) != 0 )); then
+      echo 'STOP: dedicated service home is writable by group/others' >&2
+      return 1
+    fi
+  fi
+  if [[ -e "$pm2_home" || -L "$pm2_home" ]]; then
+    if [[ -L "$pm2_home" || ! -d "$pm2_home" ]]; then
+      echo 'STOP: dedicated PM2_HOME is not a real directory' >&2
+      return 1
+    fi
+    if [[ "$(stat -c '%u:%g:%a' -- "$pm2_home")" != "$uid:$gid:700" ]]; then
+      echo 'STOP: dedicated PM2_HOME has unexpected ownership/permissions' >&2
+      return 1
+    fi
+    if [[ -n "$(find "$pm2_home" -mindepth 1 -maxdepth 1 -print -quit)" ]]; then
+      echo 'STOP: existing PM2_HOME state found; refusing to touch PM2 processes' >&2
+      return 1
+    fi
+  fi
+}
+SERVICE_UID="$(id -u "$SERVICE")"
+SERVICE_GID="$(id -g "$SERVICE")"
+verify_pristine_pm2_home "$HOME_DIR" "$PM2_HOME_DIR" "$SERVICE_UID" "$SERVICE_GID"
+echo 'Dedicated Unix user home and PM2 state: CLEAN'
 if [[ "$(stat -c '%U:%G:%a' "$ROOT")" != 'root:megagoldenclub:750' ||
       "$(stat -c '%U:%G:%a' "$ROOT/api.env")" != 'root:megagoldenclub:640' ]]; then
   echo 'STOP: protected API configuration permissions invalid' >&2; exit 1
 fi
 id "$SERVICE" >/dev/null
 runuser -u "$SERVICE" -- test -r "$ROOT/api.env"
+for entry in api/dist/main.js admin/server.js member/server.js; do
+  if ! runuser -u "$SERVICE" -- test -r "$RELEASE/$entry"; then
+    echo "STOP: dedicated service user cannot read source-free runtime $entry" >&2
+    exit 1
+  fi
+done
 test "$(/usr/bin/node -p 'process.versions.node.split(".")[0]')" = 24
 for port in 3200 3201 3202; do
   if ss -ltnH "( sport = :$port )" | grep -q .; then
