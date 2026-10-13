@@ -13,6 +13,21 @@ const lifecycle = read('backend/src/auth/super-admin-lifecycle.service.ts');
 const authModule = read('backend/src/auth/auth.module.ts');
 const failures = [];
 
+const vpsFirstAdmin = read('infra/ubuntu-vps/bootstrap-first-super-admin.mjs');
+const vpsFirstAdminShell = read('infra/ubuntu-vps/bootstrap-first-super-admin.sh');
+for (const required of [
+  'bootstrapCreateOnly',
+  "username = 'superadmin'",
+  'existingAdmins !== 0',
+  'createApplicationContext',
+]) if (!vpsFirstAdmin.includes(required)) failures.push('missing source-free first-admin bootstrap invariant: ' + required);
+for (const required of [
+  'read -rs',
+  'runuser -u "$SERVICE"',
+  'unset PASS',
+  'ONE-TIME SUPER_ADMIN BOOTSTRAP: COMPLETE',
+]) if (!vpsFirstAdminShell.includes(required)) failures.push('missing protected first-admin shell invariant: ' + required);
+
 if (packageJson.scripts?.['super-admin:bootstrap'] !== 'ts-node scripts/bootstrap-super-admin.ts') {
   failures.push('backend/package.json: super-admin:bootstrap contract drifted');
 }

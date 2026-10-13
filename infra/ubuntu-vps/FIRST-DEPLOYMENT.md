@@ -259,6 +259,32 @@ and unrelated-site regression gates remain open. Do not enable real-money
 transactions merely because local health checks pass. PM2 startup-on-reboot
 still needs a separate dedicated-user systemd assessment.
 
+### First SUPER_ADMIN after technical deployment
+
+The first database migrations seed the SUPER_ADMIN role, password policy and
+auth singleton configs, **not** a privileged user's password. The
+[existing lifecycle service](../../backend/src/auth/super-admin-lifecycle.service.ts)
+owns creation and first-login password rotation. Use the reviewed two **ops-only**
+files `bootstrap-first-super-admin.sh` and `bootstrap-first-super-admin.mjs`
+from one pinned GitHub commit on the operator's isolated VPS console **once**,
+after the source-free runtime is healthy. No repository checkout, TS execution,
+Prisma migrations, direct SQL, PM2 changes or npm on the host.
+
+The helper loads only the protected API env into a separate process running as
+`megagoldenclub`, imports the **already compiled** NestJS service from the
+pinned production release, and refuses to create any account if a SUPER_ADMIN
+already exists. It asks privately for a password and confirmation on the console
+(default password policy: 12–128 characters). Password is piped to child stdin,
+not saved in a file, argv, process environment, shell history, Git or chat.
+Username is `superadmin`; no email is required initially. Bootstrap is create-only:
+password resets require the separate audited break-glass lifecycle. The account
+must change password on first login at
+`https://admin.megagoldenclub.com/login`.
+
+**Never use this procedure to bypass backup/recovery and financial-operation
+go-live gates.** This creates only an administrative login and leaves payments
+and payouts on HOLD.
+
 ## Stage 4 — live verification + approval
 
 - Reconfirm port 3200/3201/3202 available and bound **only** to 127.0.0.1.

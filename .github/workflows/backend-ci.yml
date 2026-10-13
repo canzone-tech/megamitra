@@ -162,6 +162,10 @@ jobs:
         working-directory: .
         run: bash scripts/test-inspect-node-execution.sh
 
+      - name: Check one-time source-free first SUPER_ADMIN bootstrap safety
+        working-directory: .
+        run: bash scripts/test-first-super-admin.sh
+
       - name: Test isolated PM2 launch static safety boundaries
         working-directory: .
         run: bash scripts/test-launch-runtime.sh
