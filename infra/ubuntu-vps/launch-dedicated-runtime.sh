@@ -125,12 +125,24 @@ verify_pristine_pm2_home() {
       echo 'STOP: dedicated PM2_HOME is not a real directory' >&2
       return 1
     fi
-    if [[ "$(stat -c '%u:%g:%a' -- "$pm2_home")" != "$uid:$gid:700" ]]; then
-      echo 'STOP: dedicated PM2_HOME has unexpected ownership/permissions' >&2
+    local pm2_uid pm2_gid pm2_mode
+    IFS=: read -r pm2_uid pm2_gid pm2_mode < <(
+      stat -c '%u:%g:%a' -- "$pm2_home")
+    # A previous setup may leave an EMPTY .pm2 owned by root or this
+    # service account with a safe non-writable mode (0700/0750/0755).
+    # Only such a directory is eligible for scoped ownership correction.
+    if [[ ( "$pm2_uid" != "$uid" && "$pm2_uid" != 0 ) ||
+          ( "$pm2_gid" != "$gid" && "$pm2_gid" != 0 ) ]]; then
+      echo 'STOP: dedicated PM2_HOME has foreign ownership' >&2
+      return 1
+    fi
+    if ! [[ "$pm2_mode" =~ ^[0-7]{3,4}$ ]] ||
+       (( (8#$pm2_mode & 0022) != 0 || (8#$pm2_mode & 07000) != 0 )); then
+      echo 'STOP: dedicated PM2_HOME is unsafe/writable by others' >&2
       return 1
     fi
     if [[ -n "$(find "$pm2_home" -mindepth 1 -maxdepth 1 -print -quit)" ]]; then
-      echo 'STOP: existing PM2_HOME state found; refusing to touch PM2 processes' >&2
+      echo 'STOP: nonempty dedicated PM2_HOME; will not touch existing PM2 state' >&2
       return 1
     fi
   fi
@@ -200,7 +212,14 @@ else
   fi
 fi
 install -d -o "$SERVICE" -g "$SERVICE" -m 0700 "$HOME_DIR"
+# Preflight proved any existing PM2_HOME is an empty real directory,
+# owned by root or this service, with no writable/special permissions.
+# Only this dedicated directory is normalized. Never touch root PM2_HOME.
 install -d -o "$SERVICE" -g "$SERVICE" -m 0700 "$PM2_HOME_DIR"
+if [[ "$(stat -c '%u:%g:%a' -- "$PM2_HOME_DIR")" != "$SERVICE_UID:$SERVICE_GID:700" ]]; then
+  echo 'STOP: dedicated PM2_HOME metadata normalization failed' >&2
+  exit 1
+fi
 ln -s "$RELEASE" "$CURRENT"
 LINKED=1
 

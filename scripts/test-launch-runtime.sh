@@ -35,6 +35,22 @@ verify_pristine_pm2_home "$HOME_FIXTURE" "$PM2_FIXTURE" "$UID_NOW" "$GID_NOW"
 mkdir "$PM2_FIXTURE"
 chmod 0700 "$PM2_FIXTURE"
 verify_pristine_pm2_home "$HOME_FIXTURE" "$PM2_FIXTURE" "$UID_NOW" "$GID_NOW"
+# Safely accept legacy empty PM2_HOME from root/service bootstrap.
+for MODE in 700 750 755; do
+  chmod "$MODE" "$PM2_FIXTURE"
+  verify_pristine_pm2_home "$HOME_FIXTURE" "$PM2_FIXTURE" "$UID_NOW" "$GID_NOW"
+done
+chmod 0700 "$PM2_FIXTURE"
+for MODE in 777 775 770 2755; do
+  chmod "$MODE" "$PM2_FIXTURE"
+  if verify_pristine_pm2_home "$HOME_FIXTURE" "$PM2_FIXTURE" "$UID_NOW" "$GID_NOW"; then
+    echo "STOP: unsafe PM2_HOME mode $MODE incorrectly accepted" >&2; exit 1
+  fi
+done
+chmod 0700 "$PM2_FIXTURE"
+if verify_pristine_pm2_home "$HOME_FIXTURE" "$PM2_FIXTURE" "$((UID_NOW+1))" "$((GID_NOW+1))"; then
+  echo 'STOP: foreign PM2_HOME owner incorrectly accepted' >&2; exit 1
+fi
 touch "$PM2_FIXTURE/dump.pm2"
 if verify_pristine_pm2_home "$HOME_FIXTURE" "$PM2_FIXTURE" "$UID_NOW" "$GID_NOW"; then
   echo 'STOP: populated PM2_HOME incorrectly accepted' >&2; exit 1
