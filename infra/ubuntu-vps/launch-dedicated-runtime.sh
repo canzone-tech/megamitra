@@ -60,9 +60,30 @@ if [[ -e "$CURRENT" || -L "$CURRENT" ]]; then
   echo 'STOP: current release already exists; first launch refuses overwrite' >&2
   exit 1
 fi
+# Prior failed first launch may have installed only this reviewed ops file.
+# Reuse it ONLY when root-owned, not a symlink, mode 0644, and byte-for-byte
+# identical to this exact reviewed GitHub manifest. Never silently overwrite.
+# The pure verifier is tested on isolated fixture files in Backend CI.
+verify_existing_ecosystem() {
+  local existing="$1" reviewed="$2" uid="$3" gid="$4"
+  if [[ -L "$existing" || ! -f "$existing" ]]; then
+    echo 'STOP: existing PM2 manifest is not a regular non-symlink file' >&2
+    return 1
+  fi
+  if [[ "$(stat -c '%u:%g:%a' -- "$existing")" != "$uid:$gid:644" ]]; then
+    echo 'STOP: existing PM2 manifest has unexpected ownership or permissions' >&2
+    return 1
+  fi
+  if ! cmp -s -- "$existing" "$reviewed"; then
+    echo 'STOP: existing PM2 manifest differs from pinned reviewed version' >&2
+    return 1
+  fi
+}
+ECOSYSTEM_PRESENT=0
 if [[ -e "$ECOSYSTEM" || -L "$ECOSYSTEM" ]]; then
-  echo 'STOP: dedicated PM2 ecosystem manifest already exists; refusing overwrite' >&2
-  exit 1
+  verify_existing_ecosystem "$ECOSYSTEM" "$OPS" 0 0
+  ECOSYSTEM_PRESENT=1
+  echo 'Existing protected PM2 manifest: IDENTICAL / REUSABLE'
 fi
 
 # The dedicated Unix user may have an existing home created by useradd.
@@ -154,7 +175,9 @@ JS
 echo 'Dedicated account, reserved ports and secrets-free PM2 config: PASS'
 
 echo '=== CONFIGURE ONLY MEGAGOLDENCLUB OPS FILES ==='
-install -o root -g root -m 0644 "$OPS" "$ECOSYSTEM"
+if [[ "$ECOSYSTEM_PRESENT" == 0 ]]; then
+  install -o root -g root -m 0644 "$OPS" "$ECOSYSTEM"
+fi
 install -d -o "$SERVICE" -g "$SERVICE" -m 0700 "$HOME_DIR"
 install -d -o "$SERVICE" -g "$SERVICE" -m 0700 "$PM2_HOME_DIR"
 ln -s "$RELEASE" "$CURRENT"
