@@ -5,6 +5,7 @@ import {
   Delete,
   Get,
   Param,
+  ParseIntPipe,
   Patch,
   Post,
   Put,
@@ -181,6 +182,23 @@ export class OwnerPortalController {
     return this.portal.listSeasonPrizes(id);
   }
 
+  @Permissions('draw.policy.read')
+  @Get('seasons/:id/prize-locks')
+  prizeLocks(@Param('id') id: string) {
+    return this.portal.listLockedPrizeMonths(id);
+  }
+
+  @Permissions('draw.policy.manage')
+  @Put('seasons/:id/prizes/month/:monthNumber')
+  saveActivePrizeMonth(
+    @Param('id') id: string,
+    @Param('monthNumber', ParseIntPipe) monthNumber: number,
+    @Body() dto: SaveSeasonPrizesDto,
+    @CurrentUser() actor: AuthUser,
+  ) {
+    return this.portal.saveActiveSeasonPrizeMonth(id, monthNumber, dto.prizes, actor.id);
+  }
+
   @Permissions('draw.policy.manage')
   @Put('seasons/:id/prizes')
   savePrizes(
@@ -198,8 +216,9 @@ export class OwnerPortalController {
     @Param('id') id: string,
     @UploadedFile() file: { buffer: Buffer; originalname: string; mimetype: string; size: number } | undefined,
     @CurrentUser() actor: AuthUser,
+    @Body('monthNumber') monthNumber?: string,
   ) {
-    return this.portal.uploadSeasonPrizeMedia(id, file, actor.id);
+    return this.portal.uploadSeasonPrizeMedia(id, file, actor.id, monthNumber);
   }
 
   @Permissions('draw.policy.read')

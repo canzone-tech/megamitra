@@ -46,6 +46,32 @@ export class FinancialDbService implements OnModuleDestroy {
     }
   }
 
+  async withAdvisoryLock<T>(key: string, work: () => Promise<T>): Promise<T> {
+    const connection = await this.pool.getConnection();
+    let acquired = false;
+    try {
+      const result = (await connection.query(
+        'SELECT GET_LOCK(?, 15) AS acquired',
+        [key],
+      )) as Array<{ acquired: number | null }>;
+      if (Number(result[0]?.acquired) !== 1) {
+        throw new Error('Timed out waiting for the Season prize/draw lock');
+      }
+      acquired = true;
+      return await work();
+    } finally {
+      if (acquired) {
+        try {
+          await connection.query('SELECT RELEASE_LOCK(?)', [key]);
+        } finally {
+          connection.release();
+        }
+      } else {
+        connection.release();
+      }
+    }
+  }
+
   async onModuleDestroy(): Promise<void> {
     await this.pool.end();
   }

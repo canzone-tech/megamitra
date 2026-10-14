@@ -75,6 +75,17 @@ export class OwnerPortalDrawWorkflowService {
     dto: PrepareOwnerDrawDto,
     actorUserId: string,
   ) {
+    return this.db.withAdvisoryLock(
+      `owner-prize-month:${seasonId}:${dto.monthNumber}`,
+      () => this.prepareDrawLocked(seasonId, dto, actorUserId),
+    );
+  }
+
+  private async prepareDrawLocked(
+    seasonId: string,
+    dto: PrepareOwnerDrawDto,
+    actorUserId: string,
+  ) {
     const seasonRows = await this.rows<DrawSeasonRow>(
       `SELECT id, code, name, status, programVersionId, startDate,
               drawStartMonth, drawWeekOfMonth, drawWeekday, drawTimezone

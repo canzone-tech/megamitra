@@ -176,6 +176,7 @@ export function OwnerCorePortal({ section, extension }: { section: OwnerCoreSect
   const [duplicatePrizes, setDuplicatePrizes] = useState<PrizeDraft[]>([]);
   const [selectedSeasonId, setSelectedSeasonId] = useState('');
   const [prizeDraft, setPrizeDraft] = useState<PrizeDraft[]>([]);
+  const [lockedPrizeMonths, setLockedPrizeMonths] = useState<number[]>([]);
   const [selectedPrizeMonth, setSelectedPrizeMonth] = useState(1);
   const [drawPrizes, setDrawPrizes] = useState<Row[]>([]);
   const [selectedDrawId, setSelectedDrawId] = useState('');
@@ -243,13 +244,19 @@ export function OwnerCorePortal({ section, extension }: { section: OwnerCoreSect
         const preferred = selectedSeasonId || text(seasons.find((row) => text(row.status) === 'ACTIVE')?.id, '') || text(seasons[0]?.id, '');
         if (preferred) {
           if (preferred !== selectedSeasonId) setSelectedSeasonId(preferred);
-          const loadedPrizes = (await apiJson<Row[]>(`${API}/seasons/${encodeURIComponent(preferred)}/prizes`)).map(prizeFromRow);
+          const [loadedRows, lockState] = await Promise.all([
+            apiJson<Row[]>(`${API}/seasons/${encodeURIComponent(preferred)}/prizes`),
+            apiJson<{ lockedMonths: number[] }>(`${API}/seasons/${encodeURIComponent(preferred)}/prize-locks`),
+          ]);
+          const loadedPrizes = loadedRows.map(prizeFromRow);
+          setLockedPrizeMonths(lockState.lockedMonths);
           setPrizeDraft(loadedPrizes);
           setSelectedPrizeMonth((current) => loadedPrizes.some((prize) => prize.monthNumber === current)
             ? current
             : loadedPrizes[0]?.monthNumber ?? 1);
         } else {
           setPrizeDraft([]);
+          setLockedPrizeMonths([]);
           setSelectedPrizeMonth(1);
         }
       }
@@ -516,12 +523,18 @@ export function OwnerCorePortal({ section, extension }: { section: OwnerCoreSect
     setSelectedSeasonId(id);
     if (!id) {
       setPrizeDraft([]);
+      setLockedPrizeMonths([]);
       setSelectedPrizeMonth(1);
       return;
     }
     setBusy(true);
     try {
-      const loadedPrizes = sortPrizeDraft((await apiJson<Row[]>(`${API}/seasons/${encodeURIComponent(id)}/prizes`)).map(prizeFromRow));
+      const [prizeRows, lockState] = await Promise.all([
+        apiJson<Row[]>(`${API}/seasons/${encodeURIComponent(id)}/prizes`),
+        apiJson<{ lockedMonths: number[] }>(`${API}/seasons/${encodeURIComponent(id)}/prize-locks`),
+      ]);
+      const loadedPrizes = sortPrizeDraft(prizeRows.map(prizeFromRow));
+      setLockedPrizeMonths(lockState.lockedMonths);
       setPrizeDraft(loadedPrizes);
       setSelectedPrizeMonth(loadedPrizes[0]?.monthNumber ?? 1);
     } catch (err) {
@@ -569,6 +582,7 @@ export function OwnerCorePortal({ section, extension }: { section: OwnerCoreSect
     try {
       const form = new FormData();
       form.append('file', file);
+      form.append('monthNumber', String(prizeDraft[index]?.monthNumber ?? selectedPrizeMonth));
       const media = await apiJson<{ id: string; filename: string; contentType: string }>(
         `${API}/seasons/${encodeURIComponent(selectedSeasonId)}/prize-media`,
         { method: 'POST', body: form },
@@ -585,7 +599,10 @@ export function OwnerCorePortal({ section, extension }: { section: OwnerCoreSect
   }
   async function savePrizes() {
     if (!selectedSeasonId) return;
-    const prizes = prizeDraft.map((prize) => ({
+    const seasonRows = (Array.isArray(data) ? data : []) as Row[];
+    const seasonStatus = text(seasonRows.find((row) => text(row.id) === selectedSeasonId)?.status);
+    const activeMonth = seasonStatus === 'ACTIVE' ? selectedPrizeMonth : null;
+    const prizes = prizeDraft.filter((prize) => activeMonth === null || prize.monthNumber === activeMonth).map((prize) => ({
       monthNumber: prize.monthNumber,
       prizeCode: prize.prizeCode,
       category: prize.category,
@@ -595,13 +612,20 @@ export function OwnerCorePortal({ section, extension }: { section: OwnerCoreSect
       nominalValue: prize.nominalValue,
       mediaId: prize.mediaId,
     }));
-    const saved = await run(() => apiJson<Row[]>(`${API}/seasons/${encodeURIComponent(selectedSeasonId)}/prizes`, {
+    const endpoint = activeMonth === null
+      ? `${API}/seasons/${encodeURIComponent(selectedSeasonId)}/prizes`
+      : `${API}/seasons/${encodeURIComponent(selectedSeasonId)}/prizes/month/${activeMonth}`;
+    const saved = await run(() => apiJson<Row[]>(endpoint, {
       method: 'PUT',
       body: JSON.stringify({ prizes }),
     }), 'Prize schedule saved', false);
     if (saved) {
       setPrizeDraft(sortPrizeDraft(saved.map(prizeFromRow)));
-      setNotice('Prize schedule saved and reloaded from the server.');
+      const locks = await apiJson<{ lockedMonths: number[] }>(`${API}/seasons/${encodeURIComponent(selectedSeasonId)}/prize-locks`);
+      setLockedPrizeMonths(locks.lockedMonths);
+      setNotice(activeMonth === null
+        ? 'Prize schedule saved and reloaded from the server.'
+        : `Month ${activeMonth} prize schedule saved. Prepared draws and other months were preserved.`);
     }
   }
 
@@ -820,13 +844,21 @@ export function OwnerCorePortal({ section, extension }: { section: OwnerCoreSect
     const seasons = (Array.isArray(data) ? data : []) as Row[];
     const selectedSeason = seasons.find((row) => text(row.id) === selectedSeasonId) ?? {};
     const configuredMonths = number(selectedSeason.totalMonths, 0);
+    const seasonStatus = text(selectedSeason.status, '');
+    const isActive = seasonStatus === 'ACTIVE';
+    const isMonthEditable = (monthNumber: number) =>
+      ['DRAFT', 'REVIEW'].includes(seasonStatus)
+      || (isActive && !lockedPrizeMonths.includes(monthNumber));
+    const selectedMonthEditable = isMonthEditable(selectedPrizeMonth);
     const monthNumbers = configuredMonths > 0
       ? Array.from({ length: configuredMonths }, (_, index) => index + 1)
       : [...new Set(prizeDraft.map((prize) => prize.monthNumber))].sort((left, right) => left - right);
     const monthTabs = monthNumbers.map((monthNumber) => ({
       id: `prize-editor-month-${monthNumber}`,
       label: `Month ${monthNumber}`,
-      count: prizeDraft.filter((prize) => prize.monthNumber === monthNumber).length,
+      count: lockedPrizeMonths.includes(monthNumber) && isActive
+        ? 'Locked'
+        : prizeDraft.filter((prize) => prize.monthNumber === monthNumber).length,
     }));
     return <><Hero title="Prize Catalogue" subtitle="Manage prize categories, values, quantities, winner limits, attachments and monthly allocation." />
       <WorkspaceTabs ariaLabel="Prize catalogue workspace" tabs={[
@@ -847,8 +879,15 @@ export function OwnerCorePortal({ section, extension }: { section: OwnerCoreSect
             </div>
           </div> : null}
           {activeTab === 'prize-editor' ? selectedSeasonId ? <div className={styles.card}>
-            <SectionHead icon="🎁" title="Monthwise Prizes" action={<button type="button" className={styles.button} disabled={busy} onClick={addPrize}>+ ADD PRIZE TO MONTH {selectedPrizeMonth}</button>} />
-            <div className={styles.notice}>“Add Prize” adds another prize inside the selected month. It does not create another month.</div>
+            <SectionHead icon="🎁" title="Monthwise Prizes" action={<button type="button" className={styles.button} disabled={busy || !selectedMonthEditable} onClick={addPrize}>+ ADD PRIZE TO MONTH {selectedPrizeMonth}</button>} />
+            <div className={styles.notice}>
+              {isActive
+                ? 'ACTIVE Season: only months without a prepared draw can be edited. Locked months are read-only; saving replaces only the selected unlocked month.'
+                : ['DRAFT', 'REVIEW'].includes(seasonStatus)
+                  ? '“Add Prize” adds another prize inside the selected month. It does not create another month.'
+                  : 'This Season is read-only. Only DRAFT, REVIEW and unprepared ACTIVE months can be edited.'}
+            </div>
+            {isActive && !selectedMonthEditable ? <div className={styles.notice} role="status">Month {selectedPrizeMonth} is locked: its draw has already been prepared.</div> : null}
             {prizeDraft.length ? <WorkspaceTabs
               key={`prize-months-${selectedSeasonId}`}
               ariaLabel="Prize editor months"
@@ -879,21 +918,21 @@ export function OwnerCorePortal({ section, extension }: { section: OwnerCoreSect
                       : mediaUrl ? <span className={styles.prizeAttachmentIcon}>📎</span> : '🎁'}
                   </div>
                   <div className={styles.fields}>
-                    <Field label="Month"><input className={styles.input} type="number" min="1" max="60" value={prize.monthNumber} onChange={(event) => updatePrize(index, 'monthNumber', Number(event.target.value) || 1)} /></Field>
-                    <Field label="Prize Code"><input className={styles.input} value={prize.prizeCode} onChange={(event) => updatePrize(index, 'prizeCode', event.target.value)} /></Field>
-                    <Field label="Prize Name"><input className={styles.input} value={prize.name} onChange={(event) => updatePrize(index, 'name', event.target.value)} /></Field>
-                    <Field label="Category"><input className={styles.input} value={prize.category} onChange={(event) => updatePrize(index, 'category', event.target.value)} /></Field>
-                    <Field label="Winner Count"><input className={styles.input} type="number" min="1" value={prize.winnerCount} onChange={(event) => updatePrize(index, 'winnerCount', Number(event.target.value) || 1)} /></Field>
-                    <Field label="Approx. Value (optional)"><input className={styles.input} inputMode="decimal" value={prize.nominalValue ?? ''} onChange={(event) => updatePrize(index, 'nominalValue', event.target.value)} /></Field>
-                    <Field label="Description" full><textarea className={styles.textarea} rows={3} maxLength={5000} value={prize.description ?? ''} onChange={(event) => updatePrize(index, 'description', event.target.value)} /></Field>
-                    <Field label="Prize Image / File" full><input className={styles.input} type="file" accept="image/jpeg,image/png,image/webp,application/pdf" disabled={busy} onChange={(event) => void uploadPrizeMedia(index, event.target.files?.[0])} /></Field>
+                    <Field label="Month"><input className={styles.input} type="number" min="1" max="60" disabled={!isMonthEditable(prize.monthNumber)} value={prize.monthNumber} onChange={(event) => updatePrize(index, 'monthNumber', Number(event.target.value) || 1)} /></Field>
+                    <Field label="Prize Code"><input className={styles.input} disabled={!isMonthEditable(prize.monthNumber)} value={prize.prizeCode} onChange={(event) => updatePrize(index, 'prizeCode', event.target.value)} /></Field>
+                    <Field label="Prize Name"><input className={styles.input} disabled={!isMonthEditable(prize.monthNumber)} value={prize.name} onChange={(event) => updatePrize(index, 'name', event.target.value)} /></Field>
+                    <Field label="Category"><input className={styles.input} disabled={!isMonthEditable(prize.monthNumber)} value={prize.category} onChange={(event) => updatePrize(index, 'category', event.target.value)} /></Field>
+                    <Field label="Winner Count"><input className={styles.input} type="number" min="1" disabled={!isMonthEditable(prize.monthNumber)} value={prize.winnerCount} onChange={(event) => updatePrize(index, 'winnerCount', Number(event.target.value) || 1)} /></Field>
+                    <Field label="Approx. Value (optional)"><input className={styles.input} inputMode="decimal" disabled={!isMonthEditable(prize.monthNumber)} value={prize.nominalValue ?? ''} onChange={(event) => updatePrize(index, 'nominalValue', event.target.value)} /></Field>
+                    <Field label="Description" full><textarea className={styles.textarea} rows={3} maxLength={5000} disabled={!isMonthEditable(prize.monthNumber)} value={prize.description ?? ''} onChange={(event) => updatePrize(index, 'description', event.target.value)} /></Field>
+                    <Field label="Prize Image / File" full><input className={styles.input} type="file" accept="image/jpeg,image/png,image/webp,application/pdf" disabled={busy || !isMonthEditable(prize.monthNumber)} onChange={(event) => void uploadPrizeMedia(index, event.target.files?.[0])} /></Field>
                   </div>
-                  {prize.mediaId ? <div className={styles.attachmentRow}><span><b>{prize.mediaName || 'Prize attachment'}</b><small>{prize.mediaMimeType || 'file'}</small></span><div className={styles.buttonLine}><a className={classNames(styles.button, styles.outline, styles.linkButton)} href={mediaUrl} target="_blank" rel="noreferrer">OPEN FILE</a><button type="button" className={classNames(styles.button, styles.outline)} onClick={() => clearPrizeMedia(index)}>REMOVE FILE</button></div></div> : null}
-                  <div className={styles.buttonLine}><button type="button" className={classNames(styles.button, styles.red)} onClick={() => removePrize(index)}>REMOVE PRIZE</button></div>
+                  {prize.mediaId ? <div className={styles.attachmentRow}><span><b>{prize.mediaName || 'Prize attachment'}</b><small>{prize.mediaMimeType || 'file'}</small></span><div className={styles.buttonLine}><a className={classNames(styles.button, styles.outline, styles.linkButton)} href={mediaUrl} target="_blank" rel="noreferrer">OPEN FILE</a><button type="button" className={classNames(styles.button, styles.outline)} disabled={!isMonthEditable(prize.monthNumber)} onClick={() => clearPrizeMedia(index)}>REMOVE FILE</button></div></div> : null}
+                  <div className={styles.buttonLine}><button type="button" className={classNames(styles.button, styles.red)} disabled={!isMonthEditable(prize.monthNumber)} onClick={() => removePrize(index)}>REMOVE PRIZE</button></div>
                 </div>;
               })}</div>;
             }}</WorkspaceTabs> : <Empty>No prizes yet.</Empty>}
-            <div className={styles.buttonLine}><button type="button" className={styles.button} disabled={busy || !prizeDraft.length} onClick={() => void savePrizes()}>SAVE PRIZE SCHEDULE</button></div>
+            <div className={styles.buttonLine}><button type="button" className={styles.button} disabled={busy || !selectedMonthEditable || (!isActive && !prizeDraft.length) || (isActive && !prizeDraft.some((prize) => prize.monthNumber === selectedPrizeMonth))} onClick={() => void savePrizes()}>{isActive ? `SAVE MONTH ${selectedPrizeMonth} PRIZES` : 'SAVE PRIZE SCHEDULE'}</button></div>
           </div> : <div className={styles.card}><Empty>Select a Season first.</Empty></div> : null}
         </>}
       </WorkspaceTabs>

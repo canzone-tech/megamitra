@@ -130,7 +130,7 @@ describe('MegaGoldenClub owner lucky draw workflow integration', () => {
         currencyCode: 'INR',
         registrationFee: '0.00',
         installmentAmount: '0.00',
-        installmentCount: 0,
+        installmentCount: 2,
         installmentIntervalUnit: ProgramIntervalUnit.MONTH,
         installmentIntervalCount: 1,
         firstInstallmentOffsetDays: 0,
@@ -486,6 +486,58 @@ describe('MegaGoldenClub owner lucky draw workflow integration', () => {
   });
 
   it('keeps failed verification reviewable and completes publish, claim, and fulfilment after correction', async () => {
+    const originalMonthOne = (await request(
+      `/admin/owner-portal/seasons/${seasonId}/prizes`, adminToken,
+    )).body as unknown as Array<{ monthNumber: number; id: string; name: string }>;
+    const monthOneId = originalMonthOne.find((prize) => prize.monthNumber === 1)?.id;
+
+    const initiallyUnlocked = await request(
+      `/admin/owner-portal/seasons/${seasonId}/prize-locks`, adminToken,
+    );
+    expect(initiallyUnlocked.status).toBe(200);
+    expect(initiallyUnlocked.body.lockedMonths).toEqual([]);
+
+    const legacyBulkDenied = await request(
+      `/admin/owner-portal/seasons/${seasonId}/prizes`, adminToken,
+      { method: 'PUT', body: JSON.stringify({ prizes: [] }) },
+    );
+    expect(legacyBulkDenied.status).toBe(409);
+
+    const updatedMonthTwoPrizes = [{
+      monthNumber: 2,
+      prizeCode: secondPrizeCode,
+      category: 'UAT',
+      name: 'Updated Future Month Prize',
+      winnerCount: 2,
+    }];
+    const futureMonthAllowed = await request(
+      `/admin/owner-portal/seasons/${seasonId}/prizes/month/2`, adminToken,
+      { method: 'PUT', body: JSON.stringify({ prizes: updatedMonthTwoPrizes }) },
+    );
+    expect(futureMonthAllowed.status).toBe(200);
+    const changedPrizes = futureMonthAllowed.body as unknown as Array<{
+      id: string; monthNumber: number; name: string; winnerCount: number;
+    }>;
+    expect(changedPrizes.find((prize) => prize.monthNumber === 1)?.id).toBe(monthOneId);
+    expect(changedPrizes.find((prize) => prize.monthNumber === 2)).toMatchObject({
+      name: 'Updated Future Month Prize',
+      winnerCount: 2,
+    });
+
+    const crossMonthDenied = await request(
+      `/admin/owner-portal/seasons/${seasonId}/prizes/month/2`, adminToken,
+      { method: 'PUT', body: JSON.stringify({ prizes: [
+        { ...updatedMonthTwoPrizes[0], monthNumber: 1 },
+      ] }) },
+    );
+    expect(crossMonthDenied.status).toBe(400);
+
+    const memberDeniedPrizeChange = await request(
+      `/admin/owner-portal/seasons/${seasonId}/prizes/month/2`, memberToken,
+      { method: 'PUT', body: JSON.stringify({ prizes: updatedMonthTwoPrizes }) },
+    );
+    expect(memberDeniedPrizeChange.status).toBe(403);
+
     const prepared = await request(
       `/admin/owner-portal/seasons/${seasonId}/draws`,
       adminToken,
@@ -506,6 +558,19 @@ describe('MegaGoldenClub owner lucky draw workflow integration', () => {
     drawId = String(prepared.body.drawId);
     drawPolicyId = String(prepared.body.policyId);
     drawPolicyVersionId = String(prepared.body.policyVersionId);
+
+    const lockedMonthOne = await request(
+      `/admin/owner-portal/seasons/${seasonId}/prizes/month/1`, adminToken,
+      { method: 'PUT', body: JSON.stringify({ prizes: [{
+        monthNumber: 1, prizeCode: 'JAN_LOCKED', category: 'UAT', name: 'Forbidden',
+        winnerCount: 1,
+      }] }) },
+    );
+    expect(lockedMonthOne.status).toBe(409);
+    const oneLocked = await request(
+      `/admin/owner-portal/seasons/${seasonId}/prize-locks`, adminToken,
+    );
+    expect(oneLocked.body.lockedMonths).toEqual([1]);
 
     const memberDenied = await request(
       `/admin/owner-portal/draws/${drawRunId}/lock-eligibility`,
@@ -577,6 +642,16 @@ describe('MegaGoldenClub owner lucky draw workflow integration', () => {
     secondDrawId = String(secondPrepared.body.drawId);
     secondDrawPolicyId = String(secondPrepared.body.policyId);
     secondDrawPolicyVersionId = String(secondPrepared.body.policyVersionId);
+
+    const lockedMonthTwo = await request(
+      `/admin/owner-portal/seasons/${seasonId}/prizes/month/2`, adminToken,
+      { method: 'PUT', body: JSON.stringify({ prizes: updatedMonthTwoPrizes }) },
+    );
+    expect(lockedMonthTwo.status).toBe(409);
+    const bothLocked = await request(
+      `/admin/owner-portal/seasons/${seasonId}/prize-locks`, adminToken,
+    );
+    expect(bothLocked.body.lockedMonths).toEqual([1, 2]);
 
     const secondLocked = await request(
       `/admin/owner-portal/draws/${secondDrawRunId}/lock-eligibility`,

@@ -780,14 +780,34 @@ export class OwnerPortalService {
     );
   }
 
+  async listLockedPrizeMonths(seasonId: string) {
+    await this.requireSeason(seasonId);
+    const rows = await this.rows<{ monthNumber: number }>(
+      'SELECT DISTINCT monthNumber FROM owner_draw_runs WHERE seasonId=? ORDER BY monthNumber',
+      [seasonId],
+    );
+    return { lockedMonths: rows.map((row) => Number(row.monthNumber)) };
+  }
+
   async uploadSeasonPrizeMedia(
     seasonId: string,
     file: PrizeMediaUpload | undefined,
     actorUserId: string,
+    monthNumberRaw?: string,
   ) {
     const season = await this.requireSeason(seasonId);
-    if (!['DRAFT', 'REVIEW'].includes(season.status)) {
-      throw new ConflictException('Prize media is locked after season activation');
+    if (season.status === 'ACTIVE') {
+      const monthNumber = Number(monthNumberRaw);
+      if (!Number.isInteger(monthNumber) || monthNumber < 1 || monthNumber > Number(season.installmentCount ?? 0)) {
+        throw new BadRequestException('Choose a valid unlocked Season month before uploading prize media');
+      }
+      const prepared = await this.rows<{ id: string }>(
+        'SELECT id FROM owner_draw_runs WHERE seasonId=? AND monthNumber=? LIMIT 1',
+        [seasonId, monthNumber],
+      );
+      if (prepared.length) throw new ConflictException(`Month ${monthNumber} prize media is locked because a draw was prepared`);
+    } else if (!['DRAFT', 'REVIEW'].includes(season.status)) {
+      throw new ConflictException('Prize media is locked for this Season status');
     }
     if (!file?.buffer?.length) throw new BadRequestException('Choose a prize image or PDF to upload');
     if (file.size > 5 * 1024 * 1024) throw new BadRequestException('Prize attachment must be 5 MB or smaller');
@@ -840,6 +860,64 @@ export class OwnerPortalService {
       metadata: { prizeCount: prizes.length, currencyCode },
     });
     return this.listSeasonPrizes(seasonId);
+  }
+
+  async saveActiveSeasonPrizeMonth(
+    seasonId: string,
+    monthNumber: number,
+    prizes: OwnerSeasonPrizeDto[],
+    actorUserId: string,
+  ) {
+    if (!Number.isInteger(monthNumber) || monthNumber < 1 || monthNumber > 60) {
+      throw new BadRequestException('Invalid prize month');
+    }
+    if (!prizes.length || prizes.some((prize) => prize.monthNumber !== monthNumber)) {
+      throw new BadRequestException('Submit at least one prize, all belonging to the selected month');
+    }
+    return this.db.withAdvisoryLock(`owner-prize-month:${seasonId}:${monthNumber}`, async () => {
+      const season = await this.requireSeason(seasonId);
+      if (season.status !== 'ACTIVE') {
+        throw new ConflictException('Month-scoped amendments are only available for ACTIVE seasons');
+      }
+      if (monthNumber > Number(season.installmentCount ?? 0)) {
+        throw new BadRequestException('Prize month exceeds the Season duration');
+      }
+      const prepared = await this.rows<{ id: string }>(
+        'SELECT id FROM owner_draw_runs WHERE seasonId=? AND monthNumber=? LIMIT 1',
+        [seasonId, monthNumber],
+      );
+      if (prepared.length) {
+        throw new ConflictException(`Month ${monthNumber} prize schedule is locked because its draw was prepared`);
+      }
+
+      const previous = (await this.listSeasonPrizes(seasonId)).filter(
+        (prize) => Number(prize.monthNumber) === monthNumber,
+      );
+      const currencyCode =
+        season.currencyCode?.toUpperCase() ?? (await this.requireSettings()).currencyCode;
+      // Only replace this unlocked month; every other month keeps its original
+      // records, IDs and prepared-draw policy snapshots.
+      await this.saveSeasonPrizesInternal(seasonId, prizes, currencyCode, monthNumber);
+      const updated = await this.listSeasonPrizes(seasonId);
+      const current = updated.filter((prize) => Number(prize.monthNumber) === monthNumber);
+      await this.audit.log({
+        actorUserId,
+        action: AuditAction.UPDATE,
+        entityType: 'OwnerSeasonPrizeSchedule',
+        entityId: seasonId,
+        description: `ACTIVE Season month ${monthNumber} prize schedule amended before draw preparation`,
+        metadata: {
+          seasonId,
+          monthNumber,
+          previousPrizes: previous.map(({ prizeCode, name, category, winnerCount, nominalValue, mediaId, description }) =>
+            ({ prizeCode, name, category, winnerCount, nominalValue, mediaId, description })),
+          currentPrizes: current.map(({ prizeCode, name, category, winnerCount, nominalValue, mediaId, description }) =>
+            ({ prizeCode, name, category, winnerCount, nominalValue, mediaId, description })),
+          currencyCode,
+        },
+      });
+      return updated;
+    });
   }
 
   async prepareDraw(seasonId: string, dto: PrepareOwnerDrawDto, actorUserId: string) {
@@ -1696,6 +1774,7 @@ export class OwnerPortalService {
     seasonId: string,
     prizes: OwnerSeasonPrizeDto[],
     currencyCode: string,
+    monthNumber?: number,
   ) {
     const normalizedCurrency = currencyCode.trim().toUpperCase();
     const season = await this.requireSeason(seasonId);
@@ -1721,7 +1800,11 @@ export class OwnerPortalService {
     }
 
     await this.db.transaction(async (connection) => {
-      await connection.query('DELETE FROM owner_season_prizes WHERE seasonId=?', [seasonId]);
+      if (monthNumber === undefined) {
+        await connection.query('DELETE FROM owner_season_prizes WHERE seasonId=?', [seasonId]);
+      } else {
+        await connection.query('DELETE FROM owner_season_prizes WHERE seasonId=? AND monthNumber=?', [seasonId, monthNumber]);
+      }
       for (const prize of prizes) {
         const attachment = prize.mediaId ? media.get(prize.mediaId) : undefined;
         await connection.query(
