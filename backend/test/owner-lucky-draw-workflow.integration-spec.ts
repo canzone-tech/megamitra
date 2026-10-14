@@ -508,7 +508,7 @@ describe('MegaGoldenClub owner lucky draw workflow integration', () => {
       prizeCode: secondPrizeCode,
       category: 'UAT',
       name: 'Updated Future Month Prize',
-      winnerCount: 2,
+      winnerCount: 1,
     }];
     const futureMonthAllowed = await request(
       `/admin/owner-portal/seasons/${seasonId}/prizes/month/2`, adminToken,
@@ -521,7 +521,7 @@ describe('MegaGoldenClub owner lucky draw workflow integration', () => {
     expect(changedPrizes.find((prize) => prize.monthNumber === 1)?.id).toBe(monthOneId);
     expect(changedPrizes.find((prize) => prize.monthNumber === 2)).toMatchObject({
       name: 'Updated Future Month Prize',
-      winnerCount: 2,
+      winnerCount: 1,
     });
 
     const crossMonthDenied = await request(
