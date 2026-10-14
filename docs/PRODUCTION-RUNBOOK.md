@@ -212,6 +212,22 @@ Do not reopen traffic until verification passes and critical balances, policy ve
 
 The runtime artifact contains no `prisma` migration CLI/schema and no build tools. If a migration or recovery needs repository tooling, use the approved separate runner; do not weaken production runtime immutability.
 
+## Repeat release on an existing, healthy MegaGoldenClub VPS
+
+The first-launch script is **not** for upgrades. Use the operator-only `infra/ubuntu-vps/deploy-reviewed-update.sh` for a controlled repeat release. It downloads the immutable, CI-proven source-free runtime from the GitHub pre-release and the ops-only scripts from an exact Git commit; validates artifact SHA256 and embedded `RELEASE_SHA`; stages an unoccupied release directory; reconciles only the dedicated release tree; checks that `/opt/megagoldenclub/current` references the **expected old SHA**; then atomically switches to the new SHA and restarts **only** the three `megagoldenclub-*` processes in `/var/lib/megagoldenclub/.pm2-runtime`. Readiness is verified against localhost-only API and Admin/Member ports. On failure after switching, the helper attempts to restore the previous symlink and only those three PM2 processes. No Apache, existing root PM2, other sites, migrations or data services are modified.
+
+Before activation, the operator must verify the existing production release, real encrypted off-host recovery/restore evidence, a usable prior runtime for rollback, actual production secrets/readiness, and sign-off in `docs/RELEASE-SIGNOFF.md`. The script refuses activation without explicit `MEGAGOLDENCLUB_RECOVERY_SIGNOFF=YES` and `MEGAGOLDENCLUB_TECHNICAL_DEPLOY_APPROVED=YES` acknowledgments; these declarations **do not create backup evidence**. Finance/payout remains on HOLD independently. This is a technical application-code update only.
+
+Use a pinned ops commit (which may be newer than the source-free runtime commit because it only adds deployment tooling) and both exact runtime SHAs:
+
+```bash
+# Only after signing off the above recovery and release preconditions, on the VPS.
+MEGAGOLDENCLUB_RECOVERY_SIGNOFF=YES MEGAGOLDENCLUB_TECHNICAL_DEPLOY_APPROVED=YES \\
+  bash deploy-reviewed-update.sh <OPS_COMMIT> <CURRENT_RELEASE_SHA> <NEW_RUNTIME_SHA>
+```
+
+The script itself must first be fetched from the **same immutable OPS_COMMIT** and checked before running, and only from the reviewed `infra/ubuntu-vps` repository path. Never pipe an unpinned URL into `bash`, never copy an application source checkout to production, and never use the first-deployment bootstrap script on an already-running site. The GitHub workflow `publish-reviewed-runtime.yml` pins CI run IDs and refuses to overwrite an existing pre-release tag.
+
 ## Rollback
 
 Application code may be rolled back to the previous compatible, checksum-verified source-free release artifact. Database migrations are append-only and are not edited or automatically rolled back. If a release requires a compensating schema change, add a new forward migration and validate it through CI/UAT.

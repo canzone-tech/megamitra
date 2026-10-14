@@ -22,6 +22,9 @@ node scripts/test-select-verify-port.mjs
 echo "==> Verifying Ubuntu VPS source-free service templates"
 node "${ROOT_DIR}/scripts/verify-ubuntu-vps-config.mjs"
 
+echo "==> Testing isolated source-free repeat deployment and atomic rollback"
+bash "${ROOT_DIR}/scripts/test-upgrade-runtime.sh"
+
 echo "==> Verifying canonical UAT documentation"
 node "${ROOT_DIR}/scripts/verify-uat-docs.mjs"
 

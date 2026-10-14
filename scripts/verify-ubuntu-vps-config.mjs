@@ -299,7 +299,7 @@ for (const unsafe of [
 // Root npm run verify checks safety invariants without touching host PM2.
 const releaseWorkflow = read('.github/workflows/publish-reviewed-runtime.yml');
 for (const token of [
-  'SOURCE_SHA: ba4750b6bf0880ebb8b3a76c6af3bc14acb8e4a4',
+  'SOURCE_SHA: 5cc5b98f4b45e40d38906a153aafcbb3e2b28a70',
   'BACKEND_RUN:',
   'FRONTEND_RUN:',
   'EVIDENCE_RUN:',
@@ -355,6 +355,17 @@ for (const needle of [
   'Missing isolated runtime launch invariant: ' + needle);
 for (const forbidden of ['pm2 kill', 'systemctl restart apache', 'docker compose down', 'docker volume rm']) {
   assert.ok(!launchRuntime.includes(forbidden), 'Unsafe runtime launch operation: ' + forbidden);
+}
+
+// Subsequent releases must NOT use the first-launch script against running PM2.
+for (const scriptPath of [
+  'infra/ubuntu-vps/upgrade-dedicated-runtime.sh',
+  'infra/ubuntu-vps/deploy-reviewed-update.sh',
+]) {
+  const source = read(scriptPath);
+  for (const needle of ['megagoldenclub', 'set -euo pipefail', 'STOP:']) {
+    assert.ok(source.includes(needle), `Repeat release script missing invariant ${needle}`);
+  }
 }
 
 const api = read('backend/src/main.ts');

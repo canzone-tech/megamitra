@@ -170,6 +170,10 @@ jobs:
         working-directory: .
         run: bash scripts/test-launch-runtime.sh
 
+      - name: Regression test repeat production deployment and rollback isolation
+        working-directory: .
+        run: bash scripts/test-upgrade-runtime.sh
+
       - name: Start CI data services
         run: |
           docker compose -f ../docker-compose.yml up -d --wait --wait-timeout 120
