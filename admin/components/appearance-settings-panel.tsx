@@ -1,5 +1,6 @@
 'use client';
 
+import { ActionFeedback } from './action-feedback';
 import { useCallback, useEffect, useState } from 'react';
 import type { CSSProperties } from 'react';
 import { useRouter } from 'next/navigation';
@@ -166,8 +167,7 @@ export function AppearanceSettingsPanel() {
   }
 
   return <div className="mm-grid">
-    {error ? <div className="mm-error" role="alert">{error}</div> : null}
-    {notice ? <div className="mm-success" role="status">{notice}</div> : null}
+    <ActionFeedback error={error} notice={notice} onDismissError={() => setError('')} onDismissNotice={() => setNotice('')} />
     <div className="mm-tabs" role="tablist">{tabs.map((item) => <button key={item.kind} type="button" className={`mm-tab ${tab === item.kind ? 'active' : ''}`} onClick={() => setTab(item.kind)}>{item.label}</button>)}</div>
     <section className="mm-card">
       <div className="mm-card-head"><div><h2>{active?.definition.name ?? 'Member portal appearance'}</h2><p className="mm-note">{active?.definition.description ?? 'Versioned member portal colors, layout and wording.'}</p></div>{active?.selected ? <span className={`mm-chip ${active.selected.lifecycle === 'DRAFT' ? 'warning' : active.selected.lifecycle === 'PUBLISHED' ? 'success' : ''}`}>{versionLabel(active.selected)}</span> : <span className="mm-chip">DEFAULT</span>}</div>

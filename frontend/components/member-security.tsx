@@ -1,5 +1,6 @@
 'use client';
 
+import { ActionFeedback } from './action-feedback';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ApiClientError, apiJson } from '@/lib/client-api';
@@ -60,7 +61,7 @@ export function MemberSecurity() {
         <div className="mm-member-hero">
           <div><p className="mm-eyebrow">Account security</p><h1 className="mm-title">Identity & email</h1><p className="mm-subtitle">Review your registered account details and verify your existing email address.</p></div>
         </div>
-        {error ? <div className="mm-error" role="alert">{error}</div> : null}
+        <ActionFeedback error={error} notice={verificationNotice} onDismissError={() => setError('')} onDismissNotice={() => setVerificationNotice('')} />
         <div className="mm-wide-grid mm-security-identity-grid">
           <section className="mm-card">
             <div className="mm-card-head"><h2>Current identity</h2><span className="mm-chip">{!me ? 'Loading' : me.emailVerifiedAt ? 'Verified' : 'Unverified'}</span></div>
@@ -68,7 +69,7 @@ export function MemberSecurity() {
               <div className="mm-list-row"><span>Username</span><strong>{me?.username ?? 'Loading…'}</strong></div>
               <div className="mm-list-row"><span>Email</span><strong>{me?.email ?? '—'}</strong></div>
               <div className="mm-list-row"><span>Email status</span><strong>{!me ? 'Loading…' : me.emailVerifiedAt ? 'Verified' : 'Verification pending'}</strong></div>
-              {me?.email && !me.emailVerifiedAt ? <div className="mm-member-verify-email"><p>Verify your current email address to complete your profile.</p><button className="mm-button light" type="button" disabled={requestingVerification} onClick={() => void requestVerification()}>{requestingVerification ? 'Sending…' : 'Resend verification link'}</button>{verificationNotice ? <div className="mm-success" role="status">{verificationNotice}</div> : null}</div> : null}
+              {me?.email && !me.emailVerifiedAt ? <div className="mm-member-verify-email"><p>Verify your current email address to complete your profile.</p><button className="mm-button light" type="button" disabled={requestingVerification} onClick={() => void requestVerification()}>{requestingVerification ? 'Sending…' : 'Resend verification link'}</button></div> : null}
             </div>
           </section>
         </div>

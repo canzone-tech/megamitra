@@ -1,5 +1,6 @@
 'use client';
 
+import { ActionFeedback } from './action-feedback';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
@@ -463,8 +464,7 @@ export function OwnerFinancePortal({ section }: { section: OwnerFinanceSection }
 
   return (
     <OwnerManagementShell title={TITLES[section]} currentSection={section}>
-      {error ? <div className={classNames(styles.notice, styles.error)}>{error}</div> : null}
-      {notice ? <div className={classNames(styles.notice, styles.success)}>{notice}</div> : null}
+      <ActionFeedback error={error} notice={notice} onDismissError={() => setError('')} onDismissNotice={() => setNotice('')} />
       {section === 'payments' ? renderPayments() : section === 'wallet' ? renderWallet() : section === 'epins' ? renderEpins() : renderAuthCodes()}
     </OwnerManagementShell>
   );

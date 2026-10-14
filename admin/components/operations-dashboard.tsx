@@ -1,5 +1,6 @@
 'use client';
 
+import { ActionFeedback } from './action-feedback';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -306,8 +307,7 @@ export function OperationsDashboard() {
           <button className="mm-button" type="button" disabled={loading || busy} onClick={() => void load()}>{loading ? 'Refreshing…' : 'Refresh'}</button>
         </div>
 
-        {error ? <div className="mm-error" role="alert">{error}</div> : null}
-        {message ? <div className="mm-success" role="status">{message}</div> : null}
+        <ActionFeedback error={error} notice={message} onDismissError={() => setError('')} onDismissNotice={() => setMessage('')} />
 
         {data ? <>
           <div className="mm-grid stats" style={{ marginBottom: 20 }}>

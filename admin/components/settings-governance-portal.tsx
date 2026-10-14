@@ -1,5 +1,6 @@
 'use client';
 
+import { ActionFeedback } from './action-feedback';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -102,8 +103,7 @@ export function SettingsGovernancePortal() {
       <span className={styles.pill}>CENTRAL CONFIGURATION • DB BACKED • AUDITED</span>
     </section>
 
-    {error ? <div className={classNames(styles.notice, styles.error)} role="alert">{error}</div> : null}
-    {notice ? <div className={classNames(styles.notice, styles.success)} role="status">{notice}</div> : null}
+    <ActionFeedback error={error} notice={notice} onDismissError={() => setError('')} onDismissNotice={() => setNotice('')} />
 
     <WorkspaceTabs
       ariaLabel="Settings sections"

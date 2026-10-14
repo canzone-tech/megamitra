@@ -1,5 +1,6 @@
 'use client';
 
+import { ActionFeedback } from './action-feedback';
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -82,7 +83,7 @@ export function MemberInstallments() {
             {loading ? 'Refreshing…' : 'Refresh'}
           </button>
         </div>
-        {error ? <div className="mm-error" role="alert">{error}</div> : null}
+        <ActionFeedback error={error} onDismissError={() => setError('')} />
         {data ? data.enrollments.length ? data.enrollments.map((enrollment) => (
           <section className="mm-card mm-installment-card" key={enrollment.id} aria-label={enrollment.seasonName + ' monthwise installments'}>
             <div className="mm-card-head">

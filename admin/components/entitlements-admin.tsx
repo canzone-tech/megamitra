@@ -1,5 +1,6 @@
 'use client';
 
+import { ActionFeedback } from './action-feedback';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -239,8 +240,7 @@ export function EntitlementsAdmin() {
 
       <main className="mm-page">
         <div className="mm-hero-row"><div><p className="mm-eyebrow">Member benefits</p><h1 className="mm-title">Products & benefits</h1><p className="mm-subtitle">Choose what members receive, when they become eligible and track delivery from one simple page.</p></div><button className="mm-button" type="button" disabled={loading || busy} onClick={() => void load()}>{loading ? 'Refreshing…' : 'Refresh'}</button></div>
-        {error ? <div className="mm-error" role="alert">{error}</div> : null}
-        {message ? <div className="mm-success" role="status">{message}</div> : null}
+        <ActionFeedback error={error} notice={message} onDismissError={() => setError('')} onDismissNotice={() => setMessage('')} />
 
         <div className="mm-grid two" style={{ marginBottom: 20 }}>
           <section className="mm-card"><div className="mm-card-head"><h2>Add a product or benefit</h2><span className="mm-chip">{products.length} saved</span></div><form method="post" className="mm-card-body mm-form" onSubmit={(event) => void createProduct(event)}><label>Product name<input minLength={2} maxLength={120} value={productName} onChange={(event) => setProductName(event.target.value)} required /></label><label>Type<select value={productKind} onChange={(event) => setProductKind(event.target.value)}><option value="GOODS">Physical product</option><option value="SERVICE">Service</option><option value="BENEFIT">Member benefit</option><option value="BUNDLE">Bundle</option><option value="OTHER">Other</option></select></label><div className="mm-grid two"><label>Approx. value (optional)<input type="number" min="0" step="0.01" value={productValue} onChange={(event) => setProductValue(event.target.value)} /></label><label>Currency<input maxLength={3} value={productCurrency} onChange={(event) => setProductCurrency(event.target.value.toUpperCase())} /></label></div><button className="mm-button" disabled={busy || productName.trim().length < 2} type="submit">Save product</button></form></section>

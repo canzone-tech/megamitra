@@ -1,5 +1,6 @@
 'use client';
 
+import { ActionFeedback } from './action-feedback';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -639,8 +640,7 @@ export function OwnerCorePortal({ section, extension }: { section: OwnerCoreSect
       <main className={styles.main}>
         <header className={styles.topbar}><div className={styles.crumb}><b>{TITLES[section]}</b><span>{text(settings.companyName, 'MegaGoldenClub')} • Professional management portal</span></div><div className={styles.actions}><button className={styles.logout} type="button" onClick={logout} disabled={busy}>LOG OUT</button></div></header>
         <div className={styles.content}>
-          {error ? <div className={classNames(styles.notice, styles.error)}>{error}</div> : null}
-          {notice ? <div className={classNames(styles.notice, styles.success)}>{notice}</div> : null}
+          <ActionFeedback error={error} notice={notice} onDismissError={() => setError('')} onDismissNotice={() => setNotice('')} />
           {section === 'dashboard' ? renderDashboard() : section === 'income' ? renderIncome() : section === 'members' ? renderMembers() : section === 'binary' ? renderBinary() : section === 'placement' ? renderPlacement() : section === 'seasons' ? renderSeasons() : section === 'draw' ? renderDraw() : section === 'winners' ? renderWinners() : renderPrizes()}
         </div>
       </main>

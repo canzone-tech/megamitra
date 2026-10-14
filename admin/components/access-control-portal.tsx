@@ -1,5 +1,6 @@
 'use client';
 
+import { ActionFeedback } from './action-feedback';
 import { useCallback, useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
 import { ApiClientError, apiJson } from '@/lib/client-api';
@@ -173,8 +174,7 @@ export function AccessControlPortal({ section }: { section: AccessSection }) {
         <span className={styles.pill}>SUPER_ADMIN • ADMIN • AGENT • MEMBER</span>
       </section>
 
-      {error ? <div className={classNames(styles.notice, styles.error)} role="alert">{error}</div> : null}
-      {notice ? <div className={classNames(styles.notice, styles.success)} role="status">{notice}</div> : null}
+      <ActionFeedback error={error} notice={notice} onDismissError={() => setError('')} onDismissNotice={() => setNotice('')} />
 
       {section === 'staff' ? <StaffWorkspace /> : <RbacWorkspace />}
     </OwnerManagementShell>

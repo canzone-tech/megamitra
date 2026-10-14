@@ -1,5 +1,6 @@
 'use client';
 
+import { ActionFeedback } from './action-feedback';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -221,8 +222,7 @@ export function WithdrawalsAdmin({ embedded = false }: { embedded?: boolean } = 
           <div style={{ display: 'flex', gap: 8, alignItems: 'end' }}><div className="mm-field" style={{ margin: 0 }}><label htmlFor="withdrawal-status-filter">Status</label><select className="mm-input" id="withdrawal-status-filter" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="">All</option>{['REQUESTED','APPROVED','PROCESSING','PAYOUT_FAILED','PAID','REJECTED','CANCELLED'].map((status) => <option key={status} value={status}>{status.replaceAll('_', ' ')}</option>)}</select></div><button className="mm-button" type="button" disabled={loading} onClick={() => void load()}>{loading ? 'Refreshing…' : 'Refresh'}</button></div>
         </div>
 
-        {error ? <div className="mm-error" role="alert">{error}</div> : null}
-        {success ? <div className="mm-success" role="status">{success}</div> : null}
+        <ActionFeedback error={error} notice={success} onDismissError={() => setError('')} onDismissNotice={() => setSuccess('')} />
 
         <section className="mm-card" style={{ marginBottom: 20 }}>
           <div className="mm-card-head"><h2>Request queue</h2><span className="mm-chip">{requests?.total ?? 0} total</span></div>

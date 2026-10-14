@@ -101,6 +101,59 @@ for (const sharedPortal of [
   }
 }
 
+
+// Action results must remain visible even when the user is editing far down a page.
+// Use the same accessible, dismissible toast contract in both Next.js applications.
+const feedbackAdminScreens = [
+  'owner-core-portal', 'owner-core-v14-portal', 'owner-finance-portal',
+  'owner-control-portal', 'owner-members-portal', 'member-payment-verification-portal',
+  'settings-governance-portal', 'owner-season-advanced-panel',
+  'access-control-portal', 'owner-portal', 'owner-kyc-panel',
+  'withdrawals-admin', 'appearance-settings-panel', 'kyc-admin',
+  'platform-config-admin', 'entitlements-admin', 'operations-dashboard',
+];
+const feedbackMemberScreens = [
+  'member-installments', 'member-dashboard', 'member-security',
+  'member-kyc', 'member-withdrawals', 'signup-form',
+  'member-entitlements', 'member-payments',
+];
+for (const [directory, names] of [
+  ['admin/components', feedbackAdminScreens],
+  ['frontend/components', feedbackMemberScreens],
+]) {
+  const componentFile = path.join(repoRoot, directory, 'action-feedback.tsx');
+  const cssFile = path.join(repoRoot, directory, 'action-feedback.module.css');
+  const component = fs.readFileSync(componentFile, 'utf8');
+  const css = fs.readFileSync(cssFile, 'utf8');
+  for (const fragment of [
+    "role={failed ? 'alert' : 'status'}",
+    'aria-atomic="true"',
+    'aria-label="Dismiss notification"',
+    'if (!error && !notice) return null',
+  ]) {
+    if (!component.includes(fragment)) failures.push(`${componentFile}: missing toast behavior ${fragment}`);
+  }
+  for (const fragment of ['position: fixed', 'safe-area-inset-top', '@media (max-width: 680px)', '@media print']) {
+    if (!css.includes(fragment)) failures.push(`${cssFile}: missing viewport behavior ${fragment}`);
+  }
+  for (const name of names) {
+    const screen = path.join(directory, `${name}.tsx`);
+    const source = fs.readFileSync(path.join(repoRoot, screen), 'utf8');
+    for (const fragment of [
+      "import { ActionFeedback } from './action-feedback'",
+      '<ActionFeedback error={error}',
+      "onDismissError={() => setError('')}",
+    ]) {
+      if (!source.includes(fragment)) failures.push(`${screen}: action feedback missing ${fragment}`);
+    }
+  }
+}
+for (const filename of ['action-feedback.tsx', 'action-feedback.module.css']) {
+  const admin = fs.readFileSync(path.join(repoRoot, 'admin/components', filename), 'utf8');
+  const member = fs.readFileSync(path.join(repoRoot, 'frontend/components', filename), 'utf8');
+  if (admin !== member) failures.push(`Toast contract drifted between admin and member: ${filename}`);
+}
+
 if (failures.length) {
   console.error(failures.join('\n'));
   process.exit(1);

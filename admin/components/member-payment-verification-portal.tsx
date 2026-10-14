@@ -1,5 +1,6 @@
 'use client';
 
+import { ActionFeedback } from './action-feedback';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ApiClientError, apiJson } from '@/lib/client-api';
@@ -169,8 +170,7 @@ export function MemberPaymentVerificationPortal() {
   return (
     <OwnerManagementShell title="Member Payment Verification" currentSection="member-payments">
       <div className={styles.hero}><h1>Member Payment Verification</h1><p>Review QR / UPI installment and E-PIN purchase submissions. Approval and rejection are restricted to Super Admin.</p><span className={styles.pill}>UTR + SCREENSHOT • AUDITED REVIEW</span></div>
-      {error ? <div className={classNames(styles.notice, styles.error)} role="alert">{error}</div> : null}
-      {notice ? <div className={classNames(styles.notice, styles.success)} role="status">{notice}</div> : null}
+      <ActionFeedback error={error} notice={notice} onDismissError={() => setError('')} onDismissNotice={() => setNotice('')} />
 
       <div className={styles.card}>
         <div className={styles.sectionHead}><div className={styles.sectionTitle}><span className={styles.sectionIcon}>💳</span><h2>QR / UPI Settings</h2></div><small>Super Admin only</small></div>

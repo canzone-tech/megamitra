@@ -1,5 +1,6 @@
 'use client';
 
+import { ActionFeedback } from './action-feedback';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -98,8 +99,7 @@ export function MemberEntitlements() {
           <button className="mm-button blue" type="button" disabled={loading} onClick={() => void load()}>{loading ? 'Refreshing…' : 'Refresh'}</button>
         </div>
 
-        {error ? <div className="mm-error" role="alert">{error}</div> : null}
-        {message ? <div className="mm-success" role="status">{message}</div> : null}
+        <ActionFeedback error={error} notice={message} onDismissError={() => setError('')} onDismissNotice={() => setMessage('')} />
 
         <section className="mm-card" style={{ marginTop: 14 }}><div className="mm-card-body"><strong>Looking for achievement targets or monthly Lucky Draw prizes?</strong><p>This page shows only product benefits already granted to your account. Draw prizes and rank goals have their own member guide.</p><Link className="mm-button blue" href="/member/rewards">View rewards & Lucky Draw</Link></div></section>
 

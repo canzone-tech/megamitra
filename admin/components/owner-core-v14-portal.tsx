@@ -1,5 +1,6 @@
 'use client';
 
+import { ActionFeedback } from './action-feedback';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
@@ -579,8 +580,7 @@ export function OwnerCoreV14Portal({ section, extension }: { section: OwnerCoreV
 
   return (
     <OwnerManagementShell title={TITLES[section]} currentSection={section}>
-      {error ? <div className={classNames(styles.notice, styles.error)}>{error}</div> : null}
-      {notice ? <div className={classNames(styles.notice, styles.success)}>{notice}</div> : null}
+      <ActionFeedback error={error} notice={notice} onDismissError={() => setError('')} onDismissNotice={() => setNotice('')} />
       {section === 'dashboard' ? renderDashboard() : null}
       {section === 'income' ? renderIncome() : null}
       {section === 'members' ? renderMembers() : null}

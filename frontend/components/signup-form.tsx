@@ -1,5 +1,6 @@
 'use client';
 
+import { ActionFeedback } from './action-feedback';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { ApiClientError, apiJson } from '@/lib/client-api';
@@ -486,7 +487,7 @@ export function SignupForm() {
         ) : <div className="mm-error">Security check could not be loaded. Refresh and try again.</div>
       ) : null}
 
-      {error ? <div className="mm-error" role="alert">{error}</div> : null}
+      <ActionFeedback error={error} onDismissError={() => setError('')} />
       <button className="mm-button" type="submit" disabled={busy || Boolean(config?.captchaOnRegistrationEnabled && !captcha)}>
         {busy ? 'Creating account…' : 'Create account'}
       </button>

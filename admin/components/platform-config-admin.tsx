@@ -1,5 +1,6 @@
 'use client';
 
+import { ActionFeedback } from './action-feedback';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ApiClientError, apiJson } from '@/lib/client-api';
@@ -170,8 +171,7 @@ export function PlatformConfigAdmin() {
 
   return (
     <div className="mm-grid">
-      {error ? <div className="mm-error">{error}</div> : null}
-      {notice ? <div className="mm-success">{notice}</div> : null}
+      <ActionFeedback error={error} notice={notice} onDismissError={() => setError('')} onDismissNotice={() => setNotice('')} />
 
       <WorkspaceTabs
         ariaLabel="Security and registration configuration"

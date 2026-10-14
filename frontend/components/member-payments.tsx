@@ -1,5 +1,6 @@
 'use client';
 
+import { ActionFeedback } from './action-feedback';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
@@ -273,8 +274,7 @@ export function MemberPayments() {
       <MemberHeader />
       <main className="mm-member-main">
         <div className="mm-member-hero"><div><p className="mm-eyebrow">Member payments</p><h1 className="mm-title">Installments & E-PINs</h1><p className="mm-subtitle">Pay by QR / UPI, submit UTR and screenshot, and keep the same public receipt through verification.</p><span className="mm-portal-pill">Super Admin verification required</span></div><button className="mm-button blue" type="button" disabled={loading} onClick={() => void load()}>{loading ? 'Refreshing…' : 'Refresh'}</button></div>
-        {error ? <div className="mm-error" role="alert">{error}</div> : null}
-        {notice ? <div className="mm-success" role="status">{notice}</div> : null}
+        <ActionFeedback error={error} notice={notice} onDismissError={() => setError('')} onDismissNotice={() => setNotice('')} />
 
         <section className="mm-portal-grid">
           <article className="mm-card">

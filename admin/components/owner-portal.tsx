@@ -1,5 +1,6 @@
 'use client';
 
+import { ActionFeedback } from './action-feedback';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
@@ -213,8 +214,7 @@ export function OwnerPortal({ section }: { section: Section }) {
       <main className={styles.main}>
         <header className={styles.topbar}><div className={styles.crumb}><b>{TITLES[section]}</b><span>MegaGoldenClub • Professional management portal</span></div><div className={styles.actions}><Link className={classNames(styles.iconButton, styles.linkButton)} href="/presentation" aria-label="Appearance">◐</Link><Link className={classNames(styles.iconButton, styles.linkButton)} href="/security" aria-label="Security">◇</Link><button className={styles.logout} type="button" onClick={logout} disabled={busy}>LOG OUT</button></div></header>
         <div className={styles.content}>
-          {error ? <div className={classNames(styles.notice, styles.error)}>{error}</div> : null}
-          {notice ? <div className={classNames(styles.notice, styles.success)}>{notice}</div> : null}
+          <ActionFeedback error={error} notice={notice} onDismissError={() => setError('')} onDismissNotice={() => setNotice('')} />
           {renderSection()}
         </div>
       </main>

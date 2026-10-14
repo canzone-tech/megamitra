@@ -1,5 +1,6 @@
 'use client';
 
+import { ActionFeedback } from './action-feedback';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -163,8 +164,7 @@ export function KycAdmin() {
           <div><p className="mm-eyebrow">Member verification</p><h1 className="mm-title">KYC review & policy</h1><p className="mm-subtitle">Review member KYC submissions, update requirements and manage approval decisions from one workspace.</p></div>
           <button className="mm-button" type="button" disabled={loading} onClick={() => void load()}>{loading ? 'Refreshing…' : 'Refresh'}</button>
         </div>
-        {error ? <div className="mm-error" role="alert">{error}</div> : null}
-        {success ? <div className="mm-success" role="status">{success}</div> : null}
+        <ActionFeedback error={error} notice={success} onDismissError={() => setError('')} onDismissNotice={() => setSuccess('')} />
 
         <div className="mm-grid two">
           <section className="mm-card">

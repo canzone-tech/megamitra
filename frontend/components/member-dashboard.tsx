@@ -1,5 +1,6 @@
 'use client';
 
+import { ActionFeedback } from './action-feedback';
 import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -188,7 +189,7 @@ export function MemberDashboard() {
           </button>
         </div>
 
-        {error ? <div className="mm-error" role="alert">{error}</div> : null}
+        <ActionFeedback error={error} onDismissError={() => setError('')} />
 
         {data ? (
           <>

@@ -1,5 +1,6 @@
 'use client';
 
+import { ActionFeedback } from './action-feedback';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
@@ -139,8 +140,7 @@ export function OwnerMembersPortal({ extension }: { extension?: ReactNode }) {
         <span className={styles.pill}>ACCOUNT ROLE: MEMBER</span>
       </div>
 
-      {error ? <div className={classNames(styles.notice, styles.warn)} role="alert">{error}</div> : null}
-      {notice ? <div className={classNames(styles.notice, styles.success)} role="status">{notice}</div> : null}
+      <ActionFeedback error={error} notice={notice} onDismissError={() => setError('')} onDismissNotice={() => setNotice('')} />
 
       <WorkspaceTabs ariaLabel="Member management workspace" tabs={tabs}>
         {(activeTab) => (

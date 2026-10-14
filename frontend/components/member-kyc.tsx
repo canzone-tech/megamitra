@@ -1,5 +1,6 @@
 'use client';
 
+import { ActionFeedback } from './action-feedback';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ApiClientError, apiJson } from '@/lib/client-api';
@@ -169,8 +170,7 @@ export function MemberKyc() {
           <button className="mm-button blue" type="button" disabled={loading} onClick={() => void load()}>{loading ? 'Refreshing…' : 'Refresh'}</button>
         </div>
 
-        {error ? <div className="mm-error" role="alert">{error}</div> : null}
-        {success ? <div className="mm-success" role="status">{success}</div> : null}
+        <ActionFeedback error={error} notice={success} onDismissError={() => setError('')} onDismissNotice={() => setSuccess('')} />
 
         {state ? (
           <div className="mm-wide-grid">

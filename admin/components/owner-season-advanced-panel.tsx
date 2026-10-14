@@ -1,5 +1,6 @@
 'use client';
 
+import { ActionFeedback } from './action-feedback';
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ApiClientError, apiJson } from '@/lib/client-api';
@@ -218,8 +219,7 @@ export function OwnerSeasonAdvancedPanel({ embedded = false }: { embedded?: bool
         <div className={styles.notice}>
           <b>Fixed client rule:</b> A/B are LEFT, C/D are RIGHT. Only <b>A:C</b> and <b>B:D</b> form pairs. A:D and B:C are never eligible. Placement topology is not an editable ratio.
         </div>
-        {error ? <div className={`${styles.notice} ${styles.error}`}>{error}</div> : null}
-        {notice ? <div className={`${styles.notice} ${styles.success}`}>{notice}</div> : null}
+        <ActionFeedback error={error} notice={notice} onDismissError={() => setError('')} onDismissNotice={() => setNotice('')} />
 
         <div className={styles.fields}>
           <div className={styles.field}><label>Season</label><select className={styles.select} value={seasonId} onChange={(event) => { setSeasonId(event.target.value); void loadConfig(event.target.value); }}><option value="">Select season</option>{seasons.map((season) => <option key={season.id} value={season.id}>{season.name} • {season.status}</option>)}</select></div>

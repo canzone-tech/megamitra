@@ -1,5 +1,6 @@
 'use client';
 
+import { ActionFeedback } from './action-feedback';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ApiClientError, apiJson } from '@/lib/client-api';
@@ -233,8 +234,7 @@ export function MemberWithdrawals() {
           <div style={{ display: 'flex', gap: 8, alignItems: 'end' }}><div className="mm-field" style={{ margin: 0 }}><label htmlFor="withdrawal-currency">Currency</label><input className="mm-input" id="withdrawal-currency" maxLength={3} value={currencyCode} onChange={(event) => setCurrencyCode(event.target.value.toUpperCase())} /></div><button className="mm-button blue" type="button" disabled={loading} onClick={() => void load()}>{loading ? 'Refreshing…' : 'Refresh'}</button></div>
         </div>
 
-        {error ? <div className="mm-error" role="alert">{error}</div> : null}
-        {success ? <div className="mm-success" role="status">{success}</div> : null}
+        <ActionFeedback error={error} notice={success} onDismissError={() => setError('')} onDismissNotice={() => setSuccess('')} />
 
         {data ? (
           <>
