@@ -19,8 +19,20 @@ if git grep -ni "${LEGACY_SLUG}" -- \
   ':!.env.example' \
   ':!.github/workflows/backend-ci.yml' \
   ':!backend/test/presentation.integration-spec.ts' \
-  ':!docker-compose.yml'; then
+  ':!docker-compose.yml' \
+  ':!infra/ubuntu-vps/deploy-reviewed-update.sh'; then
   echo "ERROR: legacy product slug found outside approved persistence compatibility identifiers"
+  exit 1
+fi
+
+# The exact GitHub repository slug is used only by the ops-only runtime fetcher.
+# It is not product branding; allow it only inside two pinned GitHub URLs.
+OPS_FETCHER='infra/ubuntu-vps/deploy-reviewed-update.sh'
+EXPECTED_REPO="canzone-tech/$LEGACY_SLUG"
+if [[ "$(grep -ci "$LEGACY_SLUG" "$OPS_FETCHER" || true)" != 2 ]] ||
+   ! grep -Fxq "BASE_URL=\"https://raw.githubusercontent.com/$EXPECTED_REPO/\$OPS_COMMIT/infra/ubuntu-vps\"" "$OPS_FETCHER" ||
+   ! grep -Fxq "RELEASE_URL=\"https://github.com/$EXPECTED_REPO/releases/download/runtime-\$NEW_SHA/megagoldenclub-runtime.zip\"" "$OPS_FETCHER"; then
+  echo 'ERROR: ops-only download URLs must use only the approved GitHub repo path' >&2
   exit 1
 fi
 
