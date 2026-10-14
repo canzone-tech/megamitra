@@ -56,4 +56,40 @@ for (const invariant of [
   requireExactlyOnce(statefulPath, stateful, invariant);
 }
 
+// Persist the reviewed GitHub-first → local verify → approved production
+// contract as a regression-checked repository rule, not a chat convention.
+const deliveryPath = 'docs/DEVELOPMENT-DELIVERY-RULES.md';
+const delivery = read(deliveryPath);
+for (const section of [
+  '# MegaGoldenClub Development and Delivery Rules',
+  '## GitHub-first change process',
+  '## Release candidate verification',
+  '## Production approval and safety',
+  '## Required production smoke evidence',
+  '## Non-negotiable HOLD boundaries',
+]) {
+  requireExactlyOnce(deliveryPath, delivery, section);
+}
+for (const invariant of [
+  '`dev/local-foundation`',
+  '`npm run verify`',
+  'Backend CI',
+  'Frontend CI',
+  'Release Evidence',
+  '`--uploaded-zip`',
+  'HTTP 404, intentionally blocked by Apache',
+  'HTTP 401',
+  'HOLD',
+]) {
+  if (!delivery.includes(invariant)) {
+    throw new Error(`${deliveryPath}: missing delivery safety invariant ${invariant}`);
+  }
+}
+const agents = read('AGENTS.md');
+if (!agents.includes('[delivery rules](docs/DEVELOPMENT-DELIVERY-RULES.md)') ||
+    !agents.includes('repository-root') ||
+    !agents.includes('dev/local-foundation')) {
+  throw new Error('AGENTS.md must direct future contributors to canonical delivery rules');
+}
+
 console.log('MegaGoldenClub canonical UAT documentation verification: PASS');

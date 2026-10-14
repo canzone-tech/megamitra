@@ -6,6 +6,17 @@ MegaGoldenClub is a configurable consumer rewards and binary-network platform wi
 
 **[Business Rules Register](docs/BUSINESS-RULES-REGISTER.md)** is the cross-chat source of truth for approved decisions, current implementation, pending gaps and manual business UAT progress. Read it **before changing** identity, binary, E-PIN, season code, draw-token or payment-receipt logic. Rules must be documented alongside code and test changes; prior-chat memory is not the authority.
 
+## Mandatory development and release workflow
+
+**[Development & Delivery Rules](docs/DEVELOPMENT-DELIVERY-RULES.md)** and
+**[AGENTS.md](AGENTS.md)** are the repository instructions for future work:
+GitHub-first fixes on `dev/local-foundation` → exact-SHA Backend CI,
+Frontend CI and Release Evidence GREEN → operator `git pull` and
+**repository-root `npm run verify`** → separately approved production
+rollout with source-free checksums, dedicated PM2, rollback and
+production smoke/visual UAT. Finance/payout and the unrelated project
+on HOLD remain off-limits without explicit independent approval.
+
 ## Architecture status
 
 The repository is being bootstrapped from a clean initial state. The following project-level decisions are locked for the foundation:

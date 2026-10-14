@@ -26,6 +26,25 @@ deployment profile** and do not override this approved local-isolated choice.
 - **Recovery:** use the remote providers' verified, encrypted, off-host backup/snapshot and isolated remote restore facilities. Local Compose backup/restore scripts below remain development/CI drills, not production backup procedures.
 
 
+## Verified application update: 2026-10-14
+
+The operator supplied evidence that the **code-only** update from
+`ba4750b6bf0880ebb8b3a76c6af3bc14acb8e4a4` to
+`5cc5b98f4b45e40d38906a153aafcbb3e2b28a70` completed on the VPS,
+using source-free runtime ZIP SHA256 validation, dedicated PM2 activation
+and post-switch health checks. External curl checks returned public WWW
+and Admin HTTP 200 with TLS verification 0, API public config HTTP 200,
+and unauthenticated protected API HTTP 401; public `/health/live` HTTP
+404 was **expected**, because the Apache API vhost intentionally blocks
+all external `/health` paths. A production Prize Catalogue screenshot
+showed the floating success toast. These observations are historical;
+repeat the gates for every subsequent deployment. This does not
+automatically close the independent business, provider, finance/payout,
+off-host recovery documentation or renewal-monitoring gates.
+
+For mandatory development → CI → local verification → approved production
+handoff, see [Development and Delivery Rules](DEVELOPMENT-DELIVERY-RULES.md).
+
 ## First-deployment checkpoint
 
 The shared-VPS HTTPS Apache vhosts and Snap Certbot certificates were
