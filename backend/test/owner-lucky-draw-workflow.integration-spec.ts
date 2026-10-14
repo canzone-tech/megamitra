@@ -722,7 +722,7 @@ describe('MegaGoldenClub owner lucky draw workflow integration', () => {
     expect(externalRecorded.body.winners[0]).toMatchObject({
       drawToken: externalInstallmentToken,
       prizeCode: secondPrizeCode,
-      prizeName: 'February Workflow Prize',
+      prizeName: 'Updated Future Month Prize',
       tierWinnerPosition: 1,
       prizeWinnerCount: 1,
     });
