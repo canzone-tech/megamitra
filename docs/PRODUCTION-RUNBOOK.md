@@ -226,6 +226,28 @@ MEGAGOLDENCLUB_RECOVERY_SIGNOFF=YES MEGAGOLDENCLUB_TECHNICAL_DEPLOY_APPROVED=YES
   bash deploy-reviewed-update.sh <OPS_COMMIT> <CURRENT_RELEASE_SHA> <NEW_RUNTIME_SHA>
 ```
 
+### When GitHub's release API rejects a pinned older commit
+
+GitHub Actions can download and checksum-verify the source-free runtime while its
+`GITHUB_TOKEN` is unable to create a tag/release targeting a commit that changed
+workflow files. Do **not** weaken the release's exact-SHA identity, relax
+permissions globally, change the target to the newer ops commit, or upload any
+application source to the VPS.
+
+The already-successful pinned Backend CI run exposes a ZIP artifact called
+`megagoldenclub-runtime-<NEW_RUNTIME_SHA>`. An authorized operator can
+download **that exact** Actions artifact ZIP from GitHub's run page on a trusted
+machine (no token/secret on the VPS), verify its published outer ZIP SHA256
+against the GitHub Actions artifact metadata, then transfer that unchanged ZIP
+to an access-restricted absolute path on the VPS. The staging tool accepts
+`--uploaded-zip /absolute/path/to/artifact.zip <64-character-actions-artifact-sha256>`
+as a separate explicit mode. It verifies the transferred ZIP's SHA256 and
+then re-verifies the inner `megagoldenclub-runtime.tar.gz.sha256` and
+embedded `RELEASE_SHA` before staging. Missing or tampered artifacts fail
+closed. The same prior-release, recovery-signoff, dedicated PM2 and rollback
+gates apply. This path needs no GitHub release write permission or broad PAT.
+Do not confuse the GitHub Actions ZIP digest with the inner tar digest.
+
 The script itself must first be fetched from the **same immutable OPS_COMMIT** and checked before running, and only from the reviewed `infra/ubuntu-vps` repository path. Never pipe an unpinned URL into `bash`, never copy an application source checkout to production, and never use the first-deployment bootstrap script on an already-running site. The GitHub workflow `publish-reviewed-runtime.yml` pins CI run IDs and refuses to overwrite an existing pre-release tag.
 
 ## Rollback

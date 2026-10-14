@@ -67,4 +67,21 @@ if atomic_switch "$OLD" "$NEW"; then
   echo 'STOP: occupied pending-switch path should fail closed' >&2; exit 1
 fi
 [[ "$(readlink "$CURRENT")" == "$OLD" ]]
+# Uploaded CI ZIP fallback must reject altered bytes and symlink attacks before staging.
+awk '/^copy_approved_artifact\(\) \{/{copy=1} copy{print} copy && /^}/{exit}' "$DOWNLOADER" >"$TMP/uploaded-artifact.sh"
+source "$TMP/uploaded-artifact.sh"
+printf 'ci-pinned-runtime-zip-fixture\n' >"$TMP/ci-artifact.zip"
+ARTIFACT_DIGEST="$(sha256sum "$TMP/ci-artifact.zip" | cut -d' ' -f1)"
+copy_approved_artifact "$TMP/ci-artifact.zip" "$ARTIFACT_DIGEST" "$TMP/approved.zip"
+cmp -s "$TMP/ci-artifact.zip" "$TMP/approved.zip"
+printf 'modified-after-ci\n' >"$TMP/ci-artifact.zip"
+if copy_approved_artifact "$TMP/ci-artifact.zip" "$ARTIFACT_DIGEST" "$TMP/rejected.zip"; then
+  echo 'STOP: uploaded artifact SHA256 mismatch must fail' >&2; exit 1
+fi
+[[ ! -e "$TMP/rejected.zip" ]]
+ln -s "$TMP/ci-artifact.zip" "$TMP/fake-ci-artifact.zip"
+if copy_approved_artifact "$TMP/fake-ci-artifact.zip" "$ARTIFACT_DIGEST" "$TMP/rejected.zip"; then
+  echo 'STOP: symlinked uploaded artifact must fail' >&2; exit 1
+fi
+[[ ! -e "$TMP/rejected.zip" ]]
 echo 'Existing production release scoped update/atomic rollback regression: PASS'
