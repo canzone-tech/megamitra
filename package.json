@@ -3,6 +3,6 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "verify": "npm --prefix backend run verify"
+    "verify": "node scripts/verify-script-modes.mjs && npm --prefix backend run verify"
   }
 }

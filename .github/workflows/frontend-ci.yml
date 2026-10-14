@@ -27,6 +27,9 @@ jobs:
             admin/package-lock.json
             frontend/package-lock.json
 
+      - name: Verify executable script permissions
+        run: node scripts/verify-script-modes.mjs
+
       - name: Verify frontend lockfiles
         run: |
           test -f admin/package-lock.json
