@@ -39,5 +39,8 @@ const child = spawnSync('timeout', [
   process.execPath, '-e', 'process.on("SIGTERM", () => {}); setInterval(() => {}, 250)',
 ], { timeout: 5000, encoding: 'utf8' });
 assert.ifError(child.error);
-assert.ok([124, 137].includes(child.status), 'Hanging subprocess must exit after TERM/KILL timeout (124 or 137)');
+assert.ok(
+  child.status === 124 || child.status === 137 || child.signal === 'SIGKILL',
+  'Hanging subprocess must exit on TERM/KILL timeout (status 124/137 or signal SIGKILL)',
+);
 console.log('Authenticated UAT fixture lifecycle and Ctrl+C safety: PASS');
