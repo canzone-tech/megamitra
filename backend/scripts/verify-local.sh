@@ -119,6 +119,19 @@ UAT_ADMIN_TOKEN_VALUE=""
 UAT_MEMBER_TOKEN_VALUE=""
 API_PID=""
 
+# Treat the Nest CLI as a bounded, one-shot task. GNU timeout creates a
+# separate command process group and escalates to KILL on a stuck cleanup.
+run_uat_fixture() {
+  local action="$1" seconds
+  case "$action" in
+    create) seconds=95 ;;
+    cleanup) seconds=35 ;;
+    *) echo "ERROR: invalid UAT fixture action" >&2; return 2 ;;
+  esac
+  timeout --signal=TERM --kill-after=3s "${seconds}s" \
+    npx --no-install ts-node scripts/uat-auth-fixture.ts "$@"
+}
+
 assert_port_available() {
   node -e '
     const net = require("node:net");
@@ -153,7 +166,7 @@ cleanup_uat_fixture() {
     rm -f "${UAT_FIXTURE_FILE}"
     return 0
   fi
-  npx ts-node scripts/uat-auth-fixture.ts cleanup "${UAT_FIXTURE_FILE}"
+  run_uat_fixture cleanup "${UAT_FIXTURE_FILE}"
   UAT_FIXTURE_READY=""
   UAT_ADMIN_TOKEN_VALUE=""
   UAT_MEMBER_TOKEN_VALUE=""
@@ -163,12 +176,17 @@ cleanup_uat_fixture() {
 cleanup() {
   terminate_api
   if [[ -n "${UAT_FIXTURE_READY}" ]]; then
-    npx ts-node scripts/uat-auth-fixture.ts cleanup "${UAT_FIXTURE_FILE}" >/dev/null 2>&1 || true
+    if ! run_uat_fixture cleanup "${UAT_FIXTURE_FILE}" >/dev/null 2>&1; then
+      echo "WARNING: UAT fixture cleanup did not complete; check for stale __uat_verify_ accounts" >&2
+    fi
     UAT_FIXTURE_READY=""
   fi
   rm -f "${UAT_FIXTURE_FILE}" "${LOG_FILE}"
 }
-trap cleanup EXIT INT TERM
+trap cleanup EXIT
+# A signal MUST abort verification, not merely run cleanup and continue.
+trap 'exit 130' INT
+trap 'exit 143' TERM
 
 if ! assert_port_available; then
   echo "ERROR: selected verification port ${PORT_VALUE} became unavailable before compiled API startup"
@@ -176,7 +194,7 @@ if ! assert_port_available; then
 fi
 
 echo "==> Creating ephemeral authenticated UAT principals"
-npx ts-node scripts/uat-auth-fixture.ts create "${UAT_FIXTURE_FILE}"
+run_uat_fixture create "${UAT_FIXTURE_FILE}"
 UAT_FIXTURE_READY=1
 UAT_ADMIN_TOKEN_VALUE="$(node -e 'const fs=require("fs"); const state=JSON.parse(fs.readFileSync(process.argv[1], "utf8")); process.stdout.write(state.admin.accessToken || "")' "${UAT_FIXTURE_FILE}")"
 UAT_MEMBER_TOKEN_VALUE="$(node -e 'const fs=require("fs"); const state=JSON.parse(fs.readFileSync(process.argv[1], "utf8")); process.stdout.write(state.member.accessToken || "")' "${UAT_FIXTURE_FILE}")"
