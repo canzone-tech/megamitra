@@ -6,6 +6,12 @@ Use this checklist against a release candidate after automated verification is g
 
 For cross-chat continuity, read [Business Rules Register](BUSINESS-RULES-REGISTER.md) before UAT. Owner printed-reference formatting is implemented and its first owner receipt / Print-Save-PDF UAT scenario is recorded below; database-level season-code immutable-after-ACTIVE hardening remains pending and must not be treated as shipped.
 
+## Local verify process termination regression (2026-10-15)
+
+- [ ] After authenticated UAT smoke, ephemeral UAT accounts are deleted, the scoped Nest/Prisma fixture context closes, the temporary API process group stops, the verification port becomes available, and `MegaGoldenClub local backend verification: PASS` prints before returning to the terminal.
+- [ ] No operator terminal closure is required to finish a healthy local verify; a deliberately stuck UAT fixture exits non-zero within its timeout instead of producing a false PASS.
+- [ ] If interrupted with `Ctrl+C`, verification exits non-zero after bounded fixture cleanup, without killing unrelated local apps, Docker services, or database daemons. Do not treat an interrupted verification as success.
+
 ## Automated baseline
 
 - [ ] Backend CI is green for the exact release commit.

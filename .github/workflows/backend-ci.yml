@@ -69,6 +69,10 @@ jobs:
         working-directory: .
         run: node scripts/test-signup-sharing.mjs
 
+      - name: Regression test local UAT cleanup and bounded Ctrl+C termination
+        working-directory: .
+        run: node scripts/test-uat-fixture-lifecycle.mjs
+
       - name: Verify integration test data isolation
         working-directory: .
         run: node scripts/verify-test-data-isolation.mjs

@@ -1,12 +1,33 @@
-import { ConfigService } from '@nestjs/config';
-import { JwtService } from '@nestjs/jwt';
+import { Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { JwtModule, JwtService } from '@nestjs/jwt';
 import { NestFactory } from '@nestjs/core';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { readFile, writeFile } from 'node:fs/promises';
-import { AppModule } from '../src/app.module';
+import { envValidationSchema } from '../src/config/env.validation';
+import { PrismaModule } from '../src/database/prisma.module';
 import { PasswordService } from '../src/auth/password.service';
 import { PrismaService } from '../src/database/prisma.service';
 import { RoleStatus, UserStatus } from '../src/generated/prisma/enums';
+
+// Keep the UAT principal fixture isolated from the full API AppModule. The full
+// module starts Mongo/Redis, worker schedulers and other long-lived resources
+// that a one-shot Prisma/JWT/password CLI must never open.
+@Module({
+  imports: [
+    ConfigModule.forRoot({
+      isGlobal: true,
+      cache: true,
+      expandVariables: false,
+      validationSchema: envValidationSchema,
+      validationOptions: { abortEarly: false },
+    }),
+    PrismaModule,
+    JwtModule.register({}),
+  ],
+  providers: [PasswordService],
+})
+class UatAuthFixtureModule {}
 
 const FIXTURE_KIND = 'megagoldenclub-uat-auth-v1';
 
@@ -47,8 +68,9 @@ async function run() {
     throw new Error('Usage: ts-node scripts/uat-auth-fixture.ts <create|cleanup> <state-file>');
   }
 
-  const app = await NestFactory.createApplicationContext(AppModule, { logger: false });
+  const app = await NestFactory.createApplicationContext(UatAuthFixtureModule, { logger: false });
   const prisma = app.get(PrismaService);
+  let completed = false;
 
   try {
     if (action === 'cleanup') {
@@ -60,7 +82,7 @@ async function run() {
         prisma.userRole.deleteMany({ where: { userId: { in: userIds } } }),
         prisma.user.deleteMany({ where: { id: { in: userIds } } }),
       ]);
-      console.log('MegaGoldenClub authenticated UAT fixture cleaned');
+      completed = true;
       return;
     }
 
@@ -175,7 +197,7 @@ async function run() {
         },
       };
       await writeFile(statePath, `${JSON.stringify(state)}\n`, { mode: 0o600 });
-      console.log('MegaGoldenClub authenticated UAT fixture ready');
+      completed = true;
     } catch (error) {
       if (createdUserIds.length) {
         await prisma.user.deleteMany({ where: { id: { in: createdUserIds } } });
@@ -184,7 +206,29 @@ async function run() {
     }
   } finally {
     await app.close();
+    // Report success only AFTER Nest/Prisma cleanup has actually returned.
+    if (completed) {
+      console.log(action === 'cleanup'
+        ? 'MegaGoldenClub authenticated UAT fixture cleaned'
+        : 'MegaGoldenClub authenticated UAT fixture ready');
+    }
   }
 }
 
-void run();
+// A one-shot fixture must never hold the terminal hostage because of lingering
+// async handles. Failure/timeout is explicit and never reported as a PASS.
+const watchdog = setTimeout(() => {
+  console.error('ERROR: MegaGoldenClub UAT auth fixture lifecycle timed out');
+  process.exit(124);
+}, 110_000);
+void run().then(
+  () => {
+    clearTimeout(watchdog);
+    process.exit(0);
+  },
+  (error: unknown) => {
+    clearTimeout(watchdog);
+    console.error('ERROR: MegaGoldenClub UAT auth fixture failed', error);
+    process.exit(1);
+  },
+);

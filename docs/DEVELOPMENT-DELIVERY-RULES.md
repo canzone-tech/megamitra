@@ -8,6 +8,10 @@ business-rule approval or a blanket production authorization. The
 product decisions, and the [Production Runbook](PRODUCTION-RUNBOOK.md)
 governs detailed release operations.
 
+## Reliable local verification process lifecycle
+
+The canonical root `npm run verify` must not hang after an authenticated UAT fixture prints its cleanup message. Its fixture process starts only scoped Config/Prisma/JWT/password providers, verifies shutdown before reporting completion, and explicitly exits. Both UAT create and cleanup use strict bounded timeouts with escalation; `Ctrl+C` returns a nonzero exit after cleanup and must never silently resume verification. Hang/interrupt outputs are FAILED until the root command actually reports PASS and returns to the terminal. Do not suggest killing unrelated services or manual source edits.
+
 ## GitHub-first change process
 
 1. Use the MegaGoldenClub GitHub repository, branch
