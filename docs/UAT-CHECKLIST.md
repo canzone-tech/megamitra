@@ -34,6 +34,14 @@ For cross-chat continuity, read [Business Rules Register](BUSINESS-RULES-REGISTE
 
 - **2026-10-06 — Owner activation-payment receipt:** first paid public signup under the bootstrap sponsor was visible in the owner payment register. Owner receipt showed the recorded ₹2,000 activation payment split into ₹1,000 Registration Fee + ₹1,000 Monthly EMI, stored Lucky Draw Token `41483` for EMI #1 as AVAILABLE, and printed reference `MGC_202610_3FC2-M01-41483`. Browser Print/Save PDF preview rendered the same receipt and token/reference on one page without printing the owner dashboard. **PASS for this owner-receipt scenario only.** This does not pre-check the separate public/member receipt, future installments, draw consumption, winner, refund or full business-UAT rows below.
 
+## First-time achievement policy setup
+
+- [ ] On an isolated seeded/empty-policy owner database, 9 Income Types shows the ACTIVE season's PUBLISHED program version for first draft creation, not a retired program or a version unrelated to the active season.
+- [ ] CREATE INITIAL BONUS DRAFT creates a DRAFT with approved five-level Lightning/Bronze/Silver/Gold/Diamond values; no publication, cash posting, trips or payouts occur.
+- [ ] SAVE DRAFT persists reviewed edits, and existing CREATE DRAFT FROM PUBLISHED remains available for later versioned changes. Publish is a separate explicitly approved control and remains unexercised without finance/business sign-off.
+- [ ] If no active/paused season uses a published program version, show actionable guidance instead of empty selectors; do not invent or transfer production rank-policy data from local.
+- [ ] Confirm distinct local versus production policy registers; neither draft creation nor CI green implies production finance enablement.
+
 ## Dashboard face value and one-time signup credentials
 
 - [ ] Owner Dashboard inventory displays **active/unused/used E-PIN face values** from saved PIN snapshots, separate from ₹ net/gross collections; validate mixed currencies and incomplete legacy snapshots without double counting.

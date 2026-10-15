@@ -39,6 +39,8 @@
 
 ## Automatic Lightning Start and Level 1–4 achievements
 
+First-policy owner UI governance: the Super Admin's 9 Income Types → Versioned Achievement Policy screen shows active/paused season program versions that are already PUBLISHED but have no rank policy. CREATE INITIAL BONUS DRAFT creates a DRAFT using backend approved RANK-03 flyer defaults. No automatic rank-policy publish, reward posting or local-to-production data copying. Admin must review, save and separately authorize any publish; finance/payout HOLD remains independently enforced.
+
 | ID | Locked rule | Evidence |
 | --- | --- | --- |
 | RANK-01 | Achievement deadlines **always start at each member's original paid joining timestamp**, never at the time they complete a preceding level. Lightning: 4 hours; Bronze: 20 days; Silver: 30 days; Gold: 60 days; Diamond: 90 days. | Flyer, approved clarification. `RankAchievementService` checks milestone crossing timestamps rather than worker runtime. |

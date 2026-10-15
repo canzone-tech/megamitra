@@ -122,7 +122,10 @@ export class RankAchievementService {
       select: { id: true },
     });
     if (!programVersion) throw new NotFoundException('Program version not found');
-    const tiers = this.validateTiers(rawTiers);
+    // A first-time program has no published policy to clone in the admin UI.
+    // Omitted tiers initialize a DRAFT from the already approved flyer defaults;
+    // they never activate rewards or bypass explicit publish approval.
+    const tiers = this.validateTiers(rawTiers ?? this.initialFlyerTiers());
     const latest = await this.prisma.rankRewardPolicyVersion.findFirst({
       where: { programVersionId }, orderBy: { version: 'desc' }, select: { version: true },
     });

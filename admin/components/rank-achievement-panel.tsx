@@ -44,6 +44,22 @@ type Overview = {
   policies: PolicyRow[];
   achievements: AchievementRow[];
 };
+type ProgramRecord = {
+  id: string;
+  code: string;
+  name: string;
+  versions: Array<{ id: string; version: number; lifecycle: string; currencyCode: string }>;
+};
+type SeasonRecord = {
+  id: string;
+  name: string;
+  status: string;
+  programVersionId: string | null;
+};
+type AvailableProgram = {
+  programVersionId: string;
+  label: string;
+};
 
 const ENDPOINT = '/api/backend/admin/rank-achievements';
 
@@ -62,6 +78,8 @@ function message(error: unknown) {
 export function RankAchievementPanel() {
   const [overview, setOverview] = useState<Overview>({ policies: [], achievements: [] });
   const [policies, setPolicies] = useState<PolicyRow[]>([]);
+  const [availablePrograms, setAvailablePrograms] = useState<AvailableProgram[]>([]);
+  const [initialProgramVersionId, setInitialProgramVersionId] = useState('');
   const [selected, setSelected] = useState('');
   const [editing, setEditing] = useState<RankTier[]>([]);
   const [busy, setBusy] = useState(false);
@@ -69,10 +87,40 @@ export function RankAchievementPanel() {
   const [error, setError] = useState('');
 
   const load = useCallback(async () => {
-    const [summary, versions] = await Promise.all([
+    const [summary, versions, programs, seasons] = await Promise.all([
       apiJson<Overview>(ENDPOINT + '/overview'),
       apiJson<PolicyRow[]>(ENDPOINT + '/policies'),
+      apiJson<ProgramRecord[]>('/api/backend/admin/programs'),
+      apiJson<SeasonRecord[]>('/api/backend/admin/owner-portal/seasons'),
     ]);
+    // A rank policy is attached to the published program version for the active season,
+    // not to a local-dev program or a historical/retired version.
+    const publishedPrograms = new Map(
+      programs.flatMap((program) => program.versions
+        .filter((version) => version.lifecycle === 'PUBLISHED')
+        .map((version) => [version.id, {
+          programVersionId: version.id,
+          label: `${program.code} • Program v${version.version} • ${version.currencyCode}`,
+        }] as const)),
+    );
+    const available = Array.from(new Map(
+      seasons
+        .filter((season) => ['ACTIVE', 'PAUSED'].includes(season.status) &&
+          season.programVersionId && publishedPrograms.has(season.programVersionId))
+        .map((season) => {
+          const program = publishedPrograms.get(season.programVersionId!)!;
+          return [program.programVersionId, {
+            ...program,
+            label: `${season.name} • ${program.label}`,
+          }] as const;
+        }),
+    ).values());
+    const missing = available.filter((program) =>
+      !versions.some((version) => version.programVersionId === program.programVersionId));
+    setAvailablePrograms(missing);
+    setInitialProgramVersionId((current) =>
+      missing.some((program) => program.programVersionId === current)
+        ? current : (missing[0]?.programVersionId ?? ''));
     setOverview(summary);
     setPolicies(versions);
     const currentPolicy = versions.find((p) => p.id === selected)
@@ -116,6 +164,34 @@ export function RankAchievementPanel() {
       if (key === 'trip') return { ...tier, trip: value.trim() || null };
       return { ...tier, [key]: value };
     }));
+  }
+
+  async function createFirstDraft() {
+    const target = availablePrograms.find((program) =>
+      program.programVersionId === initialProgramVersionId);
+    if (!target) return;
+    if (!window.confirm(
+      'Create an UNPUBLISHED achievement-policy draft for ' + target.label +
+      ' using the approved five-level flyer values? This does not activate rewards.',
+    )) return;
+    setBusy(true);
+    setError('');
+    setNotice('');
+    try {
+      const draft = await apiJson<PolicyRow>(ENDPOINT + '/policies', {
+        method: 'POST',
+        body: JSON.stringify({ programVersionId: target.programVersionId }),
+      });
+      await load();
+      setSelected(draft.id);
+      setEditing(draft.tiers.map((tier) => ({ ...tier })));
+      setNotice('Initial five-level draft created for ' + target.label +
+        '. Review the values and SAVE DRAFT. Publishing needs separate financial approval.');
+    } catch (reason) {
+      setError(message(reason));
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function clonePublished() {
@@ -212,6 +288,46 @@ export function RankAchievementPanel() {
         </select>
         {active ? <button type="button" disabled={busy} className={styles.button} onClick={() => void clonePublished()}>CREATE DRAFT FROM PUBLISHED</button> : null}
       </div>
+      {availablePrograms.length > 0 ? (
+        <div className={styles.notice} style={{ marginTop: 12 }}>
+          <label htmlFor="initialRankProgram" style={{ display: 'block', marginBottom: 8, fontWeight: 800 }}>
+            First-time setup — Active season / published program version
+          </label>
+          <div className={styles.buttonLine}>
+            <select
+              id="initialRankProgram"
+              aria-label="Choose active season program version for first rank policy"
+              className={styles.select}
+              style={{ maxWidth: 460 }}
+              disabled={busy}
+              value={initialProgramVersionId}
+              onChange={(event) => setInitialProgramVersionId(event.target.value)}
+            >
+              {availablePrograms.map((program) => (
+                <option key={program.programVersionId} value={program.programVersionId}>
+                  {program.label}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              className={styles.button}
+              disabled={busy || !initialProgramVersionId}
+              onClick={() => void createFirstDraft()}
+            >
+              CREATE INITIAL BONUS DRAFT
+            </button>
+          </div>
+          Creates a draft from the locked Lightning/Bronze/Silver/Gold/Diamond values.
+          Review and save before publishing. No policy is published, no cash is posted,
+          and finance/payout HOLD stays in place until separate approval.
+        </div>
+      ) : (!policies.length ? (
+        <div className={styles.notice}>
+          No initial draft is available because there is no active/paused season with a
+          published program version. Check Season Management before configuring bonuses.
+        </div>
+      ) : null)}
       {policy?.lifecycle === 'DRAFT' ? <>
         <div className={styles.tableBox}><table className={styles.table}>
           <thead><tr><th>LEVEL</th><th>NEW DIRECT</th><th>NEW TEAM</th><th>DEADLINE HOURS</th><th>CASH ₹</th><th>MONTHLY ₹</th><th>MONTHS</th><th>TRIP</th></tr></thead>

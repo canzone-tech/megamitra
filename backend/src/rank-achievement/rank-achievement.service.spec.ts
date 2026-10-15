@@ -16,6 +16,44 @@ describe('RankAchievementService joining-date and fresh-member contracts', () =>
     return { service, enrollment, t };
   }
 
+  it('initializes only an unpublished first rank draft with the approved flyer tiers', async () => {
+    const prisma = {
+      programVersion: {
+        findUnique: jest.fn().mockResolvedValue({ id: 'published-program-v1' }),
+      },
+      rankRewardPolicyVersion: {
+        findFirst: jest.fn().mockResolvedValue(null),
+        create: jest.fn().mockImplementation(async ({ data }: { data: Record<string, unknown> }) => data),
+      },
+    };
+    const service = new RankAchievementService(prisma as never, {} as never, {} as never);
+    const result = await service.createDraft('published-program-v1', undefined, 'super-admin');
+
+    expect(result.lifecycle).toBe('DRAFT');
+    expect(result.version).toBe(1);
+    expect(result.programVersionId).toBe('published-program-v1');
+    expect(result.tiers).toEqual(service.initialFlyerTiers());
+    expect(prisma.rankRewardPolicyVersion.create).toHaveBeenCalledTimes(1);
+    expect(prisma.programVersion.findUnique).toHaveBeenCalledWith({
+      where: { id: 'published-program-v1' },
+      select: { id: true },
+    });
+  });
+
+  it('rejects an initial draft for a missing program version without writing a policy', async () => {
+    const prisma = {
+      programVersion: { findUnique: jest.fn().mockResolvedValue(null) },
+      rankRewardPolicyVersion: {
+        findFirst: jest.fn(),
+        create: jest.fn(),
+      },
+    };
+    const service = new RankAchievementService(prisma as never, {} as never, {} as never);
+    await expect(service.createDraft('missing-program', undefined, 'admin'))
+      .rejects.toThrow('Program version not found');
+    expect(prisma.rankRewardPolicyVersion.create).not.toHaveBeenCalled();
+  });
+
   it('preserves flyer values including both 18-month recurring bonuses', () => {
     const { service } = setup();
     const tiers = service.validateTiers(service.initialFlyerTiers());

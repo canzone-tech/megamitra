@@ -33,6 +33,9 @@ jobs:
       - name: Regression test one-time signup sharing controls
         run: node scripts/test-signup-sharing.mjs
 
+      - name: Regression test first rank-policy setup safety
+        run: node scripts/test-initial-rank-policy.mjs
+
       - name: Verify frontend lockfiles
         run: |
           test -f admin/package-lock.json

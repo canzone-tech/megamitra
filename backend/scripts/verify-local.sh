@@ -27,6 +27,8 @@ bash "${ROOT_DIR}/scripts/test-upgrade-runtime.sh"
 
 echo "==> Verifying signup credentials / referral sharing safety"
 node "${ROOT_DIR}/scripts/test-signup-sharing.mjs"
+echo "==> Verifying first-rank-policy setup and approval boundary"
+node "${ROOT_DIR}/scripts/test-initial-rank-policy.mjs"
 
 echo "==> Verifying canonical UAT documentation"
 node "${ROOT_DIR}/scripts/verify-uat-docs.mjs"
