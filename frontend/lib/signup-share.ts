@@ -3,6 +3,8 @@
 export type SignupShareDetails = {
   origin: string;
   username: string;
+  memberName: string;
+  sponsorName: string;
   password: string;
 };
 
@@ -16,11 +18,21 @@ export function signupReferralLink(origin: string, username: string): string {
 
 export function signupCredentialMessage(details: SignupShareDetails): string {
   const username = details.username.trim();
-  if (!username || !details.password) throw new Error('One-time account details are unavailable');
+  const memberName = details.memberName.trim();
+  const sponsorName = details.sponsorName.trim();
+  if (!username || !memberName || !sponsorName || !details.password) {
+    throw new Error('One-time account details are unavailable');
+  }
   const signIn = new URL('/login', details.origin).toString();
   const referralLink = signupReferralLink(details.origin, username);
   return [
-    'MegaGoldenClub member registration completed.',
+    'Welcome to MegaGoldenClub, ' + memberName + '!',
+    '',
+    'Dear ' + memberName + ',',
+    'Your MegaGoldenClub account has been created successfully.',
+    '',
+    'Member Name: ' + memberName,
+    'Sponsor Name: ' + sponsorName,
     'Member Login ID / Referral Code: ' + username,
     'Password: ' + details.password,
     'Login: ' + signIn,

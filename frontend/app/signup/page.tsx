@@ -1,4 +1,17 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
+
+export const metadata: Metadata = {
+  title: 'Join MegaGoldenClub',
+  description: 'Join MegaGoldenClub with a verified sponsor and a valid activation E-PIN.',
+  openGraph: {
+    title: 'Join MegaGoldenClub',
+    description: 'Create your MegaGoldenClub member account with your sponsor referral.',
+    url: 'https://www.megagoldenclub.com/signup',
+    siteName: 'MegaGoldenClub',
+    type: 'website',
+  },
+};
 import { SignupForm } from '@/components/signup-form';
 
 export default function MemberSignupPage() {

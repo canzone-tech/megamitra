@@ -1,4 +1,17 @@
+import type { Metadata } from 'next';
 import Link from 'next/link';
+
+export const metadata: Metadata = {
+  title: 'MegaGoldenClub Member Login',
+  description: 'Sign in to your MegaGoldenClub member portal.',
+  openGraph: {
+    title: 'Join MegaGoldenClub',
+    description: 'Welcome to MegaGoldenClub. Member sign-in and new member registration.',
+    url: 'https://www.megagoldenclub.com/login',
+    siteName: 'MegaGoldenClub',
+    type: 'website',
+  },
+};
 import { LoginForm } from '@/components/login-form';
 
 export default function MemberLoginPage() {

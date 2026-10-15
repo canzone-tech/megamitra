@@ -96,6 +96,7 @@ export function SignupForm() {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<RegistrationResult | null>(null);
   // Transient one-time credentials: never place in storage, telemetry or a rendered share URL.
+  const [signupMemberNameForSharing, setSignupMemberNameForSharing] = useState('');
   const [signupPasswordForSharing, setSignupPasswordForSharing] = useState('');
   const [shareStatus, setShareStatus] = useState('');
 
@@ -207,10 +208,12 @@ export function SignupForm() {
   }, [activationEpin]);
 
   function currentShareDetails() {
-    if (!result || !signupPasswordForSharing) return null;
+    if (!result || !result.sponsor?.fullName || !signupMemberNameForSharing || !signupPasswordForSharing) return null;
     return {
       origin: window.location.origin,
       username: result.user.username,
+      memberName: signupMemberNameForSharing,
+      sponsorName: result.sponsor.fullName,
       password: signupPasswordForSharing,
     };
   }
@@ -268,6 +271,7 @@ export function SignupForm() {
     setBusy(true);
     setError('');
     setResult(null);
+    setSignupMemberNameForSharing('');
     setSignupPasswordForSharing('');
     setShareStatus('');
     try {
@@ -295,6 +299,7 @@ export function SignupForm() {
       });
       // Password is only available immediately after signup, not from any later profile read.
       // AUTO mode returns a one-time initialPassword; MANUAL mode uses the submitted input.
+      setSignupMemberNameForSharing(formString(form, 'fullName'));
       setSignupPasswordForSharing(registered.initialPassword ?? formString(form, 'password'));
       setResult(registered);
       formElement.reset();
@@ -534,8 +539,10 @@ export function SignupForm() {
 
       {result ? (
         <div style={{ marginTop: 18, padding: 14, borderRadius: 13, background: 'var(--mm-green-100)', color: 'var(--mm-green-700)' }} role="status">
-          <strong>Registration submitted successfully.</strong>
+          <strong>Welcome to MegaGoldenClub, {signupMemberNameForSharing}!</strong>
+          <span style={{ display: 'block', marginTop: 4 }}>Your member registration was successful.</span>
           <span style={{ display: 'block', marginTop: 5 }}>Username: <b>{result.user.username}</b> • Role: MEMBER • Status: {result.user.status}</span>
+          <span style={{ display: 'block', marginTop: 4 }}>Member Name: {signupMemberNameForSharing}</span>
           {result.sponsor ? <span style={{ display: 'block', marginTop: 4 }}>Sponsor: {result.sponsor.fullName} ({result.sponsor.username})</span> : null}
           {result.placement?.slot ? <span style={{ display: 'block', marginTop: 4 }}>Auto placement: Slot {result.placement.slot} • {result.placement.side}</span> : null}
           {result.enrollment ? <span style={{ display: 'block', marginTop: 4 }}>Installments paid through joining: {result.enrollment.paidInstallmentCount} • Catch-up: {result.enrollment.catchUpInstallmentCount}</span> : null}

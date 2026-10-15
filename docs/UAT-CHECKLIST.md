@@ -42,6 +42,13 @@ For cross-chat continuity, read [Business Rules Register](BUSINESS-RULES-REGISTE
 - [ ] If no active/paused season uses a published program version, show actionable guidance instead of empty selectors; do not invent or transfer production rank-policy data from local.
 - [ ] Confirm distinct local versus production policy registers; neither draft creation nor CI green implies production finance enablement.
 
+## New-member welcome, sponsor name and link-preview title
+
+- [ ] Signup success shows a welcome with the newly registered member's full name and the backend-verified sponsor full name.
+- [ ] Copy Login Details and explicit WhatsApp share include welcome, member name, sponsor name, member login/referral ID, password, login and referral URLs, and password-change reminder (manual and AUTO password modes).
+- [ ] `/login` and `/signup` public Open Graph metadata contain **Join MegaGoldenClub** title; no password or member-specific secrets occur in page metadata. Cached WhatsApp previews may require refresh.
+- [ ] Private-share confirmation remains; no automatic sending, no persistence of plaintext password or leaking it on member referral pages; starting another signup clears prior one-time names and password.
+
 ## Dashboard face value and one-time signup credentials
 
 - [ ] Owner Dashboard inventory displays **active/unused/used E-PIN face values** from saved PIN snapshots, separate from ₹ net/gross collections; validate mixed currencies and incomplete legacy snapshots without double counting.
