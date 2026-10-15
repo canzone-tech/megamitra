@@ -34,6 +34,13 @@ For cross-chat continuity, read [Business Rules Register](BUSINESS-RULES-REGISTE
 
 - **2026-10-06 — Owner activation-payment receipt:** first paid public signup under the bootstrap sponsor was visible in the owner payment register. Owner receipt showed the recorded ₹2,000 activation payment split into ₹1,000 Registration Fee + ₹1,000 Monthly EMI, stored Lucky Draw Token `41483` for EMI #1 as AVAILABLE, and printed reference `MGC_202610_3FC2-M01-41483`. Browser Print/Save PDF preview rendered the same receipt and token/reference on one page without printing the owner dashboard. **PASS for this owner-receipt scenario only.** This does not pre-check the separate public/member receipt, future installments, draw consumption, winner, refund or full business-UAT rows below.
 
+## Dashboard face value and one-time signup credentials
+
+- [ ] Owner Dashboard inventory displays **active/unused/used E-PIN face values** from saved PIN snapshots, separate from ₹ net/gross collections; validate mixed currencies and incomplete legacy snapshots without double counting.
+- [ ] Public signup MANUAL password: one-time result shows referral code; Copy Code copies just the code; Copy Login Details copies code/password/referral URL; WhatsApp share warns and composes the same details only after an intentional click, without auto-sending.
+- [ ] Public signup AUTO password: one-time generated password is included in authorized copy/WhatsApp action; no plaintext password is persisted or re-exposed on regular member referral pages; login works and password-change policy remains.
+- [ ] Unsuccessful signup, retry and new registration clear any previous account's one-time credentials.
+
 ## Program, payment, receipt, E-PIN and refund
 
 - [ ] Register a MEMBER with a valid sponsor and E-PIN; verify the pin is consumed once and the intended session/enrollment activation state is created.

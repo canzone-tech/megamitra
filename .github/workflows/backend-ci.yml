@@ -65,6 +65,10 @@ jobs:
         working-directory: .
         run: node scripts/verify-uat-docs.mjs
 
+      - name: Regression test one-time signup sharing controls
+        working-directory: .
+        run: node scripts/test-signup-sharing.mjs
+
       - name: Verify integration test data isolation
         working-directory: .
         run: node scripts/verify-test-data-isolation.mjs

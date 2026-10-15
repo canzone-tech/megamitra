@@ -48,6 +48,12 @@
 | RANK-05 | A fully refunded, inactive or cancelled membership does not generate new achievements or further monthly rank payouts. Previously posted rewards must not be silently deleted or reversed; require separate controlled financial reconciliation. | Worker queries active paid enrollments, historical ledger immutability. |
 | RANK-06 | **Gold and Diamond recurring incomes are mutually exclusive, never simultaneous.** Gold grants **up to ₹2,000/month × 18 months**, but **stops immediately when Diamond is achieved** (even if some of its 18 months remain). Diamond then grants **₹5,000/month × up to 18 months**, counted from Diamond achievement. Gold installments **due before** the Diamond achievement instant stay earned and can be caught up; a Gold installment due **at or after** Diamond achievement must never be credited. Diamond does not extend/resume Gold after its own term expires. An upgrade does not silently reverse already-posted historical transactions; mismatches need reconciliation. | Owner clarification 2026-10-07; `RankAchievementService.postMonthly` checks the latest achieved income tier under the financial mutex before posting; integration regression tests validate cutoff, wallet totals and replay. |
 
+## Read-only E-PIN valuation and signup handoff (2026-10-15 scope)
+
+- Owner Dashboard shall display **E-PIN inventory face value**, grouped by its original currency, from saved registration-fee + installment snapshots for active/unused/used pins. This is **NOT cash collected**, does not change payment posting or E-PIN eligibility, and must not silently convert currencies. Legacy pins with missing snapshots must be disclosed.
+- Successful public signup shall show the newly assigned username as the referral/sponsor code plus Copy and WhatsApp share actions. On that **one-time signup success page only**, the operator can explicitly share new-account login details including manual or auto-generated password; confirmation warns against sending passwords to groups. Do not persist plaintext passwords or expose them in future member referral pages. No automatic WhatsApp message is sent.
+- These are display-only changes; no finance, payout, verification, authorization or business-rule activation is approved.
+
 ## Activation PINs, installments and tokens
 
 | ID | Rule | Implementation/evidence |

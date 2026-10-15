@@ -231,6 +231,11 @@ export function OwnerCoreV14Portal({ section, extension }: { section: OwnerCoreV
     const currency = text(active.currencyCode, settings.currencyCode ?? 'INR');
     const recentMembers = (Array.isArray(row.recentMembers) ? row.recentMembers : []) as Row[];
     const recentPayments = (Array.isArray(row.recentPayments) ? row.recentPayments : []) as Row[];
+    const epinFaceValues = (Array.isArray(row.epinFaceValues) ? row.epinFaceValues : []) as Row[];
+    const epinValuationRows = epinFaceValues.length ? epinFaceValues : [{
+      currencyCode: currency, activeFaceValue: 0, unusedFaceValue: 0, usedFaceValue: 0,
+      incompleteSnapshotCount: 0,
+    }];
     const displayTimeZone = settings.timezone || text(active.settlementTimezone, '') || undefined;
 
     return <>
@@ -299,7 +304,32 @@ export function OwnerCoreV14Portal({ section, extension }: { section: OwnerCoreV
             <div><small>USED E-PINS</small><b>{number(row.usedEpins).toLocaleString('en-IN')}</b></div>
             <div><small>ACTIVE AUTH CODES</small><b>{number(row.activeAuthCodes).toLocaleString('en-IN')}</b></div>
           </div>
-          <div className={styles.notice}>Authorization-code count includes only active, unexpired operator codes.</div>
+          <div className={styles.summary} style={{ marginTop: 12 }}>
+            {epinValuationRows.map((valueRow) => {
+              const valueCurrency = text(valueRow.currencyCode, 'UNSPECIFIED');
+              const valued = (amount: unknown) => valueCurrency === 'UNSPECIFIED'
+                ? `${number(amount).toLocaleString('en-IN', { maximumFractionDigits: 2 })} (currency unavailable)`
+                : money(amount, valueCurrency);
+              return (
+                <div key={valueCurrency}>
+                  <small>E-PIN FACE VALUE • {valueCurrency}</small>
+                  <b>{valued(valueRow.activeFaceValue)}</b>
+                  <span style={{ display: 'block', fontSize: 12, marginTop: 5 }}>
+                    Unused: {valued(valueRow.unusedFaceValue)} • Used: {valued(valueRow.usedFaceValue)}
+                  </span>
+                  {number(valueRow.incompleteSnapshotCount) > 0 ? (
+                    <span style={{ display: 'block', fontSize: 12, marginTop: 5 }}>
+                      {number(valueRow.incompleteSnapshotCount)} E-PIN(s) have incomplete historical pricing.
+                    </span>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+          <div className={styles.notice}>
+            E-PIN face value is based on each pin&apos;s saved registration-fee and installment snapshots.
+            It is inventory value only, <b>not verified money collected</b>. Authorization codes count only active, unexpired codes.
+          </div>
         </div>
       </div>
 

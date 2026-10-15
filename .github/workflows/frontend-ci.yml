@@ -30,6 +30,9 @@ jobs:
       - name: Verify executable script permissions
         run: node scripts/verify-script-modes.mjs
 
+      - name: Regression test one-time signup sharing controls
+        run: node scripts/test-signup-sharing.mjs
+
       - name: Verify frontend lockfiles
         run: |
           test -f admin/package-lock.json

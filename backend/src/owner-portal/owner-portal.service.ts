@@ -185,6 +185,7 @@ export class OwnerPortalService {
       walletStats,
       kycStats,
       inventoryStats,
+      epinFaceValueStats,
       drawStats,
       achievementStats,
       supportStats,
@@ -246,6 +247,24 @@ export class OwnerPortalService {
            (SELECT COUNT(*) FROM owner_epins WHERE status='USED') AS usedEpins,
            (SELECT COUNT(*) FROM owner_auth_codes WHERE status='ACTIVE' AND expiresAt>?) AS activeAuthCodes`,
         [now, now, now],
+      ),
+      this.rows<Record<string, unknown>>(
+        `SELECT COALESCE(NULLIF(currencyCodeSnapshot, ''), 'UNSPECIFIED') AS currencyCode,
+                COALESCE(SUM(CASE WHEN status='ACTIVE' AND expiresAt>?
+                  THEN COALESCE(registrationFeeSnapshot,0)+COALESCE(installmentAmountSnapshot,0)
+                  ELSE 0 END),0) AS activeFaceValue,
+                COALESCE(SUM(CASE WHEN status='ACTIVE' AND usedByUserId IS NULL AND expiresAt>?
+                  THEN COALESCE(registrationFeeSnapshot,0)+COALESCE(installmentAmountSnapshot,0)
+                  ELSE 0 END),0) AS unusedFaceValue,
+                COALESCE(SUM(CASE WHEN status='USED'
+                  THEN COALESCE(registrationFeeSnapshot,0)+COALESCE(installmentAmountSnapshot,0)
+                  ELSE 0 END),0) AS usedFaceValue,
+                COALESCE(SUM(CASE WHEN registrationFeeSnapshot IS NULL OR installmentAmountSnapshot IS NULL
+                  THEN 1 ELSE 0 END),0) AS incompleteSnapshotCount
+         FROM owner_epins
+         GROUP BY COALESCE(NULLIF(currencyCodeSnapshot, ''), 'UNSPECIFIED')
+         ORDER BY currencyCode`,
+        [now, now],
       ),
       this.rows<Record<string, unknown>>(
         `SELECT
@@ -325,6 +344,15 @@ export class OwnerPortalService {
       activeEpins: Number(inventory.activeEpins ?? 0),
       unusedEpins: Number(inventory.unusedEpins ?? 0),
       usedEpins: Number(inventory.usedEpins ?? 0),
+      // Face value is only an inventory valuation; it is NOT verified cash collection.
+      // Keep currencies separate and never silently convert or add across currencies.
+      epinFaceValues: epinFaceValueStats.map((entry) => ({
+        currencyCode: String(entry.currencyCode ?? 'UNSPECIFIED'),
+        activeFaceValue: String(entry.activeFaceValue ?? '0'),
+        unusedFaceValue: String(entry.unusedFaceValue ?? '0'),
+        usedFaceValue: String(entry.usedFaceValue ?? '0'),
+        incompleteSnapshotCount: Number(entry.incompleteSnapshotCount ?? 0),
+      })),
       activeAuthCodes: Number(inventory.activeAuthCodes ?? 0),
       openDraws: Number(draw.openDraws ?? 0),
       totalWinners: Number(draw.totalWinners ?? 0),

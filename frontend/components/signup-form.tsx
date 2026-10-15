@@ -4,6 +4,7 @@ import { ActionFeedback } from './action-feedback';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { ApiClientError, apiJson } from '@/lib/client-api';
+import { signupCredentialMessage, signupReferralLink, signupWhatsAppShareUrl } from '@/lib/signup-share';
 import {
   DEFAULT_INDIAN_CITY,
   DEFAULT_INDIAN_STATE,
@@ -94,6 +95,9 @@ export function SignupForm() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<RegistrationResult | null>(null);
+  // Transient one-time credentials: never place in storage, telemetry or a rendered share URL.
+  const [signupPasswordForSharing, setSignupPasswordForSharing] = useState('');
+  const [shareStatus, setShareStatus] = useState('');
 
   async function loadCaptcha() {
     const challenge = await apiJson<CaptchaChallenge>('/api/backend/captcha/challenge', {
@@ -202,6 +206,37 @@ export function SignupForm() {
     };
   }, [activationEpin]);
 
+  function currentShareDetails() {
+    if (!result || !signupPasswordForSharing) return null;
+    return {
+      origin: window.location.origin,
+      username: result.user.username,
+      password: signupPasswordForSharing,
+    };
+  }
+
+  async function copySignupInformation(includePassword: boolean) {
+    if (!result) return;
+    try {
+      const details = currentShareDetails();
+      const contents = includePassword && details
+        ? signupCredentialMessage(details)
+        : result.user.username;
+      await navigator.clipboard.writeText(contents);
+      setShareStatus(includePassword ? 'Account details copied. Share them only with the account owner.' : 'Referral code copied.');
+    } catch {
+      setShareStatus('Automatic copy was blocked. Please copy the referral code shown above.');
+    }
+  }
+
+  function shareSignupOnWhatsApp() {
+    const details = currentShareDetails();
+    if (!details) return;
+    if (!window.confirm('WhatsApp sharing will include this account password. Share it privately only with the new member, never in a group. Continue?')) return;
+    window.open(signupWhatsAppShareUrl(details), '_blank', 'noopener,noreferrer');
+    setShareStatus('WhatsApp share prepared. Verify the recipient before sending.');
+  }
+
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!config?.publicRegistrationEnabled) return;
@@ -233,6 +268,8 @@ export function SignupForm() {
     setBusy(true);
     setError('');
     setResult(null);
+    setSignupPasswordForSharing('');
+    setShareStatus('');
     try {
       const registered = await apiJson<RegistrationResult>('/api/backend/auth/register', {
         method: 'POST',
@@ -256,6 +293,9 @@ export function SignupForm() {
             : {}),
         }),
       });
+      // Password is only available immediately after signup, not from any later profile read.
+      // AUTO mode returns a one-time initialPassword; MANUAL mode uses the submitted input.
+      setSignupPasswordForSharing(registered.initialPassword ?? formString(form, 'password'));
       setResult(registered);
       formElement.reset();
       setSelectedState(DEFAULT_INDIAN_STATE);
@@ -500,6 +540,29 @@ export function SignupForm() {
           {result.placement?.slot ? <span style={{ display: 'block', marginTop: 4 }}>Auto placement: Slot {result.placement.slot} • {result.placement.side}</span> : null}
           {result.enrollment ? <span style={{ display: 'block', marginTop: 4 }}>Installments paid through joining: {result.enrollment.paidInstallmentCount} • Catch-up: {result.enrollment.catchUpInstallmentCount}</span> : null}
           {result.initialPassword ? <span style={{ display: 'block', marginTop: 7 }}>One-time generated password: <b>{result.initialPassword}</b>. Save it now.</span> : null}
+          <div style={{ marginTop: 13, padding: 12, borderRadius: 11, background: '#fff', border: '1px solid rgba(7,150,77,.26)', color: 'var(--mm-ink-900)' }}>
+            <strong style={{ display: 'block' }}>Your Referral Code: {result.user.username}</strong>
+            <span style={{ display: 'block', marginTop: 5, fontSize: 12, overflowWrap: 'anywhere' }}>
+              Referral link: {signupReferralLink(typeof window === 'undefined' ? 'https://www.megagoldenclub.com' : window.location.origin, result.user.username)}
+            </span>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
+              <button type="button" className="mm-button blue" onClick={() => void copySignupInformation(false)}>
+                Copy referral code
+              </button>
+              <button type="button" className="mm-button blue" disabled={!signupPasswordForSharing} onClick={() => void copySignupInformation(true)}>
+                Copy login details
+              </button>
+              <button type="button" className="mm-button" disabled={!signupPasswordForSharing} onClick={shareSignupOnWhatsApp}>
+                Share on WhatsApp
+              </button>
+            </div>
+            <p style={{ fontSize: 12, margin: '10px 0 0' }}>
+              Login details include your member ID, referral link and one-time account password.
+              Password sharing is optional and only happens when you click a button.
+              Send privately to the new member, never to a WhatsApp group.
+            </p>
+            {shareStatus ? <span role="status" style={{ display: 'block', marginTop: 7, fontSize: 12 }}>{shareStatus}</span> : null}
+          </div>
           <span style={{ display: 'block', marginTop: 7 }}>Complete any required verification/activation before signing in.</span>
         </div>
       ) : null}

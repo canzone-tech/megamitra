@@ -25,6 +25,9 @@ node "${ROOT_DIR}/scripts/verify-ubuntu-vps-config.mjs"
 echo "==> Testing isolated source-free repeat deployment and atomic rollback"
 bash "${ROOT_DIR}/scripts/test-upgrade-runtime.sh"
 
+echo "==> Verifying signup credentials / referral sharing safety"
+node "${ROOT_DIR}/scripts/test-signup-sharing.mjs"
+
 echo "==> Verifying canonical UAT documentation"
 node "${ROOT_DIR}/scripts/verify-uat-docs.mjs"
 
