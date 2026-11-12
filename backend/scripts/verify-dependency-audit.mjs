@@ -1,8 +1,13 @@
 import { spawnSync } from 'node:child_process';
 
 const NPM = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+// Reviewed on 2026-11-12. These advisories occur only in local/CI dev tooling;
+// production audit must still be clean. Remove the exceptions when upstream
+// Nest CLI / Jest toolchain dependencies provide compatible patched releases.
 const ALLOWED_DEV_MODERATE_ADVISORIES = new Set([
   'GHSA-HP3W-G68C-FV3C',
+  'GHSA-3G3M-2FJR-6PW4', // glob: cancellation bypass during filesystem traversal
+  'GHSA-G3HV-75WG-M249', // minimatch: globparts amplification DoS
 ]);
 
 function runAudit(extraArgs = []) {

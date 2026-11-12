@@ -8,6 +8,29 @@ business-rule approval or a blanket production authorization. The
 product decisions, and the [Production Runbook](PRODUCTION-RUNBOOK.md)
 governs detailed release operations.
 
+## Reviewed dependency audit findings (2026-11-12)
+
+The dependency audit gates fail on any production advisory and any full-install
+HIGH or CRITICAL finding. On 2026-11-12, a lockfile-only semver-compatible
+refresh addressed production `@nestjs/platform-express`, `body-parser`,
+`multer`, `joi`, `fast-uri`, and `qs` advisories (production count: **0**).
+The remaining `npm audit` MODERATE source advisories are in development-only
+build/test dependencies and do **not** occur in `npm audit --omit=dev`:
+
+- `GHSA-3G3M-2FJR-6PW4`: `glob` does not reliably stop filesystem
+  traversal after an AbortSignal; local/CI tooling traverses trusted source
+  directories, with bounded verification jobs.
+- `GHSA-G3HV-75WG-M249`: `minimatch` globparts amplification denial of
+  service; build/test tooling is not an untrusted-public-pattern endpoint.
+
+Both are reviewed, explicitly enumerated MODERATE-only exceptions in
+`backend/scripts/verify-dependency-audit.mjs`, alongside the existing reviewed
+`GHSA-HP3W-G68C-FV3C` exception. No HIGH/CRITICAL or production finding is
+excepted; the gate must fail on any unreviewed advisory. Revisit and eliminate
+these exceptions when compatible Nest CLI/Jest/ESLint transitive dependency
+updates are available and their compiled build and runtime tests pass. Do not
+force a breaking major developer-tool upgrade solely for a homepage experiment.
+
 ## Reliable local verification process lifecycle
 
 The canonical root `npm run verify` must not hang after an authenticated UAT fixture prints its cleanup message. Its fixture process starts only scoped Config/Prisma/JWT/password providers, verifies shutdown before reporting completion, and explicitly exits. Both UAT create and cleanup use strict bounded timeouts with escalation; `Ctrl+C` returns a nonzero exit after cleanup and must never silently resume verification. Hang/interrupt outputs are FAILED until the root command actually reports PASS and returns to the terminal. Do not suggest killing unrelated services or manual source edits.
