@@ -33,6 +33,9 @@ jobs:
       - name: Regression test one-time signup sharing controls
         run: node scripts/test-signup-sharing.mjs
 
+      - name: Regression test premium single-page homepage contract
+        run: node scripts/test-homepage-contract.mjs
+
       - name: Regression test first rank-policy setup safety
         run: node scripts/test-initial-rank-policy.mjs
 

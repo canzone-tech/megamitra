@@ -205,6 +205,9 @@ smoke_frontends() {
 
 echo "==> Verifying MegaGoldenClub branding contract"
 bash "${ROOT_DIR}/scripts/verify-branding.sh"
+echo "==> Verifying premium homepage content, routes and accessibility"
+node "${ROOT_DIR}/scripts/test-homepage-contract.mjs"
+
 echo "==> Verifying frontend privacy and native-form safety"
 node "${ROOT_DIR}/scripts/verify-frontend-safety.mjs"
 
