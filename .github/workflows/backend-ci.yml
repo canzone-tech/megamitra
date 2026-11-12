@@ -199,6 +199,24 @@ jobs:
       - name: Verify dependency audit policy
         run: node scripts/verify-dependency-audit.mjs
 
+      # An audit failure still fails the job. Collect a reproducible, lockfile-only
+      # remediation candidate for review rather than relaxing the policy or
+      # silently mutating dependencies in a passing build.
+      - name: Prepare dependency audit lockfile candidate
+        if: failure()
+        run: |
+          npm audit fix --package-lock-only --ignore-scripts --no-fund || true
+          node -e "const p=require('./package-lock.json'); if (p.lockfileVersion!==3) process.exit(1)"
+
+      - name: Upload dependency audit lockfile candidate
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: megagoldenclub-audit-lockfile-${{ github.sha }}
+          path: backend/package-lock.json
+          retention-days: 3
+          if-no-files-found: error
+
       - name: Validate operational scripts
         run: bash -n scripts/*.sh
 
