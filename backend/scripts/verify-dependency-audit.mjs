@@ -68,11 +68,26 @@ function sourceAdvisories(report) {
   return [...advisories.values()];
 }
 
+function describeVulnerabilities(report) {
+  return Object.entries(report?.vulnerabilities ?? {}).map(([name, finding]) => ({
+    name,
+    severity: finding?.severity,
+    range: finding?.range,
+    isDirect: finding?.isDirect,
+    fixAvailable: finding?.fixAvailable,
+    via: (finding?.via ?? []).filter((entry) => typeof entry === 'object').map((entry) => ({
+      id: advisoryId(entry.url),
+      severity: entry.severity,
+      title: entry.title,
+    })),
+  }));
+}
+
 const production = runAudit(['--omit=dev']);
 const productionCounts = counts(production);
 if (productionCounts.total !== 0) {
   throw new Error(
-    `Production dependency audit must be clean; found ${JSON.stringify(productionCounts)}`,
+    `Production dependency audit must be clean; found ${JSON.stringify(productionCounts)}; packages: ${JSON.stringify(describeVulnerabilities(production))}`,
   );
 }
 console.log('MegaGoldenClub production dependency audit: PASS (0 vulnerabilities)');
@@ -81,7 +96,7 @@ const full = runAudit();
 const fullCounts = counts(full);
 if (fullCounts.high > 0 || fullCounts.critical > 0) {
   throw new Error(
-    `High/critical dependency findings are not allowed; found ${JSON.stringify(fullCounts)}`,
+    `High/critical dependency findings are not allowed; found ${JSON.stringify(fullCounts)}; packages: ${JSON.stringify(describeVulnerabilities(full))}`,
   );
 }
 
