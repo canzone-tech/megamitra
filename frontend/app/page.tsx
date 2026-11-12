@@ -31,6 +31,12 @@ function HomeIcon({ name, size = 22 }: { name: HomeIconName; size?: number }) {
   );
 }
 
+const rewardHighlights = [
+  { icon: 'ticket', title: 'Monthly draw updates', description: 'Follow your recorded draw entries, published schedules, and official results when available.' },
+  { icon: 'gift', title: 'Product benefit records', description: 'See entitlements actually granted to your account, separate from possible draw prizes.' },
+  { icon: 'shield', title: 'Clear reward eligibility', description: 'Understand recorded rewards and the published rules that govern participation.' },
+] as const;
+
 const memberFeatures = [
   { icon: 'chart', title: 'Membership progress', description: 'Follow your enrollment and installment journey in one organized view.' },
   { icon: 'users', title: 'Referral activity', description: 'See your referral network and the activity tied to your member account.' },
@@ -71,7 +77,7 @@ export default function HomePage() {
           </Link>
           <nav className="mm-home-nav" aria-label="Primary navigation">
             <a href="#how-it-works">How it works</a>
-            <a className="mm-home-nav-optional" href="#features">Member benefits</a>
+            <a className="mm-home-nav-optional" href="#rewards">Rewards</a>
             <a className="mm-home-nav-optional" href="#questions">FAQs</a>
             <Link className="mm-home-nav-login" href="/login">Member login <HomeIcon name="arrow" size={16} /></Link>
           </nav>
@@ -132,6 +138,28 @@ export default function HomePage() {
           <div><span className="mm-home-assurance-icon"><HomeIcon name="shield" size={22} /></span><span><strong>Verified sponsor details</strong><small>Review before you register</small></span></div>
           <div><span className="mm-home-assurance-icon"><HomeIcon name="lock" size={22} /></span><span><strong>Private member access</strong><small>Your account, your information</small></span></div>
           <div><span className="mm-home-assurance-icon"><HomeIcon name="chart" size={22} /></span><span><strong>Transparent activity</strong><small>Follow your recorded journey</small></span></div>
+        </section>
+
+        <section className="mm-home-rewards" id="rewards" aria-labelledby="mm-home-rewards-title">
+          <div className="mm-home-rewards-inner">
+            <div className="mm-home-rewards-heading">
+              <div>
+                <span className="mm-home-section-eyebrow">REWARDS, MADE CLEAR</span>
+                <h2 id="mm-home-rewards-title">Brighter moments.<br /><span>Clearer participation.</span></h2>
+              </div>
+              <p>From program draws to recorded member benefits, discover the parts of your rewards journey that matter to you.</p>
+            </div>
+            <div className="mm-home-rewards-grid">
+              {rewardHighlights.map(({ icon, title, description }) => (
+                <article className="mm-home-reward-card" key={title}>
+                  <span className="mm-home-reward-card-icon"><HomeIcon name={icon} size={26} /></span>
+                  <h3>{title}</h3>
+                  <p>{description}</p>
+                </article>
+              ))}
+            </div>
+            <p className="mm-home-rewards-disclaimer">Prize types, eligibility, entitlements and draw schedules depend on your season&apos;s published rules and your account records. No prize or reward is guaranteed.</p>
+          </div>
         </section>
 
         <section className="mm-home-section mm-home-journey" id="how-it-works" aria-labelledby="mm-home-journey-title">

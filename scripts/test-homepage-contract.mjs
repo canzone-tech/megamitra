@@ -15,13 +15,15 @@ const layout = read('frontend/app/layout.tsx');
 assert.ok(layout.includes("import './landing.css'"), 'Homepage styles must be included in production build');
 assert.ok(homepage.includes("export const metadata: Metadata"), 'Homepage must provide its own SEO title/description');
 
-for (const section of ['main-content', 'how-it-works', 'features', 'questions']) {
+for (const section of ['main-content', 'rewards', 'how-it-works', 'features', 'questions']) {
   assert.ok(homepage.includes('id="' + section + '"'), 'Missing accessible landing section: ' + section);
 }
 for (const fragment of [
   'Skip to main content', 'aria-label="Primary navigation"',
   'Your membership.', 'Your journey.', 'All in one place.',
   'Illustrative preview', 'No member data shown',
+  'Brighter moments.', 'Clearer participation.', 'Monthly draw updates',
+  'Product benefit records', 'Clear reward eligibility', 'No prize or reward is guaranteed',
   'Start with your sponsor', 'Complete your registration',
   'Explore your member space', 'Membership progress',
   'Referral activity', 'Reward records', 'Lucky draw entries',
@@ -54,7 +56,7 @@ assert.ok(styles.includes('prefers-reduced-motion') && styles.includes(':focus-v
   'Reduced-motion and keyboard focus visibility must be preserved');
 assert.ok(!/^\s*(?:html|body|:root|button|input|select|textarea)\s*\{/m.test(styles),
   'Homepage stylesheet must not override shared auth/member styles globally');
-assert.ok(styles.includes('.mm-home-faq-item') && styles.includes('.mm-home-preview'),
+assert.ok(styles.includes('.mm-home-faq-item') && styles.includes('.mm-home-preview') && styles.includes('.mm-home-rewards-grid'),
   'FAQ and illustrative dashboard must have dedicated styles');
 
 console.log('MegaGoldenClub premium single-page homepage contract: PASS');
