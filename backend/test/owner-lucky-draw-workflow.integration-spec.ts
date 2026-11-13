@@ -287,6 +287,20 @@ describe('MegaGoldenClub owner lucky draw workflow integration', () => {
     secondPrizeCode = `FEB${suffix}`.toUpperCase();
   });
 
+  it('exposes sanitized active prize data publicly but keeps owner routes private', async () => {
+    const publicResponse = await request('/public/prizes/catalogue');
+    expect(publicResponse.status).toBe(200);
+    expect(publicResponse.body).toHaveProperty('season');
+    expect(Array.isArray(publicResponse.body.prizes)).toBe(true);
+    expect(JSON.stringify(publicResponse.body)).not.toContain('actorUserId');
+    expect(JSON.stringify(publicResponse.body)).not.toContain('mediaName');
+    expect(JSON.stringify(publicResponse.body)).not.toContain('createdByUserId');
+    const adminResponse = await request(`/admin/owner-portal/seasons/${seasonId}/prizes`);
+    expect(adminResponse.status).toBe(401);
+    const unknownImage = await fetch(`${baseUrl}/public/prizes/images/${'a'.repeat(24)}`);
+    expect(unknownImage.status).toBe(404);
+  });
+
   it('allows five-digit token reuse across seasons but never within one season', async () => {
     const otherSeasonId = randomUUID();
     let scopedToken = '';

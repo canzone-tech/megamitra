@@ -15,6 +15,8 @@ import { OwnerPortalController } from './owner-portal.controller';
 import { OwnerPortalDrawWorkflowService } from './owner-portal-draw-workflow.service';
 import { OwnerPortalFinanceService } from './owner-portal-finance.service';
 import { OwnerPortalService } from './owner-portal.service';
+import { PublicPrizeCatalogueController } from './public-prize-catalogue.controller';
+import { PublicPrizeCatalogueService } from './public-prize-catalogue.service';
 import { OwnerPrizeMediaStore } from './owner-prize-media.store';
 import { OwnerSeasonBinaryV14ConfigurationService } from './owner-season-binary-v14-configuration.service';
 import { OwnerSeasonConfigurationService } from './owner-season-configuration.service';
@@ -34,10 +36,12 @@ import { OwnerSeasonConfigurationService } from './owner-season-configuration.se
     OwnerPortalController,
     OwnerPortalCoreController,
     OwnerPortalControlController,
+    PublicPrizeCatalogueController,
   ],
   providers: [
     OwnerPortalService,
     OwnerPrizeMediaStore,
+    PublicPrizeCatalogueService,
     OwnerPortalDrawWorkflowService,
     OwnerPortalFinanceService,
     OwnerPortalCoreService,
