@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import './rewards.css';
+import './prize-catalogue.css';
 
 export default function PublicRewardsLayout({ children }: { children: ReactNode }) {
   return (

@@ -125,9 +125,9 @@ export default function AwardsAndRewardsPage() {
       <section className="mm-rewards-monthly-feature" aria-labelledby="mm-rewards-monthly-feature-title">
         <div className="mm-rewards-container mm-rewards-monthly-feature-inner">
           <div>
-            <span className="mm-rewards-kicker">18 MONTHS • FLYER CONCEPT</span>
-            <h2 id="mm-rewards-monthly-feature-title">Monthly Lucky Draw <span>Prize Preview.</span></h2>
-            <p>Explore the month-by-month prize ideas shown in the supplied 18-month rewards flyer — scooters, gold jewellery, cars, motorbikes and more. This is an illustrative visual preview, not an official, live prize announcement.</p>
+            <span className="mm-rewards-kicker">MONTH-WISE ACTIVE SEASON CATALOGUE</span>
+            <h2 id="mm-rewards-monthly-feature-title">Monthly Lucky Draw <span>Prize Catalogue.</span></h2>
+            <p>Browse the month-by-month prizes configured in the current active season. Each round has a dedicated detail page with all listed prizes, images and descriptions from the Admin Prize Catalogue.</p>
             <Link className="mm-rewards-button mm-rewards-button-primary" href="/rewards/monthly-prizes">Explore 18 months <span aria-hidden="true">↗</span></Link>
           </div>
           <div className="mm-rewards-monthly-feature-art" aria-hidden="true">

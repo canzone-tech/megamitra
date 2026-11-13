@@ -1,0 +1,63 @@
+/* Public month selector and authoritative active-season detail views. */
+.mm-prizes-availability { margin:25px 0 0; padding:15px 19px; border-radius:13px; background:#f3f7fc; color:#3c5676; font-size:13px; line-height:1.7; }
+.mm-prizes-month-grid { margin-top:27px; }
+.mm-prizes-month-card { display:grid; grid-template-columns:126px minmax(0,1fr); align-items:stretch; min-height:188px; }
+.mm-prizes-month-art { position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:5px; padding:16px 8px; color:#153d77; background:linear-gradient(155deg,#e9f3ff,#fff3dd); overflow:hidden; }
+.mm-prizes-month-art::after { content:''; position:absolute; width:165px; height:165px; border-radius:50%; border:1px solid rgba(255,255,255,.85); left:-29px; top:19px; pointer-events:none; }
+.mm-prizes-month-card:nth-child(3n+2) .mm-prizes-month-art { background:linear-gradient(145deg,#fff2df,#ffe7f0); color:#a35e22; }
+.mm-prizes-month-card:nth-child(3n) .mm-prizes-month-art { background:linear-gradient(145deg,#fff0f6,#e9efff); color:#a62670; }
+.mm-prizes-month-label { position:relative; z-index:1; font-size:10px; font-weight:900; letter-spacing:.17em; }
+.mm-prizes-month-number { position:relative; z-index:1; font-size:64px; letter-spacing:-.08em; font-weight:900; line-height:1; }
+.mm-prizes-month-gift { position:relative; z-index:1; width:29px; height:29px; }
+.mm-prizes-month-gift svg { width:100%; height:100%; }
+.mm-prizes-month-spark { position:absolute; right:14px; top:24px; font-size:18px; color:#d9a94e; }
+.mm-prizes-month-copy { display:flex; flex-direction:column; align-items:start; justify-content:center; gap:9px; padding:20px 21px; }
+.mm-prizes-month-copy h3 { margin:0; font-size:18px; letter-spacing:-.025em; color:#0e2c55; }
+.mm-prizes-month-copy p { margin:0; color:#60768f; font-size:12px; line-height:1.5; }
+.mm-prizes-detail-link { display:inline-flex; align-items:center; gap:10px; padding:10px 14px; margin-top:7px; border-radius:9px; color:#fff; background:#103d80; font-size:12px; font-weight:850; text-decoration:none; }
+.mm-prizes-detail-link:hover { background:#1554a8; }
+.mm-prizes-detail-link:focus-visible { outline:3px solid #da9e2d; outline-offset:3px; }
+.mm-prizes-detail-hero-inner { display:flex; justify-content:space-between; align-items:center; gap:48px; padding:70px 0; }
+.mm-prizes-detail-hero-inner > div:first-child { max-width:790px; }
+.mm-prizes-detail-medallion { flex:none; display:flex; flex-direction:column; justify-content:center; align-items:center; border:1px solid rgba(255,215,150,.35); border-radius:50%; background:radial-gradient(circle,rgba(248,201,110,.18),transparent 75%); color:#fbd18b; width:215px; height:215px; }
+.mm-prizes-detail-medallion > span,.mm-prizes-detail-medallion small { font-weight:850; letter-spacing:.15em; font-size:11px; }
+.mm-prizes-detail-medallion strong { font-size:94px; line-height:1; letter-spacing:-.07em; }
+.mm-prizes-detail-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:20px; margin-top:35px; }
+.mm-prizes-detail-card { min-width:0; overflow:hidden; border:1px solid #e6eaf1; border-radius:20px; background:#fff; box-shadow:0 12px 36px rgba(14,45,91,.07); }
+.mm-prizes-detail-image { height:238px; display:grid; place-items:center; padding:18px; background:radial-gradient(circle at 50% 25%,#fff,#f3f6fc 80%); }
+.mm-prizes-detail-image img { display:block; width:100%; height:100%; object-fit:contain; }
+.mm-prizes-detail-placeholder { display:grid; place-items:center; gap:6px; color:#b58939; }
+.mm-prizes-detail-placeholder svg { width:87px; height:87px; }
+.mm-prizes-detail-placeholder span { font-size:12px; color:#7e8ca1; }
+.mm-prizes-detail-copy { padding:25px; }
+.mm-prizes-detail-category { font-size:10px; letter-spacing:.1em; font-weight:900; text-transform:uppercase; color:#9d661f; }
+.mm-prizes-detail-copy h3 { color:#112f58; font-size:21px; line-height:1.35; margin:10px 0; overflow-wrap:anywhere; }
+.mm-prizes-detail-copy > p { color:#60728b; font-size:13px; line-height:1.75; margin:10px 0 20px; white-space:pre-wrap; overflow-wrap:anywhere; }
+.mm-prizes-detail-facts { margin:20px 0 0; padding-top:15px; border-top:1px solid #eaf0f5; }
+.mm-prizes-detail-facts > div { display:flex; justify-content:space-between; gap:15px; padding:6px 0; font-size:12px; }
+.mm-prizes-detail-facts dt { color:#697b8f; }
+.mm-prizes-detail-facts dd { color:#123968; font-weight:850; margin:0; text-align:right; }
+.mm-prizes-month-navigation { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:15px; margin-top:35px; }
+.mm-prizes-month-navigation a { padding:12px 16px; border:1px solid #dbe4ee; border-radius:11px; font-size:13px; font-weight:850; color:#153d78; }
+.mm-prizes-month-navigation a:hover { border-color:#b6c9e1; background:#f6f9fe; }
+.mm-prizes-empty { margin:32px 0; }
+@media (max-width: 1100px) {
+  .mm-prizes-month-card { grid-template-columns:102px minmax(0,1fr); }
+  .mm-prizes-month-number { font-size:55px; }
+  .mm-prizes-detail-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+@media (max-width: 680px) {
+  .mm-prizes-month-card { grid-template-columns:116px minmax(0,1fr); min-height:155px; }
+  .mm-prizes-month-number { font-size:54px; }
+  .mm-prizes-month-copy { padding:17px; }
+  .mm-prizes-month-copy h3 { font-size:16px; }
+  .mm-prizes-detail-hero-inner { padding:55px 0; }
+  .mm-prizes-detail-medallion { display:none; }
+  .mm-prizes-detail-grid { grid-template-columns:1fr; gap:14px; }
+  .mm-prizes-detail-image { height:218px; }
+  .mm-prizes-month-navigation { flex-direction:column; align-items:stretch; }
+  .mm-prizes-month-navigation a { text-align:center; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mm-prizes-detail-link { transition:none !important; }
+}
