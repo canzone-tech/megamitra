@@ -14,7 +14,7 @@ export default function PublicRewardsLayout({ children }: { children: ReactNode 
           </Link>
           <nav className="mm-home-nav" aria-label="Primary navigation">
             <Link href="/">Home</Link>
-            <Link className="mm-home-nav-optional" href="/rewards" aria-current="page">Awards &amp; Rewards</Link>
+            <Link className="mm-home-nav-optional" href="/rewards">Awards &amp; Rewards</Link>
             <Link className="mm-home-nav-optional" href="/rewards/monthly-prizes">Monthly prizes</Link>
             <Link className="mm-home-nav-login" href="/login">Member login <span aria-hidden="true">↗</span></Link>
           </nav>

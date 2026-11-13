@@ -93,7 +93,7 @@ export default function AwardsAndRewardsPage() {
           <div>
             <span className="mm-rewards-kicker">18 MONTHS • FLYER CONCEPT</span>
             <h2 id="mm-rewards-monthly-feature-title">Monthly Lucky Draw <span>Prize Preview.</span></h2>
-            <p>Explore the month-by-month prize ideas shown in the supplied MegaMitra Rewards flyer — scooters, gold jewellery, cars, motorbikes and more. This is an illustrative visual preview, not an official, live prize announcement.</p>
+            <p>Explore the month-by-month prize ideas shown in the supplied 18-month rewards flyer — scooters, gold jewellery, cars, motorbikes and more. This is an illustrative visual preview, not an official, live prize announcement.</p>
             <Link className="mm-rewards-button mm-rewards-button-primary" href="/rewards/monthly-prizes">Explore 18 months <span aria-hidden="true">↗</span></Link>
           </div>
           <div className="mm-rewards-monthly-feature-art" aria-hidden="true">

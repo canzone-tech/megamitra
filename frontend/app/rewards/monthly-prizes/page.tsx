@@ -1,14 +1,15 @@
 import type { Metadata } from 'next';
+import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { flyerPrizeConcepts, type PrizeConcept } from '../prize-preview';
 
 export const metadata: Metadata = {
   title: 'Monthly Lucky Draw Prize Preview | MegaGoldenClub',
-  description: 'Explore the 18-month illustrative prize concepts from the MegaMitra Rewards flyer. Actual season prizes and draw schedules are confirmed only in official published member records.',
+  description: 'Explore the 18-month illustrative prize concepts from the supplied 18-month rewards flyer. Actual season prizes and draw schedules are confirmed only in official published member records.',
 };
 
 function PrizeSymbol({ kind }: { kind: PrizeConcept['kind'] }) {
-  const shapes: Record<PrizeConcept['kind'], React.ReactNode> = {
+  const shapes: Record<PrizeConcept['kind'], ReactNode> = {
     car: <><path d="M4 15h16l-2-6H6l-2 6Zm2-6 2-4h8l2 4M4 15v3h3v-3m10 0v3h3v-3"/><circle cx="7" cy="15" r="1"/><circle cx="17" cy="15" r="1"/></>,
     scooter: <><circle cx="5" cy="18" r="2.5"/><circle cx="19" cy="18" r="2.5"/><path d="M8 18h5l3-7h-6l-2 7Zm8-7-2-6h4m-5 13h3"/></>,
     bike: <><circle cx="5" cy="18" r="3"/><circle cx="19" cy="18" r="3"/><path d="m5 18 5-8 4 8h5l-5-8h-4M12 6h5m-7 4-2-4"/></>,
@@ -26,7 +27,7 @@ export default function MonthlyPrizesPage() {
             <Link href="/rewards" className="mm-prizes-back">‹ Awards &amp; Rewards</Link>
             <span className="mm-rewards-eyebrow"><span aria-hidden="true">✦</span> CELEBRATING THE POSSIBILITIES</span>
             <h1 id="mm-prizes-title">Monthly Lucky Draw<br /><span>Prize Preview.</span></h1>
-            <p>A visual walk through the prize categories in the original 18-month MegaMitra Rewards flyer. Explore a new concept for every monthly round.</p>
+            <p>A visual walk through the prize categories in the original 18-month supplied 18-month rewards flyer. Explore a new concept for every monthly round.</p>
             <p className="mm-prizes-hero-disclaimer"><strong>Illustrative flyer preview only.</strong> Not an official prize announcement, confirmed draw date, winner list or guaranteed benefit.</p>
           </div>
           <div className="mm-prizes-hero-medallion" aria-hidden="true"><span>18</span><small>MONTHLY<br />PREVIEW ROUNDS</small><span className="mm-prizes-hero-twinkle">✦</span></div>

@@ -69,6 +69,9 @@ assert.ok(awardsPage.includes('not an official, live prize announcement') &&
 assert.ok(!/apiJson|fetch\(|sessionStorage|localStorage|admin\/owner-portal/.test(awardsPage + monthlyPage),
   'Public rewards pages must not access private member/admin prize data');
 assert.ok(prizePreview.includes('NOT an authoritative prize table') &&
+  prizePreview.includes('Hero HF 100 and EV scooter') &&
+  prizePreview.includes('Honda Activa and EV scooter') &&
+  prizePreview.includes('Two cars and EV scooter') &&
   prizePreview.includes('flyerPrizeConcepts') &&
   !/nominalValue|winnerCount|drawAt|token/.test(prizePreview.split('export const flyerPrizeConcepts')[1]),
   'Flyer concepts may not invent official prize values, winners, dates or tokens');
