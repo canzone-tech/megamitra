@@ -51,6 +51,12 @@ for (const match of homepage.matchAll(/href="([^"]+)"/g)) {
     assert.ok(['/', '/login', '/signup', '/forgot-password', '/rewards', '/rewards/monthly-prizes'].includes(path), 'Unsupported landing route: ' + path);
   }
 }
+assert.ok(homepage.includes('className="mm-home-nav-reward" href="/rewards"') &&
+  homepage.includes('className="mm-home-nav-reward" href="/rewards/monthly-prizes"') &&
+  homepage.includes('aria-label="Rewards shortcuts"') &&
+  rewardsLayout.includes('aria-label="Rewards shortcuts"') &&
+  styles.includes('.mm-home-mobile-rewards-nav { display:flex;'),
+  'The homepage and reward pages must expose rewards and monthly prizes from their top navigation');
 assert.ok(rewardsLayout.includes("import './rewards.css'") &&
   rewardsLayout.includes('aria-label="Primary navigation"') &&
   rewardsLayout.includes('href="/rewards/monthly-prizes"') &&
@@ -60,6 +66,35 @@ assert.ok(awardsPage.includes("function MilestoneIcon") &&
   awardsPage.includes("<MilestoneIcon name={tier.icon} />") &&
   !/symbol:\\s*['"](?:◆|★|◇)['"]/.test(awardsPage),
   'Milestone awards must use real vector icons rather than typographic placeholders');
+const rankRegister = read('docs/BUSINESS-RULES-REGISTER.md');
+for (const [name, direct, team, deadline, cash] of [
+  ['Lightning Start', 4, 0, '4 hours', '₹1,000'],
+  ['Bronze', 10, 40, '20 days', '₹5,000'],
+  ['Silver', 25, 100, '30 days', '₹10,000'],
+  ['Gold', 50, 250, '60 days', '₹20,000'],
+  ['Diamond', 100, 500, '90 days', '₹50,000'],
+]) {
+  const line = awardsPage.split('\n').find((text) => text.includes("name: '" + name + "'"));
+  assert.ok(line && line.includes('direct: ' + direct + ', team: ' + team) &&
+    line.includes("deadline: '" + deadline + "'") &&
+    line.includes("cash: '" + cash + "'"),
+    'Public rank reference drift: ' + name);
+  assert.ok(rankRegister.includes(name) && rankRegister.includes(cash),
+    'Approved rank rules missing: ' + name);
+}
+for (const detail of [
+  'Goa family trip', 'Ooty family trip', 'Shimla family trip',
+  '₹2,000/month up to 18 months, stopping on Diamond achievement',
+  '₹5,000/month up to 18 months after Diamond achievement',
+  'original paid joining timestamp',
+  'Gold and Diamond monthly rewards are mutually exclusive',
+  '<dl className="mm-rewards-tier-details">',
+  'className="mm-rewards-policy-link" href="/login"',
+]) assert.ok(awardsPage.includes(detail), 'Milestone reference missing: ' + detail);
+assert.ok(rewardsCss.includes('.mm-rewards-tier-details') &&
+  rewardsCss.includes('.mm-rewards-rules-note') &&
+  rewardsCss.includes('.mm-rewards-tier-row { grid-template-columns:1fr; }'),
+  'Milestone details must have a readable mobile layout');
 assert.ok(awardsPage.includes("Awards &amp; <span>Rewards.") &&
   awardsPage.includes("Lightning Start") &&
   awardsPage.includes("Explore monthly prizes") &&
@@ -88,7 +123,8 @@ assert.ok(rewardsCss.includes('@media (max-width: 680px)') &&
   rewardsLayout.includes('mm-rewards-site'),
   'Rewards subsite must have responsive, reduced-motion and shared focus contracts');
 assert.ok(browserUat.includes("name: 'public-awards-mobile'") &&
-  browserUat.includes("name: 'public-monthly-prizes-mobile'"),
+  browserUat.includes("name: 'public-monthly-prizes-mobile'") &&
+  browserUat.includes('scenario.requireRewardNav'),
   'Browser UAT must exercise rewards and prize pages on mobile');
 assert.equal((homepage.match(/<details className="mm-home-faq-item"/g) || []).length, 1,
   'FAQs must use accessible native details/summary, not JS-only state');

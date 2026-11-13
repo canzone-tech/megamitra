@@ -704,6 +704,21 @@ async function runScenario(debugPort, scenario) {
         throw new Error(`${scenario.name} admin navigation icon mismatch: ${mismatches.join('; ')}`);
       }
     }
+    if (scenario.requireRewardNav) {
+      const linksVisible = await evaluate(client, `(() => {
+        const paths = ['/rewards', '/rewards/monthly-prizes'];
+        const links = [...document.querySelectorAll('.mm-home-header a[href]')];
+        return paths.every((path) => links.some((link) => {
+          const bounds = link.getBoundingClientRect();
+          return new URL(link.href).pathname === path &&
+            bounds.width > 0 && bounds.height > 0 &&
+            getComputedStyle(link).visibility !== 'hidden';
+        }));
+      })()`);
+      if (!linksVisible) {
+        throw new Error(`${scenario.name} is missing visible Awards & Rewards / Monthly prizes header links`);
+      }
+    }
     if (scenario.requireMemberMobileNav || scenario.requireMemberDesktopNav) {
       const primary = ['Dashboard', 'Payments & E-PINs', 'Benefits'];
       const missingPrimary = primary.filter((label) => !metrics.memberNavLabels.includes(label));
@@ -812,26 +827,31 @@ async function main() {
   const scenarios = [
     {
       name: 'public-awards-desktop',
+      requireRewardNav: true,
       baseUrl: memberBaseUrl, path: '/rewards', width: 1440, height: 1000,
-      mobile: false, expectedTexts: ['Awards & Rewards.', 'Explore monthly prizes', 'not an official, live prize announcement'],
+      mobile: false, expectedTexts: ['Awards & Rewards.', 'Explore monthly prizes', 'not an official, live prize announcement', 'New qualified direct', 'Shimla family trip'],
     },
     {
       name: 'public-awards-mobile',
+      requireRewardNav: true,
       baseUrl: memberBaseUrl, path: '/rewards', width: 390, height: 844,
-      mobile: true, expectedTexts: ['Awards & Rewards.', 'Explore monthly prizes'],
+      mobile: true, expectedTexts: ['Awards & Rewards.', 'Explore monthly prizes', 'New qualified team', '₹50,000'],
     },
     {
       name: 'public-monthly-prizes-desktop',
+      requireRewardNav: true,
       baseUrl: memberBaseUrl, path: '/rewards/monthly-prizes', width: 1440, height: 1000,
       mobile: false, expectedTexts: ['Monthly Lucky Draw', 'MONTH 01', 'MONTH 18', 'Not an official prize announcement'],
     },
     {
       name: 'public-monthly-prizes-mobile',
+      requireRewardNav: true,
       baseUrl: memberBaseUrl, path: '/rewards/monthly-prizes', width: 390, height: 844,
       mobile: true, expectedTexts: ['Monthly Lucky Draw', 'MONTH 01', 'MONTH 18'],
     },
     {
       name: 'public-home-cursor-mobile',
+      requireRewardNav: true,
       baseUrl: memberBaseUrl,
       path: '/',
       width: 390,
@@ -842,6 +862,7 @@ async function main() {
     },
     {
       name: 'public-home-cursor-desktop',
+      requireRewardNav: true,
       baseUrl: memberBaseUrl,
       path: '/',
       width: 1440,
