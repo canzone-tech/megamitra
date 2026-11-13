@@ -11,6 +11,7 @@ const read = (path) => readFileSync(resolve(root, path), 'utf8');
 const homepage = read('frontend/app/page.tsx');
 const styles = read('frontend/app/landing.css');
 const layout = read('frontend/app/layout.tsx');
+const motion = read('frontend/components/homepage-motion.tsx');
 
 assert.ok(layout.includes("import './landing.css'"), 'Homepage styles must be included in production build');
 assert.ok(homepage.includes("export const metadata: Metadata"), 'Homepage must provide its own SEO title/description');
@@ -50,6 +51,24 @@ assert.ok(!/localStorage|sessionStorage|fetch\(|useEffect|useState|window\./.tes
   'Public homepage must stay static without secret-bearing client-side business logic');
 assert.ok(!/guaranteed (returns|income|winnings)|earn ₹|₹\s*\d+|\d+% returns/i.test(homepage),
   'Homepage must not make invented financial claims');
+assert.ok(homepage.includes('aria-hidden="true">\n            {heroSparkles.map(') &&
+  homepage.includes('const heroSparkles = Array.from({ length: 18 }'),
+  'Sparkles must be deterministic, decorative, and absent from assistive technology');
+assert.ok(homepage.includes('<HomepageMotion />') &&
+  homepage.includes('data-home-reveal') &&
+  motion.includes("'use client'") &&
+  motion.includes('IntersectionObserver') &&
+  motion.includes('observer.unobserve(entry.target)') &&
+  motion.includes("getBoundingClientRect().top") &&
+  motion.includes("observer.disconnect()"),
+  'Homepage reveals must be progressive, bounded, and cleaned up');
+assert.ok(!/setInterval|Math\\.random|canvas|getUserMedia|requestAnimationFrame/.test(motion),
+  'Homepage motion must not add perpetual JS animation loops or dynamic randomness');
+for (const name of ['sparkle-twinkle', 'ambient-drift', 'preview-float', 'trust-ring', 'reveal-in']) {
+  assert.ok(styles.includes('@keyframes mm-home-' + name), 'Missing motion keyframes: ' + name);
+}
+assert.ok(styles.includes('.mm-home [data-home-reveal].mm-home-reveal-pending { opacity: 1 !important; transform: none !important; }'),
+  'Reduced-motion users must never have hidden reveal content');
 assert.ok(styles.includes('@media (max-width: 680px)') && styles.includes('@media (max-width: 370px)'),
   'Responsive phone layouts must be defined');
 assert.ok(styles.includes('prefers-reduced-motion') && styles.includes(':focus-visible'),

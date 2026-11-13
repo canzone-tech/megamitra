@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import HomepageMotion from '../components/homepage-motion';
 
 export const metadata: Metadata = {
   title: 'MegaGoldenClub | Your Membership Journey',
@@ -30,6 +31,8 @@ function HomeIcon({ name, size = 22 }: { name: HomeIconName; size?: number }) {
     </svg>
   );
 }
+
+const heroSparkles = Array.from({ length: 18 }, (_, index) => index);
 
 const rewardHighlights = [
   { icon: 'ticket', title: 'Monthly draw updates', description: 'Follow your recorded draw entries, published schedules, and official results when available.' },
@@ -68,6 +71,7 @@ const questions = [
 export default function HomePage() {
   return (
     <div className="mm-home">
+      <HomepageMotion />
       <a className="mm-home-skip" href="#main-content">Skip to main content</a>
       <header className="mm-home-header">
         <div className="mm-home-header-inner">
@@ -86,6 +90,9 @@ export default function HomePage() {
 
       <main id="main-content">
         <div className="mm-home-hero-wrap">
+          <div className="mm-home-sparkle-field" aria-hidden="true">
+            {heroSparkles.map((index) => <span className="mm-home-sparkle" key={index} />)}
+          </div>
           <div className="mm-home-orb mm-home-orb-one" aria-hidden="true" />
           <div className="mm-home-orb mm-home-orb-two" aria-hidden="true" />
           <section className="mm-home-hero" aria-labelledby="mm-home-hero-title">
@@ -142,7 +149,7 @@ export default function HomePage() {
 
         <section className="mm-home-rewards" id="rewards" aria-labelledby="mm-home-rewards-title">
           <div className="mm-home-rewards-inner">
-            <div className="mm-home-rewards-heading">
+            <div className="mm-home-rewards-heading" data-home-reveal>
               <div>
                 <span className="mm-home-section-eyebrow">REWARDS, MADE CLEAR</span>
                 <h2 id="mm-home-rewards-title">Brighter moments.<br /><span>Clearer participation.</span></h2>
@@ -151,7 +158,7 @@ export default function HomePage() {
             </div>
             <div className="mm-home-rewards-grid">
               {rewardHighlights.map(({ icon, title, description }) => (
-                <article className="mm-home-reward-card" key={title}>
+                <article className="mm-home-reward-card" key={title} data-home-reveal>
                   <span className="mm-home-reward-card-icon"><HomeIcon name={icon} size={26} /></span>
                   <h3>{title}</h3>
                   <p>{description}</p>
@@ -163,23 +170,23 @@ export default function HomePage() {
         </section>
 
         <section className="mm-home-section mm-home-journey" id="how-it-works" aria-labelledby="mm-home-journey-title">
-          <div className="mm-home-section-heading mm-home-section-centered">
+          <div className="mm-home-section-heading mm-home-section-centered" data-home-reveal>
             <span className="mm-home-section-eyebrow">THE MEMBER JOURNEY</span>
             <h2 id="mm-home-journey-title">A simple path to getting started.</h2>
             <p>From your first registration step to your member dashboard, everything has a place.</p>
           </div>
           <div className="mm-home-steps">
-            <article className="mm-home-step">
+            <article className="mm-home-step" data-home-reveal>
               <div className="mm-home-step-head"><span className="mm-home-step-number">01</span><span className="mm-home-step-symbol"><HomeIcon name="person" size={25} /></span></div>
               <h3>Start with your sponsor</h3>
               <p>Follow a referral link or enter a sponsor reference, then review the details displayed during signup.</p>
             </article>
-            <article className="mm-home-step">
+            <article className="mm-home-step" data-home-reveal>
               <div className="mm-home-step-head"><span className="mm-home-step-number">02</span><span className="mm-home-step-symbol"><HomeIcon name="ticket" size={25} /></span></div>
               <h3>Complete your registration</h3>
               <p>Provide your member details and use a valid single-use E-PIN to complete the registration process.</p>
             </article>
-            <article className="mm-home-step">
+            <article className="mm-home-step" data-home-reveal>
               <div className="mm-home-step-head"><span className="mm-home-step-number">03</span><span className="mm-home-step-symbol"><HomeIcon name="compass" size={25} /></span></div>
               <h3>Explore your member space</h3>
               <p>Sign in to follow progress, referrals, recorded benefits, account activity, and security settings.</p>
@@ -189,7 +196,7 @@ export default function HomePage() {
         </section>
 
         <section className="mm-home-section mm-home-features-section" id="features" aria-labelledby="mm-home-features-title">
-          <div className="mm-home-features-heading">
+          <div className="mm-home-features-heading" data-home-reveal>
             <div className="mm-home-section-heading">
               <span className="mm-home-section-eyebrow">ONE CONNECTED MEMBER SPACE</span>
               <h2 id="mm-home-features-title">Your important details,<br /><span>thoughtfully organized.</span></h2>
@@ -198,7 +205,7 @@ export default function HomePage() {
           </div>
           <div className="mm-home-features-grid">
             {memberFeatures.map((feature) => (
-              <article className="mm-home-feature-card" key={feature.title}>
+              <article className="mm-home-feature-card" key={feature.title} data-home-reveal>
                 <span className="mm-home-feature-icon"><HomeIcon name={feature.icon} size={25} /></span>
                 <h3>{feature.title}</h3>
                 <p>{feature.description}</p>
@@ -210,7 +217,7 @@ export default function HomePage() {
 
         <section className="mm-home-promise" aria-labelledby="mm-home-promise-title">
           <div className="mm-home-promise-art" aria-hidden="true"><div className="mm-home-promise-ring"><HomeIcon name="shield" size={62} /></div></div>
-          <div className="mm-home-promise-copy">
+          <div className="mm-home-promise-copy" data-home-reveal>
             <span className="mm-home-section-eyebrow">BUILT AROUND TRUST</span>
             <h2 id="mm-home-promise-title">Clarity matters.<br /><span>So does your confidence.</span></h2>
             <p>Your member portal should help you understand your participation and protect your account—not make promises it cannot support.</p>
@@ -223,13 +230,13 @@ export default function HomePage() {
         </section>
 
         <section className="mm-home-section mm-home-faq-section" id="questions" aria-labelledby="mm-home-faq-title">
-          <div className="mm-home-faq-intro">
+          <div className="mm-home-faq-intro" data-home-reveal>
             <span className="mm-home-section-eyebrow">GOOD TO KNOW</span>
             <h2 id="mm-home-faq-title">Questions before<br />you begin?</h2>
             <p>Here are a few helpful answers about joining and using the member portal.</p>
             <Link href="/login" className="mm-home-faq-link">Already a member? Sign in <HomeIcon name="arrow" size={17} /></Link>
           </div>
-          <div className="mm-home-faq-list">
+          <div className="mm-home-faq-list" data-home-reveal>
             {questions.map(({ question, answer }) => (
               <details className="mm-home-faq-item" key={question}>
                 <summary>{question}<span className="mm-home-faq-plus" aria-hidden="true" /></summary>
@@ -239,7 +246,7 @@ export default function HomePage() {
           </div>
         </section>
 
-        <section className="mm-home-last-cta" aria-labelledby="mm-home-last-cta-title">
+        <section className="mm-home-last-cta" data-home-reveal aria-labelledby="mm-home-last-cta-title">
           <div>
             <span className="mm-home-section-eyebrow">YOUR NEXT STEP</span>
             <h2 id="mm-home-last-cta-title">Ready to begin your journey?</h2>

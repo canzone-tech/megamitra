@@ -263,6 +263,100 @@
   .mm-home-hero-actions { flex-direction: column; }
   .mm-home-btn { width: 100%; }
 }
+
+/* Premium motion is a decorative layer: no random values, timers or animation library. */
+.mm-home-sparkle-field { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 0; }
+.mm-home-sparkle { position: absolute; width: 4px; height: 4px; border-radius: 50%; background: #ffdc91; opacity: .2; box-shadow: 0 0 10px rgba(255,213,129,.8), 0 0 20px rgba(255,201,96,.28); animation: mm-home-sparkle-twinkle 8s ease-in-out infinite; }
+.mm-home-sparkle:nth-child(3n) { background: #f5f8ff; box-shadow: 0 0 10px rgba(231,240,255,.75); }
+.mm-home-sparkle:nth-child(4n) { width: 3px; height: 3px; }
+.mm-home-sparkle:nth-child(5n)::after { content: ''; position: absolute; width: 1px; height: 16px; top: -6px; left: 1.5px; background: linear-gradient(transparent,rgba(255,231,185,.8),transparent); }
+.mm-home-sparkle:nth-child(1) { left: 7%; top: 16%; animation-delay: -2s; animation-duration: 9s; }
+.mm-home-sparkle:nth-child(2) { left: 16%; top: 65%; animation-delay: -6s; animation-duration: 11s; }
+.mm-home-sparkle:nth-child(3) { left: 29%; top: 18%; animation-delay: -4s; animation-duration: 8s; }
+.mm-home-sparkle:nth-child(4) { left: 39%; top: 82%; animation-delay: -1s; animation-duration: 12s; }
+.mm-home-sparkle:nth-child(5) { left: 52%; top: 15%; animation-delay: -7s; animation-duration: 10s; }
+.mm-home-sparkle:nth-child(6) { left: 61%; top: 71%; animation-delay: -3s; animation-duration: 8s; }
+.mm-home-sparkle:nth-child(7) { left: 72%; top: 12%; animation-delay: -5s; animation-duration: 11s; }
+.mm-home-sparkle:nth-child(8) { left: 83%; top: 78%; animation-delay: -8s; animation-duration: 9s; }
+.mm-home-sparkle:nth-child(9) { left: 91%; top: 28%; animation-delay: -2s; animation-duration: 13s; }
+.mm-home-sparkle:nth-child(10) { left: 11%; top: 44%; animation-delay: -7s; animation-duration: 10s; }
+.mm-home-sparkle:nth-child(11) { left: 44%; top: 38%; animation-delay: -4s; animation-duration: 12s; }
+.mm-home-sparkle:nth-child(12) { left: 57%; top: 53%; animation-delay: -9s; animation-duration: 9s; }
+.mm-home-sparkle:nth-child(13) { left: 74%; top: 49%; animation-delay: -5s; animation-duration: 13s; }
+.mm-home-sparkle:nth-child(14) { left: 95%; top: 55%; animation-delay: -1s; animation-duration: 8s; }
+.mm-home-sparkle:nth-child(15) { left: 22%; top: 84%; animation-delay: -6s; animation-duration: 11s; }
+.mm-home-sparkle:nth-child(16) { left: 34%; top: 57%; animation-delay: -3s; animation-duration: 10s; }
+.mm-home-sparkle:nth-child(17) { left: 66%; top: 29%; animation-delay: -8s; animation-duration: 12s; }
+.mm-home-sparkle:nth-child(18) { left: 87%; top: 10%; animation-delay: -4s; animation-duration: 9s; }
+
+.mm-home-orb-one { animation: mm-home-ambient-drift 22s ease-in-out infinite alternate; }
+.mm-home-orb-two { animation: mm-home-ambient-drift 28s ease-in-out infinite alternate-reverse; }
+.mm-home-preview-area { animation: mm-home-preview-float 9s ease-in-out infinite; }
+.mm-home-preview-glow { animation: mm-home-glow-breathe 10s ease-in-out infinite alternate; }
+.mm-home-eyebrow-dot { animation: mm-home-beacon 4s ease-in-out infinite; }
+
+.mm-home-btn { position: relative; isolation: isolate; overflow: hidden; }
+.mm-home-btn svg, .mm-home-nav-login svg { transition: transform .2s ease; }
+.mm-home-btn::after { content: ''; position: absolute; inset: -40% auto -40% -65%; width: 35%; transform: skewX(-23deg) translateX(0); background: linear-gradient(90deg,transparent,rgba(255,255,255,.32),transparent); opacity: 0; transition: transform .65s ease, opacity .2s ease; pointer-events: none; z-index: 1; }
+.mm-home-reward-card { transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease; }
+.mm-home-reward-card::before { background-size: 200% 100%; transition: background-position .6s ease; }
+.mm-home-step { transition: transform .25s ease, box-shadow .25s ease, border-color .25s ease; }
+.mm-home-promise-art::before { animation: mm-home-trust-ring 9s ease-in-out infinite; }
+.mm-home-promise-art::after { animation: mm-home-trust-ring 9s ease-in-out -4.5s infinite; }
+
+@media (hover: hover) and (pointer: fine) {
+  .mm-home-btn:hover::after { opacity: 1; transform: skewX(-23deg) translateX(530%); }
+  .mm-home-btn:hover svg, .mm-home-nav-login:hover svg { transform: translateX(3px); }
+  .mm-home-reward-card:hover { transform: translateY(-5px); border-color: #eac9d8; box-shadow: 0 20px 45px rgba(22,32,75,.11); }
+  .mm-home-reward-card:hover::before { background-position: 100% 0; }
+  .mm-home-step:hover { transform: translateY(-4px); border-color: #d4dfec; box-shadow: 0 18px 40px rgba(15,39,79,.09); }
+}
+
+/* Progressive enhancement: content is always visible without JS or Observer support. */
+.mm-home [data-home-reveal].mm-home-reveal-pending { opacity: 0; transform: translate3d(0,22px,0); }
+.mm-home [data-home-reveal].mm-home-reveal-visible { animation: mm-home-reveal-in .75s cubic-bezier(.2,.75,.25,1) backwards; }
+.mm-home .mm-home-reward-card:nth-child(2).mm-home-reveal-visible,
+.mm-home .mm-home-step:nth-child(2).mm-home-reveal-visible,
+.mm-home .mm-home-feature-card:nth-child(3n+2).mm-home-reveal-visible { animation-delay: 90ms; }
+.mm-home .mm-home-reward-card:nth-child(3).mm-home-reveal-visible,
+.mm-home .mm-home-step:nth-child(3).mm-home-reveal-visible,
+.mm-home .mm-home-feature-card:nth-child(3n).mm-home-reveal-visible { animation-delay: 160ms; }
+
+@keyframes mm-home-sparkle-twinkle {
+  0%, 100% { opacity: .12; transform: translate3d(0,0,0) scale(.7); }
+  45% { opacity: .9; transform: translate3d(2px,-8px,0) scale(1.25); }
+  70% { opacity: .35; transform: translate3d(4px,-12px,0) scale(.85); }
+}
+@keyframes mm-home-ambient-drift {
+  from { transform: translate3d(-12px,8px,0) scale(.95); opacity: .65; }
+  to { transform: translate3d(24px,-15px,0) scale(1.12); opacity: 1; }
+}
+@keyframes mm-home-preview-float {
+  0%, 100% { transform: translate3d(0,0,0); }
+  50% { transform: translate3d(0,-11px,0); }
+}
+@keyframes mm-home-glow-breathe {
+  from { opacity: .55; transform: scale(.95); }
+  to { opacity: 1; transform: scale(1.06); }
+}
+@keyframes mm-home-beacon {
+  0%, 100% { opacity: .7; transform: scale(.85); }
+  50% { opacity: 1; transform: scale(1.18); }
+}
+@keyframes mm-home-trust-ring {
+  0%, 100% { opacity: .55; transform: scale(.97); }
+  50% { opacity: 1; transform: scale(1.04); }
+}
+@keyframes mm-home-reveal-in {
+  from { opacity: 0; transform: translate3d(0,22px,0); }
+  to { opacity: 1; transform: translate3d(0,0,0); }
+}
+@media (max-width: 680px) {
+  .mm-home-sparkle:nth-child(n+11) { display: none; }
+  .mm-home-preview-area { animation-duration: 12s; }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .mm-home [data-home-reveal].mm-home-reveal-pending { opacity: 1 !important; transform: none !important; }
   .mm-home *, .mm-home *::before, .mm-home *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
 }
