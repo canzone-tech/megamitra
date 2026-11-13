@@ -298,14 +298,28 @@ for (const unsafe of [
 // Source-free runtime deploy is a separate production-only ops procedure.
 // Root npm run verify checks safety invariants without touching host PM2.
 const releaseWorkflow = read('.github/workflows/publish-reviewed-runtime.yml');
+// Runtime publication pins change per approved release. Validate their strict
+// structure and internal consistency rather than a stale, historical SHA.
+const pin = (name) => {
+  const line = releaseWorkflow.match(new RegExp(
+    '^\\s*' + name + ": '?([^'\\n]+)'?\\s*$", 'm',
+  ));
+  assert.ok(line, 'Missing immutable release workflow pin: ' + name);
+  return line[1];
+};
+const sourceSha = pin('SOURCE_SHA');
+assert.match(sourceSha, /^[0-9a-f]{40}$/, 'Release source must be an exact Git SHA');
+assert.equal(pin('RELEASE_TAG'), 'runtime-' + sourceSha,
+  'Runtime tag must be bound to the pinned source SHA');
+const runIds = ['BACKEND_RUN', 'FRONTEND_RUN', 'EVIDENCE_RUN'].map(pin);
+for (const runId of runIds) assert.match(runId, /^[0-9]{8,}$/, 'CI run ID must be pinned');
+assert.equal(new Set(runIds).size, 3, 'All three CI evidence runs must be distinct');
 for (const token of [
-  'SOURCE_SHA: 5cc5b98f4b45e40d38906a153aafcbb3e2b28a70',
-  'BACKEND_RUN:',
-  'FRONTEND_RUN:',
-  'EVIDENCE_RUN:',
   'actions/download-artifact@v4',
   'sha256sum --check --status',
   'gh release create',
+  '--target "$SOURCE_SHA"',
+  '$SOURCE_SHA success completed',
   '--prerelease',
 ]) assert.ok(releaseWorkflow.includes(token),
   'Published binary must prove approved same-SHA CI provenance: ' + token);
