@@ -17,6 +17,7 @@ const awardsPage = read('frontend/app/rewards/page.tsx');
 const monthlyPage = read('frontend/app/rewards/monthly-prizes/page.tsx');
 const rewardsLayout = read('frontend/app/rewards/layout.tsx');
 const rewardsCss = read('frontend/app/rewards/rewards.css');
+const prizeCss = read('frontend/app/rewards/prize-catalogue.css');
 const prizeDetail = read('frontend/app/rewards/monthly-prizes/[month]/page.tsx');
 const publicPrizeClient = read('frontend/lib/public-prizes.ts');
 const publicMediaProxy = read('frontend/app/api/public-prize-media/[mediaId]/route.ts');
@@ -117,6 +118,18 @@ assert.ok(prizeDetail.includes('readPublishedPrizes()') &&
   prizeDetail.includes('prize.imageMediaId') &&
   prizeDetail.includes('prizes.length === 0'),
   'Month detail must render all configured prizes, attachments and empty states');
+assert.ok(prizeDetail.includes('className="mm-prizes-detail-image-frame"') &&
+  prizeDetail.includes('<Image src=') &&
+  prizeDetail.includes('alt={prize.name} fill') &&
+  prizeCss.includes('.mm-prizes-detail-image-frame { position:relative;') &&
+  prizeCss.includes('min-height:0; overflow:hidden;') &&
+  prizeCss.includes('.mm-prizes-detail-image img { display:block; object-fit:contain; }'),
+  'Prize images must use a bounded aspect-ratio-safe frame, never intrude into prize text');
+assert.ok(browserUat.includes('scenario.verifyPrizeImageLayout') &&
+  browserUat.includes("imageWithinFrame") &&
+  browserUat.includes("copyBelowImage") &&
+  browserUat.includes("objectFit"),
+  'Real Chromium UAT must guard portrait and landscape image overlap on desktop and mobile');
 assert.ok(publicPrizeClient.includes('/public/prizes/catalogue') &&
   publicPrizeClient.includes("cache: 'no-store'") &&
   publicMediaProxy.includes('/public/prizes/images/') &&

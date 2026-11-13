@@ -69,8 +69,12 @@ export default async function MonthPrizeDetailsPage({
               return <article className="mm-prizes-detail-card" key={prize.prizeCode}>
                 <div className="mm-prizes-detail-image">
                   {prize.imageMediaId ? (
-                    <Image src={`/api/public-prize-media/${prize.imageMediaId}`}
-                      alt={prize.name} width={450} height={310} unoptimized />
+                    <div className="mm-prizes-detail-image-frame">
+                      <Image src={`/api/public-prize-media/${prize.imageMediaId}`}
+                        alt={prize.name} fill
+                        sizes="(max-width: 680px) calc(100vw - 72px), (max-width: 1100px) 45vw, 360px"
+                        unoptimized />
+                    </div>
                   ) : (
                     <div className="mm-prizes-detail-placeholder">
                       <svg aria-hidden="true" viewBox="0 0 64 64" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round"><rect x="12" y="26" width="40" height="27" rx="3"/><path d="M9 19h46v11H9M32 19v34M23 19C9 17 12 3 20 4c7 2 12 15 12 15Z"/></svg>
