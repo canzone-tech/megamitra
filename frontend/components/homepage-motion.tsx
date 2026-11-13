@@ -3,10 +3,10 @@
 import { useEffect } from 'react';
 // A bounded, deterministic spray keeps the cursor trail elegant and lightweight.
 // Values are decorative offsets in CSS pixels, not application/business data.
-const CURSOR_EMIT_INTERVAL_MS = 50;
-const CURSOR_MIN_DISTANCE_PX = 10;
-const CURSOR_MAX_PARTICLES = 30;
-const CURSOR_PARTICLES_PER_EMIT = 2;
+const CURSOR_EMIT_INTERVAL_MS = 42;
+const CURSOR_MIN_DISTANCE_PX = 8;
+const CURSOR_MAX_PARTICLES = 42;
+const CURSOR_PARTICLES_PER_EMIT = 3;
 const CURSOR_SPREAD = [
   { x: -5, y: 4, dx: -24, dy: -19 },
   { x: 8, y: -4, dx: 28, dy: -27 },
@@ -57,7 +57,9 @@ export default function HomepageMotion() {
     const home = document.querySelector<HTMLElement>('.mm-home');
     if (!home) return;
 
-    const finePointer = window.matchMedia('(hover: hover) and (pointer: fine)');
+    // Pointer media queries can be false on Linux/remote desktops even when
+    // a mouse is active. Use the actual pointerType plus responsive width.
+    const desktopWidth = window.matchMedia('(min-width: 681px)');
     const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
     const layer = document.createElement('div');
     layer.className = 'mm-home-cursor-trail';
@@ -79,7 +81,7 @@ export default function HomepageMotion() {
       activeParticles.clear();
     };
     const allowed = () =>
-      finePointer.matches && !reducedMotion.matches && !document.hidden;
+      desktopWidth.matches && !reducedMotion.matches && !document.hidden;
 
     const onPointerMove = (event: PointerEvent) => {
       if (!allowed() || !event.isPrimary || event.pointerType !== 'mouse') return;
@@ -120,13 +122,13 @@ export default function HomepageMotion() {
       }
     };
     home.addEventListener('pointermove', onPointerMove, { passive: true });
-    finePointer.addEventListener('change', onPreferencesChange);
+    desktopWidth.addEventListener('change', onPreferencesChange);
     reducedMotion.addEventListener('change', onPreferencesChange);
     document.addEventListener('visibilitychange', onPreferencesChange);
 
     return () => {
       home.removeEventListener('pointermove', onPointerMove);
-      finePointer.removeEventListener('change', onPreferencesChange);
+      desktopWidth.removeEventListener('change', onPreferencesChange);
       reducedMotion.removeEventListener('change', onPreferencesChange);
       document.removeEventListener('visibilitychange', onPreferencesChange);
       clearParticles();

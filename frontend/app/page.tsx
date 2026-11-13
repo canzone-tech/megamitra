@@ -32,7 +32,7 @@ function HomeIcon({ name, size = 22 }: { name: HomeIconName; size?: number }) {
   );
 }
 
-const heroSparkles = Array.from({ length: 18 }, (_, index) => index);
+const heroSparkles = Array.from({ length: 40 }, (_, index) => index);
 
 const rewardHighlights = [
   { icon: 'ticket', title: 'Monthly draw updates', description: 'Follow your recorded draw entries, published schedules, and official results when available.' },

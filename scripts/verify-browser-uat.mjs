@@ -316,28 +316,6 @@ async function runScenario(debugPort, scenario) {
       await setAccessCookie(client, scenario.baseUrl, scenario.cookieName, scenario.token);
     }
 
-    if (scenario.verifyHomepageCursor) {
-      // Headless Chrome has no physical pointing device and reports (pointer: none)
-      // despite desktop viewport dimensions. Simulate a fine mouse capability for
-      // this single UI contract test, without weakening production feature gating.
-      // The actual CSS rendering still requires manual desktop visual UAT.
-      await client.send('Page.addScriptToEvaluateOnNewDocument', {
-        source: `(() => {
-          const nativeMatchMedia = window.matchMedia.bind(window);
-          window.matchMedia = (query) => {
-            const result = nativeMatchMedia(query);
-            if (query !== '(hover: hover) and (pointer: fine)') return result;
-            return {
-              media: result.media,
-              matches: true,
-              addEventListener: result.addEventListener.bind(result),
-              removeEventListener: result.removeEventListener.bind(result),
-            };
-          };
-        })()`,
-      });
-    }
-
     const url = `${scenario.baseUrl}${scenario.path}`;
     const navigation = await client.send('Page.navigate', { url });
     if (navigation.errorText) throw new Error(`${scenario.name} navigation failed: ${navigation.errorText}`);
@@ -372,17 +350,14 @@ async function runScenario(debugPort, scenario) {
       await waitForExpression(client, 'Boolean(document.querySelector(".mm-home-cursor-trail"))',
         'homepage cursor layer mounted after hydration');
       const enabled = await evaluate(client,
-        "matchMedia('(hover: hover) and (pointer: fine)').matches && !matchMedia('(prefers-reduced-motion: reduce)').matches");
-      if (!enabled) throw new Error('Desktop Chrome UAT is not in fine-pointer, full-motion mode');
+        "matchMedia('(min-width: 681px)').matches && !matchMedia('(prefers-reduced-motion: reduce)').matches");
+      if (!enabled) throw new Error('Desktop cursor UAT requires a wide viewport and normal motion');
 
-      await evaluate(client, `(() => {
-        const target = document.querySelector('.mm-home-hero');
-        target.dispatchEvent(new PointerEvent('pointermove', {
-          bubbles: true, isPrimary: true, pointerType: 'mouse', clientX: 380, clientY: 320,
-        }));
-      })()`);
-      await waitForExpression(client, 'document.querySelectorAll(".mm-home-cursor-spark").length === 2',
-        'mouse motion creates exactly two bounded golden particles');
+      // Real Chromium mouse movement verifies the production event path, without
+      // spoofing pointer capabilities in the test runner.
+      await client.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 380, y: 320 });
+      await waitForExpression(client, 'document.querySelectorAll(".mm-home-cursor-spark").length === 3',
+        'real mouse movement creates three golden particles');
       const trailSafety = await evaluate(client, `(() => {
         const layer = document.querySelector('.mm-home-cursor-trail');
         return { hiddenFromAT: layer?.getAttribute('aria-hidden') === 'true',
@@ -418,6 +393,24 @@ async function runScenario(debugPort, scenario) {
       const reducedCount = await evaluate(client, 'document.querySelectorAll(".mm-home-cursor-spark").length');
       if (reducedCount !== 0) throw new Error('Reduced motion still emitted cursor sparkles');
       await client.send('Emulation.setEmulatedMedia', { features: [] });
+    }
+
+    if (scenario.verifyHomepageCursorMobile) {
+      await waitForExpression(client, 'Boolean(document.querySelector(".mm-home-cursor-trail"))',
+        'mobile cursor layer mounted after hydration');
+      const mobile = await evaluate(client, `(() => {
+        const root = document.querySelector('.mm-home-hero');
+        root.dispatchEvent(new PointerEvent('pointermove', {
+          bubbles: true, isPrimary: true, pointerType: 'mouse', clientX: 180, clientY: 260,
+        }));
+        return {
+          sparkleCount: document.querySelectorAll('.mm-home-cursor-spark').length,
+          layerHidden: getComputedStyle(document.querySelector('.mm-home-cursor-trail')).display === 'none',
+        };
+      })()`);
+      if (!mobile.layerHidden || mobile.sparkleCount !== 0) {
+        throw new Error('Mobile homepage must not emit or display mouse sparkles');
+      }
     }
 
     if (scenario.verifyQrUpload) {
@@ -817,6 +810,16 @@ async function main() {
   await waitForJson(`http://127.0.0.1:${debugPort}/json/version`, chrome);
 
   const scenarios = [
+    {
+      name: 'public-home-cursor-mobile',
+      baseUrl: memberBaseUrl,
+      path: '/',
+      width: 390,
+      height: 844,
+      mobile: true,
+      expectedTexts: ['Your membership.', 'Brighter moments.'],
+      verifyHomepageCursorMobile: true,
+    },
     {
       name: 'public-home-cursor-desktop',
       baseUrl: memberBaseUrl,

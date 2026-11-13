@@ -53,7 +53,7 @@ assert.ok(!/localStorage|sessionStorage|fetch\(|useEffect|useState|window\./.tes
 assert.ok(!/guaranteed (returns|income|winnings)|earn ₹|₹\s*\d+|\d+% returns/i.test(homepage),
   'Homepage must not make invented financial claims');
 assert.ok(homepage.includes('aria-hidden="true">\n            {heroSparkles.map(') &&
-  homepage.includes('const heroSparkles = Array.from({ length: 18 }'),
+  homepage.includes('const heroSparkles = Array.from({ length: 40 }'),
   'Sparkles must be deterministic, decorative, and absent from assistive technology');
 assert.ok(homepage.includes('<HomepageMotion />') &&
   homepage.includes('data-home-reveal') &&
@@ -69,8 +69,8 @@ assert.ok(motion.includes("home.addEventListener('pointermove', onPointerMove, {
   motion.includes("event.pointerType !== 'mouse'") &&
   motion.includes("event.isPrimary") &&
   motion.includes("document.hidden") &&
-  motion.includes("CURSOR_MAX_PARTICLES") &&
-  motion.includes("CURSOR_EMIT_INTERVAL_MS") &&
+  motion.includes("CURSOR_MAX_PARTICLES = 42") &&
+  motion.includes("CURSOR_EMIT_INTERVAL_MS = 42") &&
   motion.includes("CURSOR_MIN_DISTANCE_PX") &&
   motion.includes("activeParticles.size >= CURSOR_MAX_PARTICLES") &&
   motion.includes("sparkle.addEventListener('animationend'") &&
@@ -78,12 +78,12 @@ assert.ok(motion.includes("home.addEventListener('pointermove', onPointerMove, {
   motion.includes("layer.remove()"),
   'Cursor particles must be mouse-only, throttled, bounded, and cleaned up');
 for (const capability of [
-  "'(hover: hover) and (pointer: fine)'",
+  "'(min-width: 681px)'",
   "'(prefers-reduced-motion: reduce)'",
-  "finePointer.addEventListener('change'",
+  "desktopWidth.addEventListener('change'",
   "reducedMotion.addEventListener('change'",
   "document.addEventListener('visibilitychange'",
-  "finePointer.removeEventListener('change'",
+  "desktopWidth.removeEventListener('change'",
   "reducedMotion.removeEventListener('change'",
 ]) {
   assert.ok(motion.includes(capability), 'Cursor effect missing responsive motion control: ' + capability);
@@ -91,13 +91,14 @@ for (const capability of [
 assert.ok(styles.includes('.mm-home-cursor-trail') &&
   styles.includes('pointer-events: none;') &&
   styles.includes('@keyframes mm-home-cursor-scatter') &&
-  styles.includes('@media (hover: none), (pointer: coarse)') &&
+  styles.includes('@media (max-width: 680px)') &&
   styles.includes('.mm-home-cursor-trail { display: none !important; }'),
   'Cursor sparkles must never intercept clicks or appear on touch/reduced-motion devices');
 assert.ok(browserUat.includes("name: 'public-home-cursor-desktop'") &&
   browserUat.includes("scenario.verifyHomepageCursor") &&
-  browserUat.includes("Page.addScriptToEvaluateOnNewDocument") &&
-  browserUat.includes("Headless Chrome has no physical pointing device") &&
+  !browserUat.includes("Page.addScriptToEvaluateOnNewDocument") &&
+  browserUat.includes("Input.dispatchMouseEvent") &&
+  browserUat.includes("name: 'public-home-cursor-mobile'") &&
   browserUat.includes("Emulation.setEmulatedMedia") &&
   browserUat.includes("pointerType: 'touch'"),
   'Browser UAT must exercise the real cursor effect, touch bypass, and reduced-motion switch');
