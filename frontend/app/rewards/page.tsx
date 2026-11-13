@@ -15,13 +15,18 @@ const recognition = [
 
 type MilestoneIconName = 'bolt' | 'bronze' | 'silver' | 'gold' | 'diamond';
 
+// Presentation-only snapshot of approved RANK-01–03 reference rules.
+ // Real qualification and published values are owned by the backend season policy.
 const milestones = [
-  { name: 'Lightning Start', icon: 'bolt' },
-  { name: 'Bronze', icon: 'bronze' },
-  { name: 'Silver', icon: 'silver' },
-  { name: 'Gold', icon: 'gold' },
-  { name: 'Diamond', icon: 'diamond' },
-] as const satisfies ReadonlyArray<{ name: string; icon: MilestoneIconName }>;
+  { name: 'Lightning Start', icon: 'bolt', direct: 4, team: 0, deadline: '4 hours', cash: '₹1,000', trip: null, monthly: null },
+  { name: 'Bronze', icon: 'bronze', direct: 10, team: 40, deadline: '20 days', cash: '₹5,000', trip: null, monthly: null },
+  { name: 'Silver', icon: 'silver', direct: 25, team: 100, deadline: '30 days', cash: '₹10,000', trip: 'Goa family trip', monthly: null },
+  { name: 'Gold', icon: 'gold', direct: 50, team: 250, deadline: '60 days', cash: '₹20,000', trip: 'Ooty family trip', monthly: '₹2,000/month up to 18 months, stopping on Diamond achievement' },
+  { name: 'Diamond', icon: 'diamond', direct: 100, team: 500, deadline: '90 days', cash: '₹50,000', trip: 'Shimla family trip', monthly: '₹5,000/month up to 18 months after Diamond achievement' },
+] as const satisfies ReadonlyArray<{
+  name: string; icon: MilestoneIconName; direct: number; team: number;
+  deadline: string; cash: string; trip: string | null; monthly: string | null;
+}>;
 
 function MilestoneIcon({ name }: { name: MilestoneIconName }) {
   const paths: Record<MilestoneIconName, ReactNode> = {
@@ -88,17 +93,32 @@ export default function AwardsAndRewardsPage() {
           <div className="mm-rewards-section-head">
             <span className="mm-rewards-kicker">ACHIEVEMENT RECOGNITION</span>
             <h2 id="mm-rewards-milestones-title">A progression of <span>possibilities.</span></h2>
-            <p>These level names are part of the program design. Published season policy, new-member qualification and timing determine whether any milestone is actually earned.</p>
+            <p>Explore original reference qualification targets, joining-date deadlines and possible benefits for each level. These are examples, not a live-season offer or guaranteed earnings; published season policy takes precedence.</p>
           </div>
           <div className="mm-rewards-tier-row">
             {milestones.map((tier) => (
-              <div className="mm-rewards-tier" key={tier.name}>
-                <span className="mm-rewards-tier-symbol" aria-hidden="true"><MilestoneIcon name={tier.icon} /></span>
-                <strong>{tier.name}</strong>
-              </div>
+              <article className="mm-rewards-tier" key={tier.name}>
+                <div className="mm-rewards-tier-heading">
+                  <span className="mm-rewards-tier-symbol" aria-hidden="true"><MilestoneIcon name={tier.icon} /></span>
+                  <div><span className="mm-rewards-tier-label">Reference milestone</span><h3>{tier.name}</h3></div>
+                </div>
+                <dl className="mm-rewards-tier-details">
+                  <div><dt>New qualified direct</dt><dd>{tier.direct} members</dd></div>
+                  {tier.team ? <div><dt>New qualified team</dt><dd>{tier.team} members</dd></div> : null}
+                  <div><dt>Deadline from paid joining</dt><dd>Within {tier.deadline}</dd></div>
+                  <div className="mm-rewards-tier-cash"><dt>Reference cash bonus</dt><dd>{tier.cash}</dd></div>
+                </dl>
+                {tier.trip ? <p className="mm-rewards-tier-extra"><span>Family trip</span><strong>{tier.trip}</strong></p> : null}
+                {tier.monthly ? <p className="mm-rewards-tier-extra"><span>Reference monthly benefit</span><strong>{tier.monthly}</strong></p> : null}
+              </article>
             ))}
           </div>
-          <p className="mm-rewards-subnote">Recognition levels are not guaranteed earnings or entitlements. Your account shows confirmed achievements and the exact published rules.</p>
+          <aside className="mm-rewards-rules-note" aria-label="Achievement reference rules">
+            <strong>How qualification works in the reference program</strong>
+            <p>All deadlines begin at the original paid joining timestamp. Each level needs fresh active paid qualified direct and sponsor-tree team members, not people counted at earlier levels. Missing Lightning Start does not block Bronze.</p>
+            <p>Gold and Diamond monthly rewards are mutually exclusive and never simultaneous: Gold stops on Diamond achievement. Trips require separate fulfilment. Your published season policy and recorded results are authoritative; no reward or income is guaranteed.</p>
+            <Link className="mm-rewards-policy-link" href="/login">View my official published rank policy and achievements <span aria-hidden="true">↗</span></Link>
+          </aside>
         </div>
       </section>
 

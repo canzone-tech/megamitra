@@ -81,11 +81,17 @@ export default function HomePage() {
           </Link>
           <nav className="mm-home-nav" aria-label="Primary navigation">
             <a href="#how-it-works">How it works</a>
-            <Link className="mm-home-nav-optional" href="/rewards">Awards &amp; Rewards</Link>
+            <Link className="mm-home-nav-reward" href="/rewards">Awards &amp; Rewards</Link>
+            <Link className="mm-home-nav-reward" href="/rewards/monthly-prizes">Monthly prizes</Link>
             <a className="mm-home-nav-optional" href="#questions">FAQs</a>
             <Link className="mm-home-nav-login" href="/login">Member login <HomeIcon name="arrow" size={16} /></Link>
           </nav>
         </div>
+
+        <nav className="mm-home-mobile-rewards-nav" aria-label="Rewards shortcuts">
+          <Link href="/rewards">Awards &amp; Rewards</Link>
+          <Link href="/rewards/monthly-prizes">Monthly prizes</Link>
+        </nav>
       </header>
 
       <main id="main-content">

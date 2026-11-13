@@ -146,3 +146,34 @@
 @media (prefers-reduced-motion: reduce) {
   .mm-rewards-site *, .mm-rewards-site *::before, .mm-rewards-site *::after { animation:none !important; transition:none !important; }
 }
+
+/* Detailed reference tiers: five cards in a balanced 3 + 2 desktop composition. */
+.mm-rewards-tier-row { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:18px; margin-bottom:26px; align-items:stretch; }
+.mm-rewards-tier { grid-column:span 2; display:flex; flex-direction:column; align-items:stretch; gap:18px; justify-items:normal; padding:24px; text-align:left; border-radius:20px; box-shadow:0 12px 32px rgba(18,38,75,.055); }
+.mm-rewards-tier:nth-child(n+4) { grid-column:span 3; }
+.mm-rewards-tier-heading { display:flex; align-items:center; gap:14px; }
+.mm-rewards-tier-heading h3 { margin:5px 0 0; font-size:19px; color:#153355; letter-spacing:-.025em; }
+.mm-rewards-tier-label { font-size:10px; text-transform:uppercase; letter-spacing:.09em; font-weight:900; color:#9c712d; }
+.mm-rewards-tier-symbol { flex:none; width:59px; height:59px; border-radius:17px; }
+.mm-rewards-tier-details { display:grid; gap:0; margin:0; }
+.mm-rewards-tier-details > div { display:flex; gap:14px; align-items:baseline; justify-content:space-between; padding:10px 0; border-bottom:1px solid #ebeff5; }
+.mm-rewards-tier-details dt { font-size:12px; color:#5d708a; line-height:1.45; }
+.mm-rewards-tier-details dd { margin:0; font-size:13px; font-weight:850; text-align:right; color:#16375f; white-space:nowrap; }
+.mm-rewards-tier-details .mm-rewards-tier-cash { border-bottom:0; }
+.mm-rewards-tier-details .mm-rewards-tier-cash dd { color:#a56c16; font-size:19px; }
+.mm-rewards-tier-extra { display:flex; flex-wrap:wrap; gap:5px 13px; margin:0; padding:13px; border-radius:12px; background:#fff8e9; color:#715021; font-size:12px; line-height:1.6; overflow-wrap:anywhere; }
+.mm-rewards-tier-extra span { color:#796b53; }
+.mm-rewards-rules-note { padding:25px 29px; border:1px solid #e6e0d7; border-radius:17px; background:rgba(255,255,255,.78); }
+.mm-rewards-rules-note > strong { font-size:16px; color:#193758; }
+.mm-rewards-rules-note p { font-size:13px; color:#60718b; line-height:1.75; margin:10px 0; }
+.mm-rewards-policy-link { display:inline-flex; gap:10px; margin-top:12px; color:#164c93; font-weight:850; font-size:13px; }
+.mm-rewards-policy-link:hover { color:#b91971; }
+@media (max-width: 900px) {
+  .mm-rewards-tier-row { grid-template-columns:repeat(2,minmax(0,1fr)); gap:13px; }
+  .mm-rewards-tier, .mm-rewards-tier:nth-child(n+4) { grid-column:span 1; }
+}
+@media (max-width: 680px) {
+  .mm-rewards-tier-row { grid-template-columns:1fr; }
+  .mm-rewards-tier { padding:22px; }
+  .mm-rewards-rules-note { padding:21px; }
+}

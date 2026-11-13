@@ -432,3 +432,12 @@
   .mm-home [data-home-reveal].mm-home-reveal-pending { opacity: 1 !important; transform: none !important; }
   .mm-home *, .mm-home *::before, .mm-home *::after { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
 }
+
+/* Public rewards stay one tap away even on narrow screens. */
+.mm-home-mobile-rewards-nav { display:none; }
+@media (max-width: 680px) {
+  .mm-home-mobile-rewards-nav { display:flex; justify-content:center; gap:27px; padding:10px 14px; border-top:1px solid #e9eef5; background:#fff; }
+  .mm-home-mobile-rewards-nav a { color:#24416a; font-weight:850; font-size:12px; }
+  .mm-home-mobile-rewards-nav a:hover { color:#c90067; }
+  .mm-home-mobile-rewards-nav a:focus-visible { outline:2px solid #daa044; outline-offset:4px; }
+}
