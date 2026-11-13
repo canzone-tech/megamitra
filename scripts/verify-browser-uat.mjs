@@ -369,13 +369,18 @@ async function runScenario(debugPort, scenario) {
       if (!trailSafety.hiddenFromAT || !trailSafety.pointerTransparent) {
         throw new Error('Homepage cursor trail must be decorative and click-through');
       }
-      await evaluate(client, `(() => {
+      // Compare in the same browser task: animation expiry between CDP calls
+      // must not create a flaky touch-bypass assertion.
+      const touchResult = await evaluate(client, `(() => {
+        const before = document.querySelectorAll('.mm-home-cursor-spark').length;
         document.querySelector('.mm-home-hero').dispatchEvent(new PointerEvent('pointermove', {
           bubbles: true, isPrimary: true, pointerType: 'touch', clientX: 520, clientY: 390,
         }));
+        return { before, after: document.querySelectorAll('.mm-home-cursor-spark').length };
       })()`);
-      const afterTouch = await evaluate(client, 'document.querySelectorAll(".mm-home-cursor-spark").length');
-      if (afterTouch !== 2) throw new Error('Touch motion unexpectedly emitted desktop cursor sparkles');
+      if (touchResult.before !== touchResult.after) {
+        throw new Error('Touch motion unexpectedly emitted desktop cursor sparkles');
+      }
 
       await client.send('Emulation.setEmulatedMedia', {
         features: [{ name: 'prefers-reduced-motion', value: 'reduce' }],
