@@ -17,7 +17,11 @@ const awardsPage = read('frontend/app/rewards/page.tsx');
 const monthlyPage = read('frontend/app/rewards/monthly-prizes/page.tsx');
 const rewardsLayout = read('frontend/app/rewards/layout.tsx');
 const rewardsCss = read('frontend/app/rewards/rewards.css');
-const prizePreview = read('frontend/app/rewards/prize-preview.ts');
+const prizeDetail = read('frontend/app/rewards/monthly-prizes/[month]/page.tsx');
+const publicPrizeClient = read('frontend/lib/public-prizes.ts');
+const publicMediaProxy = read('frontend/app/api/public-prize-media/[mediaId]/route.ts');
+const publicPrizeService = read('backend/src/owner-portal/public-prize-catalogue.service.ts');
+const publicPrizeController = read('backend/src/owner-portal/public-prize-catalogue.controller.ts');
 
 assert.ok(layout.includes("import './landing.css'"), 'Homepage styles must be included in production build');
 assert.ok(homepage.includes("export const metadata: Metadata"), 'Homepage must provide its own SEO title/description');
@@ -100,23 +104,33 @@ assert.ok(awardsPage.includes("Awards &amp; <span>Rewards.") &&
   awardsPage.includes("Explore monthly prizes") &&
   awardsPage.includes('Actual prizes, qualified rewards and dates'),
   'Awards page content must remain visible and link to monthly prize preview');
-assert.ok(awardsPage.includes('not an official, live prize announcement') &&
-  monthlyPage.includes('Not an official prize announcement') &&
-  monthlyPage.includes('Flyer concept • Not confirmed') &&
-  monthlyPage.includes('Holding a token does not guarantee a prize'),
-  'Public pages must clearly distinguish the flyer from official published prize data');
-assert.ok(!/apiJson|fetch\(|sessionStorage|localStorage|admin\/owner-portal/.test(awardsPage + monthlyPage),
-  'Public rewards pages must not access private member/admin prize data');
-assert.ok(prizePreview.includes('NOT an authoritative prize table') &&
-  prizePreview.includes('Hero HF 100 and EV scooter') &&
-  prizePreview.includes('Honda Activa and EV scooter') &&
-  prizePreview.includes('Two cars and EV scooter') &&
-  prizePreview.includes('flyerPrizeConcepts') &&
-  !/nominalValue|winnerCount|drawAt|token/.test(prizePreview.split('export const flyerPrizeConcepts')[1]),
-  'Flyer concepts may not invent official prize values, winners, dates or tokens');
-const months = [...prizePreview.matchAll(/\{ month: (\d+),/g)].map((match) => Number(match[1]));
-assert.deepEqual(months, Array.from({ length: 18 }, (_, i) => i + 1),
-  'Monthly flyer concept must have exactly one card for each of 18 months');
+assert.ok(monthlyPage.includes("readPublishedPrizes()") &&
+  monthlyPage.includes('View Details') &&
+  !monthlyPage.includes('Flyer concept • Not confirmed') &&
+  !monthlyPage.includes('flyerPrizeConcepts') &&
+  monthlyPage.includes('Array.from({ length: months }'),
+  'Month selector must use consistent month navigation without hardcoded flyer prizes');
+assert.ok(prizeDetail.includes('readPublishedPrizes()') &&
+  prizeDetail.includes('prize.name') &&
+  prizeDetail.includes('prize.description') &&
+  prizeDetail.includes('prize.winnerCount') &&
+  prizeDetail.includes('prize.imageMediaId') &&
+  prizeDetail.includes('prizes.length === 0'),
+  'Month detail must render all configured prizes, attachments and empty states');
+assert.ok(publicPrizeClient.includes('/public/prizes/catalogue') &&
+  publicPrizeClient.includes("cache: 'no-store'") &&
+  publicMediaProxy.includes('/public/prizes/images/') &&
+  publicMediaProxy.includes("'Cache-Control': 'no-store'"),
+  'Public prize data and images must bypass caches and use the safe backend');
+assert.ok(publicPrizeController.includes('@Public()') &&
+  publicPrizeController.includes("Controller('public/prizes')") &&
+  publicPrizeService.includes("s.status='ACTIVE'") &&
+  publicPrizeService.includes("p.status='ACTIVE'") &&
+  publicPrizeService.includes('image.info.seasonId !== seasonId') &&
+  publicPrizeService.includes('IMAGE_TYPES.has'),
+  'Public prize endpoints must exclude drafts, inactive rows and unlinked media');
+assert.ok(!/admin\/owner-portal|sessionStorage|localStorage/.test(monthlyPage + prizeDetail + publicPrizeClient),
+  'Public pages must not access private admin or member APIs');
 assert.ok(rewardsCss.includes('@media (max-width: 680px)') &&
   rewardsCss.includes(':focus-visible') &&
   rewardsCss.includes('prefers-reduced-motion') &&
@@ -124,6 +138,8 @@ assert.ok(rewardsCss.includes('@media (max-width: 680px)') &&
   'Rewards subsite must have responsive, reduced-motion and shared focus contracts');
 assert.ok(browserUat.includes("name: 'public-awards-mobile'") &&
   browserUat.includes("name: 'public-monthly-prizes-mobile'") &&
+  browserUat.includes("name: 'public-month-detail-mobile'") &&
+  browserUat.includes("name: 'public-month-detail-desktop'") &&
   browserUat.includes('scenario.requireRewardNav'),
   'Browser UAT must exercise rewards and prize pages on mobile');
 assert.equal((homepage.match(/<details className="mm-home-faq-item"/g) || []).length, 1,

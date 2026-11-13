@@ -173,7 +173,12 @@ smoke_frontends() {
   expect_body_text "${member_base_url}/rewards" "RECOGNITION THAT INSPIRES"
   expect_body_text "${member_base_url}/rewards" "New qualified direct"
   expect_body_text "${member_base_url}/rewards" "Gold and Diamond monthly rewards are mutually exclusive"
-  expect_body_text "${member_base_url}/rewards/monthly-prizes" "Not an official prize announcement"
+  expect_body_text "${member_base_url}/rewards/monthly-prizes" "View Details"
+  expect_status 200 "${member_base_url}/rewards/monthly-prizes/1"
+  expect_status 200 "${member_base_url}/rewards/monthly-prizes/18"
+  expect_status 404 "${member_base_url}/rewards/monthly-prizes/61"
+  expect_body_text "${member_base_url}/rewards/monthly-prizes/1" "Month 01"
+  expect_status 404 "${member_base_url}/api/public-prize-media/invalid"
 
   expect_status 307 "${admin_base_url}/operations"
   expect_status 307 "${admin_base_url}/business-plan"
