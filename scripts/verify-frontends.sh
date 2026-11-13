@@ -168,6 +168,10 @@ smoke_frontends() {
   expect_post_form "${member_base_url}/login"
   expect_body_text "${member_base_url}/" "MegaGoldenClub"
   expect_body_absent "${member_base_url}/" "${LEGACY_UI_BRAND}"
+  expect_status 200 "${member_base_url}/rewards"
+  expect_status 200 "${member_base_url}/rewards/monthly-prizes"
+  expect_body_text "${member_base_url}/rewards" "RECOGNITION THAT INSPIRES"
+  expect_body_text "${member_base_url}/rewards/monthly-prizes" "Not an official prize announcement"
 
   expect_status 307 "${admin_base_url}/operations"
   expect_status 307 "${admin_base_url}/business-plan"

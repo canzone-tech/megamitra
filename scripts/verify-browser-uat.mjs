@@ -811,6 +811,26 @@ async function main() {
 
   const scenarios = [
     {
+      name: 'public-awards-desktop',
+      baseUrl: memberBaseUrl, path: '/rewards', width: 1440, height: 1000,
+      mobile: false, expectedTexts: ['Awards & Rewards.', 'Explore monthly prizes', 'not an official, live prize announcement'],
+    },
+    {
+      name: 'public-awards-mobile',
+      baseUrl: memberBaseUrl, path: '/rewards', width: 390, height: 844,
+      mobile: true, expectedTexts: ['Awards & Rewards.', 'Explore monthly prizes'],
+    },
+    {
+      name: 'public-monthly-prizes-desktop',
+      baseUrl: memberBaseUrl, path: '/rewards/monthly-prizes', width: 1440, height: 1000,
+      mobile: false, expectedTexts: ['Monthly Lucky Draw', 'MONTH 01', 'MONTH 18', 'Not an official prize announcement'],
+    },
+    {
+      name: 'public-monthly-prizes-mobile',
+      baseUrl: memberBaseUrl, path: '/rewards/monthly-prizes', width: 390, height: 844,
+      mobile: true, expectedTexts: ['Monthly Lucky Draw', 'MONTH 01', 'MONTH 18'],
+    },
+    {
       name: 'public-home-cursor-mobile',
       baseUrl: memberBaseUrl,
       path: '/',

@@ -13,6 +13,11 @@ const styles = read('frontend/app/landing.css');
 const layout = read('frontend/app/layout.tsx');
 const motion = read('frontend/components/homepage-motion.tsx');
 const browserUat = read('scripts/verify-browser-uat.mjs');
+const awardsPage = read('frontend/app/rewards/page.tsx');
+const monthlyPage = read('frontend/app/rewards/monthly-prizes/page.tsx');
+const rewardsLayout = read('frontend/app/rewards/layout.tsx');
+const rewardsCss = read('frontend/app/rewards/rewards.css');
+const prizePreview = read('frontend/app/rewards/prize-preview.ts');
 
 assert.ok(layout.includes("import './landing.css'"), 'Homepage styles must be included in production build');
 assert.ok(homepage.includes("export const metadata: Metadata"), 'Homepage must provide its own SEO title/description');
@@ -35,7 +40,7 @@ for (const fragment of [
 ]) {
   assert.ok(homepage.includes(fragment), 'Homepage contract missing: ' + fragment);
 }
-for (const route of ['/login', '/signup', '/forgot-password']) {
+for (const route of ['/login', '/signup', '/forgot-password', '/rewards', '/rewards/monthly-prizes']) {
   assert.ok(homepage.includes('href="' + route + '"'), 'Missing member navigation: ' + route);
 }
 for (const match of homepage.matchAll(/href="([^"]+)"/g)) {
@@ -43,9 +48,41 @@ for (const match of homepage.matchAll(/href="([^"]+)"/g)) {
   if (path.startsWith('#')) {
     assert.ok(homepage.includes('id="' + path.slice(1) + '"'), 'Broken anchor: ' + path);
   } else {
-    assert.ok(['/', '/login', '/signup', '/forgot-password'].includes(path), 'Unsupported landing route: ' + path);
+    assert.ok(['/', '/login', '/signup', '/forgot-password', '/rewards', '/rewards/monthly-prizes'].includes(path), 'Unsupported landing route: ' + path);
   }
 }
+assert.ok(rewardsLayout.includes("import './rewards.css'") &&
+  rewardsLayout.includes('aria-label="Primary navigation"') &&
+  rewardsLayout.includes('href="/rewards/monthly-prizes"') &&
+  rewardsLayout.includes('href="/login"'),
+  'Public rewards pages must share site styling and accessible, functional navigation');
+assert.ok(awardsPage.includes("Awards &amp; <span>Rewards.") &&
+  awardsPage.includes("Lightning Start") &&
+  awardsPage.includes("Explore monthly prizes") &&
+  awardsPage.includes('Actual prizes, qualified rewards and dates'),
+  'Awards page content must remain visible and link to monthly prize preview');
+assert.ok(awardsPage.includes('not an official, live prize announcement') &&
+  monthlyPage.includes('Not an official prize announcement') &&
+  monthlyPage.includes('Flyer concept • Not confirmed') &&
+  monthlyPage.includes('Holding a token does not guarantee a prize'),
+  'Public pages must clearly distinguish the flyer from official published prize data');
+assert.ok(!/apiJson|fetch\(|sessionStorage|localStorage|admin\/owner-portal/.test(awardsPage + monthlyPage),
+  'Public rewards pages must not access private member/admin prize data');
+assert.ok(prizePreview.includes('NOT an authoritative prize table') &&
+  prizePreview.includes('flyerPrizeConcepts') &&
+  !/nominalValue|winnerCount|drawAt|token/.test(prizePreview.split('export const flyerPrizeConcepts')[1]),
+  'Flyer concepts may not invent official prize values, winners, dates or tokens');
+const months = [...prizePreview.matchAll(/\{ month: (\d+),/g)].map((match) => Number(match[1]));
+assert.deepEqual(months, Array.from({ length: 18 }, (_, i) => i + 1),
+  'Monthly flyer concept must have exactly one card for each of 18 months');
+assert.ok(rewardsCss.includes('@media (max-width: 680px)') &&
+  rewardsCss.includes(':focus-visible') &&
+  rewardsCss.includes('prefers-reduced-motion') &&
+  rewardsLayout.includes('mm-rewards-site'),
+  'Rewards subsite must have responsive, reduced-motion and shared focus contracts');
+assert.ok(browserUat.includes("name: 'public-awards-mobile'") &&
+  browserUat.includes("name: 'public-monthly-prizes-mobile'"),
+  'Browser UAT must exercise rewards and prize pages on mobile');
 assert.equal((homepage.match(/<details className="mm-home-faq-item"/g) || []).length, 1,
   'FAQs must use accessible native details/summary, not JS-only state');
 assert.ok(!/localStorage|sessionStorage|fetch\(|useEffect|useState|window\./.test(homepage),

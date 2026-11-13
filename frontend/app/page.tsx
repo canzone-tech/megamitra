@@ -81,7 +81,7 @@ export default function HomePage() {
           </Link>
           <nav className="mm-home-nav" aria-label="Primary navigation">
             <a href="#how-it-works">How it works</a>
-            <a className="mm-home-nav-optional" href="#rewards">Rewards</a>
+            <Link className="mm-home-nav-optional" href="/rewards">Awards &amp; Rewards</Link>
             <a className="mm-home-nav-optional" href="#questions">FAQs</a>
             <Link className="mm-home-nav-login" href="/login">Member login <HomeIcon name="arrow" size={16} /></Link>
           </nav>
@@ -164,6 +164,10 @@ export default function HomePage() {
                   <p>{description}</p>
                 </article>
               ))}
+            </div>
+            <div className="mm-home-rewards-actions">
+              <Link href="/rewards" className="mm-home-btn mm-home-btn-white">Explore Awards &amp; Rewards <HomeIcon name="arrow" size={17} /></Link>
+              <Link href="/rewards/monthly-prizes" className="mm-home-rewards-monthly-link">Monthly prize preview <HomeIcon name="arrow" size={17} /></Link>
             </div>
             <p className="mm-home-rewards-disclaimer">Prize types, eligibility, entitlements and draw schedules depend on your season&apos;s published rules and your account records. No prize or reward is guaranteed.</p>
           </div>
@@ -262,7 +266,7 @@ export default function HomePage() {
       <footer className="mm-home-footer">
         <div className="mm-home-footer-upper">
           <Link className="mm-home-brand mm-home-brand-footer" href="/" aria-label="MegaGoldenClub home"><span className="mm-brand-mark" aria-hidden="true">M</span><span>Mega<span className="mm-home-brand-accent">GoldenClub</span><small>MEMBER EXPERIENCE</small></span></Link>
-          <nav aria-label="Footer navigation"><Link href="/signup">Registration</Link><Link href="/login">Member login</Link><Link href="/forgot-password">Account recovery</Link><a href="#questions">FAQs</a></nav>
+          <nav aria-label="Footer navigation"><Link href="/signup">Registration</Link><Link href="/login">Member login</Link><Link href="/forgot-password">Account recovery</Link><Link href="/rewards">Awards &amp; Rewards</Link><Link href="/rewards/monthly-prizes">Monthly prizes</Link><a href="#questions">FAQs</a></nav>
         </div>
         <div className="mm-home-footer-lower">
           <span>© {new Date().getFullYear()} MegaGoldenClub. Member participation portal.</span>

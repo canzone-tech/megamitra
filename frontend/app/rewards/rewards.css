@@ -1,0 +1,148 @@
+/* Public rewards subsite: inherits the shared MegaGoldenClub tokens + homepage brand. */
+.mm-rewards-site { --reward-gold: var(--home-gold); --reward-ink: var(--home-navy); --reward-pink: var(--mm-magenta-700); min-height: 100vh; }
+.mm-rewards-site .mm-home-nav a[aria-current="page"] { color: #b11f70; }
+.mm-rewards-site a:focus-visible { outline: 3px solid #df9c20; outline-offset: 4px; }
+.mm-rewards-main { background: #fff; }
+.mm-rewards-container { width: min(1240px,calc(100% - 56px)); margin: 0 auto; }
+.mm-rewards-hero, .mm-prizes-hero { position: relative; overflow: hidden; background: radial-gradient(circle at 78% 18%,rgba(83,111,202,.28),transparent 35%), linear-gradient(115deg,#051733,#0b2a60 72%,#11295d); color: white; }
+.mm-rewards-hero::before, .mm-prizes-hero::before { content:''; position:absolute; width:660px; height:660px; right:-210px; top:-340px; border:1px solid rgba(245,197,100,.13); border-radius:50%; pointer-events:none; }
+.mm-rewards-hero-inner { min-height: 590px; display:grid; grid-template-columns:minmax(0,1.15fr) minmax(340px,.85fr); gap:50px; align-items:center; padding:85px 0 95px; }
+.mm-rewards-hero-copy { position:relative; z-index:1; }
+.mm-rewards-eyebrow { display:inline-flex; align-items:center; gap:10px; color:#f5c771; font-size:11px; letter-spacing:.19em; font-weight:900; }
+.mm-rewards-eyebrow > span { font-size:18px; letter-spacing:0; }
+.mm-rewards-hero h1, .mm-prizes-hero h1 { margin:22px 0 20px; font-size:clamp(45px,5vw,70px); line-height:1.11; font-weight:850; letter-spacing:-.055em; color:#fff; }
+.mm-rewards-hero h1 span, .mm-prizes-hero h1 span { color:#f6c66d; }
+.mm-rewards-hero-copy > p:not(.mm-rewards-hero-note) { max-width:660px; color:#c9d8ed; font-size:17px; line-height:1.85; }
+.mm-rewards-actions { display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-top:29px; }
+.mm-rewards-button { display:inline-flex; align-items:center; justify-content:center; gap:14px; min-height:49px; padding:12px 21px; font-size:13px; line-height:1.3; font-weight:850; text-decoration:none; border-radius:12px; transition:transform .18s ease,box-shadow .18s ease; }
+.mm-rewards-button:hover { transform:translateY(-2px); }
+.mm-rewards-button-primary { color:#122544; background:linear-gradient(110deg,#ffdfa1,#f1ba57); box-shadow:0 8px 28px rgba(241,190,92,.18); }
+.mm-rewards-button-outline { color:#fff; border:1px solid #7388ae; background:rgba(255,255,255,.06); }
+.mm-rewards-button-dark { color:#fff; background:#0d326d; }
+.mm-rewards-hero-note { max-width:650px; margin-top:25px; color:#a6bcda; font-size:12px; line-height:1.65; }
+.mm-rewards-hero-visual { position:relative; display:grid; place-items:center; min-height:440px; color:#ffd88b; isolation:isolate; }
+.mm-rewards-visual-ring { position:absolute; width:380px; aspect-ratio:1; border:1px solid rgba(246,198,109,.25); border-radius:50%; }
+.mm-rewards-visual-ring-inner { width:290px; background:radial-gradient(circle,rgba(237,174,63,.12),rgba(237,174,63,0) 75%); }
+.mm-rewards-visual-ring-outer { box-shadow:0 0 95px rgba(247,197,88,.07); }
+.mm-rewards-trophy { width: min(270px,70%); filter:drop-shadow(0 20px 40px rgba(255,190,74,.16)); }
+.mm-rewards-visual-star { position:absolute; color:#f9d58c; font-size:30px; }
+.mm-rewards-visual-star-one { top:14%; left:24%; }
+.mm-rewards-visual-star-two { top:24%; right:10%; font-size:20px; }
+.mm-rewards-visual-star-three { bottom:22%; right:20%; font-size:17px; }
+.mm-rewards-visual-caption { position:absolute; bottom:5%; text-align:center; font-size:10px; letter-spacing:.19em; color:#9cb8e3; font-weight:800; }
+.mm-rewards-section, .mm-prizes-section { padding:93px 0 105px; }
+.mm-rewards-section-head { max-width:770px; }
+.mm-rewards-kicker { display:inline-block; font-size:11px; letter-spacing:.18em; color:#a4711b; font-weight:900; }
+.mm-rewards-section-head h2, .mm-rewards-monthly-feature h2 { margin:14px 0; color:#102848; font-size:clamp(33px,3.6vw,49px); line-height:1.14; letter-spacing:-.045em; }
+.mm-rewards-section-head h2 span, .mm-rewards-monthly-feature h2 span { color:#b91971; }
+.mm-rewards-section-head > p { max-width:730px; margin:0; color:#5e6d83; font-size:15px; line-height:1.8; }
+.mm-rewards-pathways { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px; margin-top:42px; }
+.mm-rewards-pathway { padding:29px; border:1px solid #e5ebf4; background:#fff; border-radius:20px; box-shadow:0 12px 32px rgba(17,38,75,.045); }
+.mm-rewards-pathway-top { display:flex; justify-content:space-between; align-items:center; color:#d4dfed; font-size:28px; font-weight:850; }
+.mm-rewards-pathway-top > span:last-child { color:#d29b31; }
+.mm-rewards-pathway-label { display:block; margin:19px 0 8px; font-size:10px; font-weight:900; color:#b0206c; letter-spacing:.1em; text-transform:uppercase; }
+.mm-rewards-pathway h3 { margin:0 0 13px; color:#12315e; font-size:21px; letter-spacing:-.02em; }
+.mm-rewards-pathway p { margin:0; color:#64748b; font-size:13px; line-height:1.78; }
+.mm-rewards-milestones { background:linear-gradient(110deg,#fff8eb,#fffbf6 48%,#fff0f6); padding:88px 0; border-block:1px solid #f2e6e8; }
+.mm-rewards-tier-row { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:14px; margin:35px 0 20px; }
+.mm-rewards-tier { display:grid; justify-items:center; gap:12px; min-width:0; border:1px solid #f0dfe1; border-radius:17px; background:#fff; padding:22px 8px; color:#163257; font-size:13px; text-align:center; }
+.mm-rewards-tier-symbol { display:grid; place-items:center; background:#fff2d7; color:#b58322; width:62px; height:62px; border-radius:50%; font-size:25px; }
+.mm-rewards-tier:nth-child(2) .mm-rewards-tier-symbol { background:#f4e7d8; color:#b06b34; }
+.mm-rewards-tier:nth-child(3) .mm-rewards-tier-symbol { background:#eaf2fb; color:#60788c; }
+.mm-rewards-tier:nth-child(4) .mm-rewards-tier-symbol { background:#fff0cc; color:#ba841a; }
+.mm-rewards-tier:nth-child(5) .mm-rewards-tier-symbol { background:#f7e9f9; color:#a333ad; }
+.mm-rewards-subnote { max-width:850px; margin:18px 0 0; font-size:12px; line-height:1.7; color:#647086; }
+.mm-rewards-monthly-feature { background:#0c2c62; color:white; overflow:hidden; padding:75px 0; }
+.mm-rewards-monthly-feature-inner { display:grid; grid-template-columns:minmax(0,1.15fr) minmax(270px,.85fr); gap:45px; align-items:center; }
+.mm-rewards-monthly-feature h2 { color:#fff; }
+.mm-rewards-monthly-feature h2 span { color:#f6c66d; }
+.mm-rewards-monthly-feature p { max-width:675px; margin:0 0 25px; color:#c9d9ee; font-size:15px; line-height:1.8; }
+.mm-rewards-monthly-feature-art { display:grid; place-items:center; min-height:305px; position:relative; }
+.mm-rewards-gift-box { position:relative; width:140px; height:154px; }
+.mm-rewards-gift-body { position:absolute; left:18px; bottom:12px; width:105px; height:100px; border-radius:8px 8px 13px 13px; background:linear-gradient(135deg,#e53c90,#9b165e); box-shadow:inset 42px 0 rgba(255,255,255,.08),0 25px 50px rgba(0,0,0,.2); }
+.mm-rewards-gift-body::after { position:absolute; content:''; left:46px; inset-block:0; width:16px; background:linear-gradient(#ffe2a7,#e7ab40); }
+.mm-rewards-gift-lid { position:absolute; z-index:2; width:125px; height:27px; left:8px; bottom:109px; border-radius:6px; background:linear-gradient(95deg,#ffc36f,#f0a444); }
+.mm-rewards-gift-knot { position:absolute; z-index:3; left:58px; top:-9px; color:#ffdf9b; font-size:25px; }
+.mm-rewards-monthly-feature-art > strong { position:absolute; top:15px; right:20px; font-size:70px; letter-spacing:-.05em; color:#ffd481; opacity:.48; }
+.mm-rewards-monthly-feature-art > span { position:absolute; bottom:16px; font-size:10px; letter-spacing:.2em; color:#b4c9e6; font-weight:850; }
+.mm-rewards-footer-note { text-align:center; padding:76px 0 92px; }
+.mm-rewards-footer-note h2 { margin:0 0 14px; color:#102848; font-size:32px; letter-spacing:-.035em; }
+.mm-rewards-footer-note p { max-width:770px; margin:0 auto 24px; color:#63758d; font-size:14px; line-height:1.8; }
+
+/* Monthly prize concept listing; no live prizes or winner data. */
+.mm-prizes-hero-inner { min-height:380px; padding:66px 0; display:grid; align-items:center; grid-template-columns:minmax(0,1fr) 250px; gap:35px; }
+.mm-prizes-back { display:inline-flex; margin-bottom:21px; color:#cfdeef; font-size:13px; font-weight:800; text-decoration:none; }
+.mm-prizes-hero h1 { font-size:clamp(43px,4.3vw,61px); margin:16px 0; }
+.mm-prizes-hero p { margin:0; max-width:750px; font-size:15px; line-height:1.8; color:#c7d5eb; }
+.mm-prizes-hero p.mm-prizes-hero-disclaimer { margin-top:19px; color:#ffe3a7; font-size:12px; }
+.mm-prizes-hero-medallion { position:relative; width:220px; aspect-ratio:1; border-radius:50%; border:1px solid rgba(255,224,168,.32); display:flex; flex-direction:column; align-items:center; justify-content:center; background:radial-gradient(circle,rgba(254,216,149,.22),transparent 75%); color:#ffe4aa; }
+.mm-prizes-hero-medallion > span:first-child { font-size:95px; line-height:1; letter-spacing:-.08em; font-weight:900; }
+.mm-prizes-hero-medallion small { font-size:10px; letter-spacing:.14em; line-height:1.6; font-weight:850; text-align:center; }
+.mm-prizes-hero-twinkle { position:absolute; top:4%; right:8%; font-size:24px; }
+.mm-prizes-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:18px; margin-top:39px; }
+.mm-prizes-card { min-width:0; border:1px solid #e3eaf3; border-radius:19px; overflow:hidden; background:#fff; box-shadow:0 9px 28px rgba(19,43,86,.048); }
+.mm-prizes-card-art { position:relative; overflow:hidden; display:flex; align-items:center; justify-content:center; height:170px; background:radial-gradient(circle at 70% 30%,#e4edff,transparent 45%),linear-gradient(110deg,#eaf3ff,#f5f9ff); color:#1555aa; }
+.mm-prizes-card-art::after { content:''; position:absolute; width:220px; height:220px; border:1px solid rgba(255,255,255,.7); border-radius:50%; left:calc(50% - 110px); top:30px; }
+.mm-prizes-card-art-car { background:linear-gradient(120deg,#fff1e0,#fff9ec); color:#a36b14; }
+.mm-prizes-card-art-bike { background:linear-gradient(120deg,#fce9f4,#fff6fa); color:#b12f79; }
+.mm-prizes-card-art-gold { background:linear-gradient(120deg,#fff4dc,#fff9e9); color:#a17b1b; }
+.mm-prizes-month { position:absolute; z-index:1; top:15px; left:17px; display:inline-block; border:1px solid rgba(50,66,93,.15); border-radius:99px; padding:6px 10px; background:rgba(255,255,255,.75); font-size:10px; letter-spacing:.11em; font-weight:900; color:#243e61; }
+.mm-prizes-icon svg { position:relative; z-index:1; width:91px; height:91px; filter:drop-shadow(0 9px 12px rgba(15,30,80,.07)); }
+.mm-prizes-art-shine { position:absolute; z-index:1; right:23px; top:50%; font-size:26px; color:#d5a64c; }
+.mm-prizes-card-copy { padding:22px 23px 25px; }
+.mm-prizes-concept-label { display:block; color:#a26619; font-size:10px; font-weight:900; letter-spacing:.08em; text-transform:uppercase; }
+.mm-prizes-card h3 { font-size:18px; letter-spacing:-.025em; color:#112c52; line-height:1.35; margin:11px 0 9px; }
+.mm-prizes-card p { margin:0; color:#63758a; font-size:13px; line-height:1.65; }
+.mm-prizes-terms { display:grid; grid-template-columns:75px minmax(0,1fr); gap:25px; background:#fff8eb; padding:34px; border:1px solid #f0e2c5; border-radius:20px; margin-bottom:90px; }
+.mm-prizes-terms-icon { display:grid; place-items:center; width:64px; height:64px; border-radius:50%; background:#ffedc5; font-size:32px; color:#ac7b21; }
+.mm-prizes-terms h2 { margin:0 0 12px; color:#122e55; font-size:24px; }
+.mm-prizes-terms p { margin:0 0 15px; color:#607189; font-size:13px; line-height:1.75; }
+.mm-prizes-terms .mm-rewards-button { margin-top:7px; }
+
+@media (hover: hover) and (pointer: fine) {
+  .mm-rewards-pathway, .mm-prizes-card { transition:transform .2s ease,box-shadow .2s ease; }
+  .mm-rewards-pathway:hover, .mm-prizes-card:hover { transform:translateY(-4px); box-shadow:0 18px 38px rgba(22,45,84,.1); }
+}
+@media (max-width: 900px) {
+  .mm-rewards-hero-inner { grid-template-columns:1fr; padding:76px 0; gap:15px; }
+  .mm-rewards-hero-visual { min-height:280px; }
+  .mm-rewards-visual-ring { width:270px; }
+  .mm-rewards-visual-ring-inner { width:205px; }
+  .mm-rewards-pathways { gap:12px; }
+  .mm-rewards-tier-row { grid-template-columns:repeat(3,minmax(0,1fr)); }
+  .mm-rewards-monthly-feature-inner { grid-template-columns:1fr; }
+  .mm-rewards-monthly-feature-art { min-height:240px; }
+  .mm-prizes-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+@media (max-width: 680px) {
+  .mm-rewards-container { width:calc(100% - 36px); }
+  .mm-rewards-hero-inner { padding:66px 0 57px; }
+  .mm-rewards-hero h1 { font-size:clamp(38px,10vw,52px); }
+  .mm-rewards-hero-copy > p:not(.mm-rewards-hero-note) { font-size:15px; }
+  .mm-rewards-actions { flex-direction:column; align-items:stretch; }
+  .mm-rewards-button { width:100%; }
+  .mm-rewards-hero-visual { min-height:240px; }
+  .mm-rewards-visual-ring { width:220px; }
+  .mm-rewards-visual-ring-inner { width:165px; }
+  .mm-rewards-trophy { width:155px; }
+  .mm-rewards-section, .mm-prizes-section { padding:67px 0; }
+  .mm-rewards-section-head h2 { font-size:clamp(32px,8vw,41px); }
+  .mm-rewards-pathways { grid-template-columns:1fr; margin-top:25px; }
+  .mm-rewards-pathway { padding:25px; }
+  .mm-rewards-milestones { padding:64px 0; }
+  .mm-rewards-tier-row { grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+  .mm-rewards-monthly-feature { padding:60px 0; }
+  .mm-rewards-monthly-feature-art { min-height:220px; }
+  .mm-rewards-footer-note { padding:62px 0; }
+  .mm-prizes-hero-inner { grid-template-columns:1fr; padding:52px 0; }
+  .mm-prizes-hero h1 { font-size:clamp(37px,9vw,51px); }
+  .mm-prizes-hero-medallion { width:150px; }
+  .mm-prizes-hero-medallion > span:first-child { font-size:65px; }
+  .mm-prizes-grid { grid-template-columns:1fr; gap:13px; }
+  .mm-prizes-card-art { height:150px; }
+  .mm-prizes-card-copy { padding:21px; }
+  .mm-prizes-terms { grid-template-columns:1fr; gap:16px; padding:25px; margin-bottom:65px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mm-rewards-site *, .mm-rewards-site *::before, .mm-rewards-site *::after { animation:none !important; transition:none !important; }
+}
