@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import type { ReactNode } from 'react';
 import Link from 'next/link';
 
 export const metadata: Metadata = {
@@ -12,13 +13,26 @@ const recognition = [
   { number: '03', label: 'Member product benefits', title: 'Meaningful benefits, clearly recorded', description: 'Any granted product entitlement is recorded against your account, separate from a possible lucky draw prize.' },
 ] as const;
 
+type MilestoneIconName = 'bolt' | 'bronze' | 'silver' | 'gold' | 'diamond';
+
 const milestones = [
-  { name: 'Lightning Start', symbol: '✦' },
-  { name: 'Bronze', symbol: '◆' },
-  { name: 'Silver', symbol: '✧' },
-  { name: 'Gold', symbol: '★' },
-  { name: 'Diamond', symbol: '◇' },
-] as const;
+  { name: 'Lightning Start', icon: 'bolt' },
+  { name: 'Bronze', icon: 'bronze' },
+  { name: 'Silver', icon: 'silver' },
+  { name: 'Gold', icon: 'gold' },
+  { name: 'Diamond', icon: 'diamond' },
+] as const satisfies ReadonlyArray<{ name: string; icon: MilestoneIconName }>;
+
+function MilestoneIcon({ name }: { name: MilestoneIconName }) {
+  const paths: Record<MilestoneIconName, ReactNode> = {
+    bolt: <path d="M13 2 5 13h7l-1 9 8-11h-7l1-9Z" />,
+    bronze: <><circle cx="12" cy="12" r="8" /><path d="m9 8 3 2 3-2M9 16l3-2 3 2" /></>,
+    silver: <><path d="m12 2 2.8 6.9L22 12l-7.2 3.1L12 22l-2.8-6.9L2 12l7.2-3.1L12 2Z" /></>,
+    gold: <><path d="M6 3h12v9a6 6 0 0 1-12 0V3ZM6 5H3v4a4 4 0 0 0 4 4m11-8h3v4a4 4 0 0 1-4 4M12 18v3m-5 0h10" /></>,
+    diamond: <><path d="M3 9 8 3h8l5 6-9 12L3 9Z" /><path d="M3 9h18M8 3l4 18 4-18" /></>,
+  };
+  return <svg aria-hidden="true" width="29" height="29" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">{paths[name]}</svg>;
+}
 
 export default function AwardsAndRewardsPage() {
   return (
@@ -79,7 +93,7 @@ export default function AwardsAndRewardsPage() {
           <div className="mm-rewards-tier-row">
             {milestones.map((tier) => (
               <div className="mm-rewards-tier" key={tier.name}>
-                <span className="mm-rewards-tier-symbol" aria-hidden="true">{tier.symbol}</span>
+                <span className="mm-rewards-tier-symbol" aria-hidden="true"><MilestoneIcon name={tier.icon} /></span>
                 <strong>{tier.name}</strong>
               </div>
             ))}

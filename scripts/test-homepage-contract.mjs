@@ -56,6 +56,10 @@ assert.ok(rewardsLayout.includes("import './rewards.css'") &&
   rewardsLayout.includes('href="/rewards/monthly-prizes"') &&
   rewardsLayout.includes('href="/login"'),
   'Public rewards pages must share site styling and accessible, functional navigation');
+assert.ok(awardsPage.includes("function MilestoneIcon") &&
+  awardsPage.includes("<MilestoneIcon name={tier.icon} />") &&
+  !/symbol:\\s*['"](?:◆|★|◇)['"]/.test(awardsPage),
+  'Milestone awards must use real vector icons rather than typographic placeholders');
 assert.ok(awardsPage.includes("Awards &amp; <span>Rewards.") &&
   awardsPage.includes("Lightning Start") &&
   awardsPage.includes("Explore monthly prizes") &&
