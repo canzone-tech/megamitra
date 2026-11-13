@@ -96,6 +96,8 @@ assert.ok(styles.includes('.mm-home-cursor-trail') &&
   'Cursor sparkles must never intercept clicks or appear on touch/reduced-motion devices');
 assert.ok(browserUat.includes("name: 'public-home-cursor-desktop'") &&
   browserUat.includes("scenario.verifyHomepageCursor") &&
+  browserUat.includes("Page.addScriptToEvaluateOnNewDocument") &&
+  browserUat.includes("Headless Chrome has no physical pointing device") &&
   browserUat.includes("Emulation.setEmulatedMedia") &&
   browserUat.includes("pointerType: 'touch'"),
   'Browser UAT must exercise the real cursor effect, touch bypass, and reduced-motion switch');

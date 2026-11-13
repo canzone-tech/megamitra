@@ -316,6 +316,28 @@ async function runScenario(debugPort, scenario) {
       await setAccessCookie(client, scenario.baseUrl, scenario.cookieName, scenario.token);
     }
 
+    if (scenario.verifyHomepageCursor) {
+      // Headless Chrome has no physical pointing device and reports (pointer: none)
+      // despite desktop viewport dimensions. Simulate a fine mouse capability for
+      // this single UI contract test, without weakening production feature gating.
+      // The actual CSS rendering still requires manual desktop visual UAT.
+      await client.send('Page.addScriptToEvaluateOnNewDocument', {
+        source: `(() => {
+          const nativeMatchMedia = window.matchMedia.bind(window);
+          window.matchMedia = (query) => {
+            const result = nativeMatchMedia(query);
+            if (query !== '(hover: hover) and (pointer: fine)') return result;
+            return {
+              media: result.media,
+              matches: true,
+              addEventListener: result.addEventListener.bind(result),
+              removeEventListener: result.removeEventListener.bind(result),
+            };
+          };
+        })()`,
+      });
+    }
+
     const url = `${scenario.baseUrl}${scenario.path}`;
     const navigation = await client.send('Page.navigate', { url });
     if (navigation.errorText) throw new Error(`${scenario.name} navigation failed: ${navigation.errorText}`);
