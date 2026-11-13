@@ -19,11 +19,11 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
-      SOURCE_SHA: 5cc5b98f4b45e40d38906a153aafcbb3e2b28a70
-      BACKEND_RUN: '38528081726'
-      FRONTEND_RUN: '38528081771'
-      EVIDENCE_RUN: '38528081756'
-      RELEASE_TAG: runtime-5cc5b98f4b45e40d38906a153aafcbb3e2b28a70
+      SOURCE_SHA: 675148b454299238383c002e176cd24bd60d6dad
+      BACKEND_RUN: '43421564396'
+      FRONTEND_RUN: '43421564419'
+      EVIDENCE_RUN: '43421564482'
+      RELEASE_TAG: runtime-675148b454299238383c002e176cd24bd60d6dad
       GH_TOKEN: ${{ github.token }}
 
     steps:
