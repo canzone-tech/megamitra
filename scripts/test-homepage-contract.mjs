@@ -62,7 +62,7 @@ assert.ok(homepage.includes('<HomepageMotion />') &&
   motion.includes("getBoundingClientRect().top") &&
   motion.includes("observer.disconnect()"),
   'Homepage reveals must be progressive, bounded, and cleaned up');
-assert.ok(!/setInterval|Math\\.random|canvas|getUserMedia|requestAnimationFrame/.test(motion),
+assert.ok(!/setInterval|Math\.random|canvas|getUserMedia|requestAnimationFrame/.test(motion),
   'Homepage motion must not add perpetual JS animation loops or dynamic randomness');
 for (const name of ['sparkle-twinkle', 'ambient-drift', 'preview-float', 'trust-ring', 'reveal-in']) {
   assert.ok(styles.includes('@keyframes mm-home-' + name), 'Missing motion keyframes: ' + name);
