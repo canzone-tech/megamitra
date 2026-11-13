@@ -345,6 +345,54 @@ async function runScenario(debugPort, scenario) {
       }
     }
 
+
+    if (scenario.verifyHomepageCursor) {
+      await waitForExpression(client, 'Boolean(document.querySelector(".mm-home-cursor-trail"))',
+        'homepage cursor layer mounted after hydration');
+      const enabled = await evaluate(client,
+        "matchMedia('(hover: hover) and (pointer: fine)').matches && !matchMedia('(prefers-reduced-motion: reduce)').matches");
+      if (!enabled) throw new Error('Desktop Chrome UAT is not in fine-pointer, full-motion mode');
+
+      await evaluate(client, `(() => {
+        const target = document.querySelector('.mm-home-hero');
+        target.dispatchEvent(new PointerEvent('pointermove', {
+          bubbles: true, isPrimary: true, pointerType: 'mouse', clientX: 380, clientY: 320,
+        }));
+      })()`);
+      await waitForExpression(client, 'document.querySelectorAll(".mm-home-cursor-spark").length === 2',
+        'mouse motion creates exactly two bounded golden particles');
+      const trailSafety = await evaluate(client, `(() => {
+        const layer = document.querySelector('.mm-home-cursor-trail');
+        return { hiddenFromAT: layer?.getAttribute('aria-hidden') === 'true',
+          pointerTransparent: getComputedStyle(layer).pointerEvents === 'none' };
+      })()`);
+      if (!trailSafety.hiddenFromAT || !trailSafety.pointerTransparent) {
+        throw new Error('Homepage cursor trail must be decorative and click-through');
+      }
+      await evaluate(client, `(() => {
+        document.querySelector('.mm-home-hero').dispatchEvent(new PointerEvent('pointermove', {
+          bubbles: true, isPrimary: true, pointerType: 'touch', clientX: 520, clientY: 390,
+        }));
+      })()`);
+      const afterTouch = await evaluate(client, 'document.querySelectorAll(".mm-home-cursor-spark").length');
+      if (afterTouch !== 2) throw new Error('Touch motion unexpectedly emitted desktop cursor sparkles');
+
+      await client.send('Emulation.setEmulatedMedia', {
+        features: [{ name: 'prefers-reduced-motion', value: 'reduce' }],
+      });
+      await waitForExpression(client,
+        'matchMedia("(prefers-reduced-motion: reduce)").matches && document.querySelectorAll(".mm-home-cursor-spark").length === 0',
+        'reduced-motion clears active golden particles');
+      await evaluate(client, `(() => {
+        document.querySelector('.mm-home-hero').dispatchEvent(new PointerEvent('pointermove', {
+          bubbles: true, isPrimary: true, pointerType: 'mouse', clientX: 570, clientY: 410,
+        }));
+      })()`);
+      const reducedCount = await evaluate(client, 'document.querySelectorAll(".mm-home-cursor-spark").length');
+      if (reducedCount !== 0) throw new Error('Reduced motion still emitted cursor sparkles');
+      await client.send('Emulation.setEmulatedMedia', { features: [] });
+    }
+
     if (scenario.verifyQrUpload) {
       await waitForExpression(client,
         'Boolean(document.querySelector("input[type=file][accept*=image]") && document.querySelector("input[name=upiId]"))',
@@ -742,6 +790,16 @@ async function main() {
   await waitForJson(`http://127.0.0.1:${debugPort}/json/version`, chrome);
 
   const scenarios = [
+    {
+      name: 'public-home-cursor-desktop',
+      baseUrl: memberBaseUrl,
+      path: '/',
+      width: 1440,
+      height: 1000,
+      mobile: false,
+      expectedTexts: ['Your membership.', 'Brighter moments.', 'No reward is guaranteed'],
+      verifyHomepageCursor: true,
+    },
     {
       name: 'admin-dashboard-desktop',
       baseUrl: adminBaseUrl,

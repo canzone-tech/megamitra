@@ -12,6 +12,7 @@ const homepage = read('frontend/app/page.tsx');
 const styles = read('frontend/app/landing.css');
 const layout = read('frontend/app/layout.tsx');
 const motion = read('frontend/components/homepage-motion.tsx');
+const browserUat = read('scripts/verify-browser-uat.mjs');
 
 assert.ok(layout.includes("import './landing.css'"), 'Homepage styles must be included in production build');
 assert.ok(homepage.includes("export const metadata: Metadata"), 'Homepage must provide its own SEO title/description');
@@ -62,6 +63,43 @@ assert.ok(homepage.includes('<HomepageMotion />') &&
   motion.includes("getBoundingClientRect().top") &&
   motion.includes("observer.disconnect()"),
   'Homepage reveals must be progressive, bounded, and cleaned up');
+
+assert.ok(motion.includes("home.addEventListener('pointermove', onPointerMove, { passive: true })") &&
+  motion.includes("home.removeEventListener('pointermove', onPointerMove)") &&
+  motion.includes("event.pointerType !== 'mouse'") &&
+  motion.includes("event.isPrimary") &&
+  motion.includes("document.hidden") &&
+  motion.includes("CURSOR_MAX_PARTICLES") &&
+  motion.includes("CURSOR_EMIT_INTERVAL_MS") &&
+  motion.includes("CURSOR_MIN_DISTANCE_PX") &&
+  motion.includes("activeParticles.size >= CURSOR_MAX_PARTICLES") &&
+  motion.includes("sparkle.addEventListener('animationend'") &&
+  motion.includes("clearParticles();") &&
+  motion.includes("layer.remove()"),
+  'Cursor particles must be mouse-only, throttled, bounded, and cleaned up');
+for (const capability of [
+  "'(hover: hover) and (pointer: fine)'",
+  "'(prefers-reduced-motion: reduce)'",
+  "finePointer.addEventListener('change'",
+  "reducedMotion.addEventListener('change'",
+  "document.addEventListener('visibilitychange'",
+  "finePointer.removeEventListener('change'",
+  "reducedMotion.removeEventListener('change'",
+]) {
+  assert.ok(motion.includes(capability), 'Cursor effect missing responsive motion control: ' + capability);
+}
+assert.ok(styles.includes('.mm-home-cursor-trail') &&
+  styles.includes('pointer-events: none;') &&
+  styles.includes('@keyframes mm-home-cursor-scatter') &&
+  styles.includes('@media (hover: none), (pointer: coarse)') &&
+  styles.includes('.mm-home-cursor-trail { display: none !important; }'),
+  'Cursor sparkles must never intercept clicks or appear on touch/reduced-motion devices');
+assert.ok(browserUat.includes("name: 'public-home-cursor-desktop'") &&
+  browserUat.includes("scenario.verifyHomepageCursor") &&
+  browserUat.includes("Emulation.setEmulatedMedia") &&
+  browserUat.includes("pointerType: 'touch'"),
+  'Browser UAT must exercise the real cursor effect, touch bypass, and reduced-motion switch');
+
 assert.ok(!/setInterval|Math\.random|canvas|getUserMedia|requestAnimationFrame/.test(motion),
   'Homepage motion must not add perpetual JS animation loops or dynamic randomness');
 for (const name of ['sparkle-twinkle', 'ambient-drift', 'preview-float', 'trust-ring', 'reveal-in']) {
