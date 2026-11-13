@@ -829,7 +829,7 @@ async function main() {
       name: 'public-awards-desktop',
       requireRewardNav: true,
       baseUrl: memberBaseUrl, path: '/rewards', width: 1440, height: 1000,
-      mobile: false, expectedTexts: ['Awards & Rewards.', 'Explore monthly prizes', 'not an official, live prize announcement', 'New qualified direct', 'Shimla family trip'],
+      mobile: false, expectedTexts: ['Awards & Rewards.', 'Explore monthly prizes', 'Admin Prize Catalogue', 'New qualified direct', 'Shimla family trip'],
     },
     {
       name: 'public-awards-mobile',
