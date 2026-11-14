@@ -1,4 +1,5 @@
 'use client';
+import { PasswordInput } from '@/components/password-input';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -114,8 +115,8 @@ export function ResetPasswordForm({ token }: { token: string }) {
   if (!token) return <div className="mm-error">This password reset link is incomplete. Please request a new reset link.</div>;
   return (
     <form method="post" onSubmit={submit}>
-      <div className="mm-field"><label htmlFor="new-password">New password</label><input className="mm-input" id="new-password" type="password" autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} required /></div>
-      <div className="mm-field"><label htmlFor="confirm-password">Confirm new password</label><input className="mm-input" id="confirm-password" type="password" autoComplete="new-password" value={confirm} onChange={(event) => setConfirm(event.target.value)} required /></div>
+      <div className="mm-field"><label htmlFor="new-password">New password</label><PasswordInput label="New password" className="mm-input" id="new-password" autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} required /></div>
+      <div className="mm-field"><label htmlFor="confirm-password">Confirm new password</label><PasswordInput label="Confirm new password" className="mm-input" id="confirm-password" autoComplete="new-password" value={confirm} onChange={(event) => setConfirm(event.target.value)} required /></div>
       {result ? <div className={result.tone === 'success' ? 'mm-success' : 'mm-error'} role="status">{result.message}</div> : null}
       <button className="mm-button" type="submit" disabled={busy}>{busy ? 'Resetting…' : 'Reset password'}</button>
     </form>
@@ -213,7 +214,7 @@ export function EmailChangeRequestForm() {
   return (
     <form method="post" onSubmit={submit}>
       <div className="mm-field"><label htmlFor="new-email">New email</label><input className="mm-input" id="new-email" type="email" autoComplete="email" value={newEmail} onChange={(event) => setNewEmail(event.target.value)} required /></div>
-      <div className="mm-field"><label htmlFor="email-change-password">Current password</label><input className="mm-input" id="email-change-password" type="password" autoComplete="current-password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} required /></div>
+      <div className="mm-field"><label htmlFor="email-change-password">Current password</label><PasswordInput label="Current password" className="mm-input" id="email-change-password" autoComplete="current-password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} required /></div>
       {result ? <div className={result.tone === 'success' ? 'mm-success' : 'mm-error'} role="status">{result.message}</div> : null}
       <button className="mm-button" type="submit" disabled={busy}>{busy ? 'Sending…' : 'Verify new email'}</button>
     </form>

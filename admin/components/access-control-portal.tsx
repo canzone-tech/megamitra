@@ -1,4 +1,5 @@
 'use client';
+import { PasswordInput } from '@/components/password-input';
 
 import { ActionFeedback } from './action-feedback';
 import { useCallback, useEffect, useState } from 'react';
@@ -195,7 +196,7 @@ export function AccessControlPortal({ section }: { section: AccessSection }) {
             <div className={styles.field}><label>Last Name</label><input name="lastName" className={styles.input} /></div>
             <div className={styles.field}><label>Email</label><input name="email" type="email" className={styles.input} /></div>
             <div className={styles.field}><label>Mobile</label><input name="phone" className={styles.input} /></div>
-            <div className={classNames(styles.field, styles.full)}><label>Initial Password</label><input name="password" type="password" autoComplete="new-password" className={styles.input} required /></div>
+            <div className={classNames(styles.field, styles.full)}><label>Initial Password</label><PasswordInput label="Initial password" name="password" autoComplete="new-password" className={styles.input} required /></div>
           </div>
           <div className={styles.notice}>New staff accounts are ACTIVE but must change their initial password before using management tools.</div>
           <div className={styles.buttonLine}><button className={styles.button} disabled={busy}>CREATE ACCOUNT</button></div>

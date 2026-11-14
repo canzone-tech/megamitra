@@ -347,6 +347,60 @@ async function runScenario(debugPort, scenario) {
 
 
 
+    if (scenario.verifyPasswordVisibility) {
+      await waitForExpression(client,
+        `document.querySelectorAll('.mm-password-field').length === ${scenario.verifyPasswordVisibility}`,
+        `${scenario.name} password controls mounted`);
+      // Exercise real client-side React handlers on both desktop and mobile.
+      // No credentials are sent to any API or included in test output.
+      await sleep(150);
+      const checks = await evaluate(client, `(async () => {
+        const fields = [...document.querySelectorAll('.mm-password-field')];
+        const results = [];
+        for (const field of fields) {
+          const input = field.querySelector('input');
+          const toggle = field.querySelector('button');
+          if (!input || !toggle) { results.push({ missingControl: true }); continue; }
+          const originalValue = input.value;
+          const initiallyHidden = input.type === 'password' &&
+            toggle.type === 'button' &&
+            toggle.getAttribute('aria-pressed') === 'false' &&
+            toggle.getAttribute('aria-label')?.startsWith('Show ');
+          const bounds = toggle.getBoundingClientRect();
+          const inputBounds = input.getBoundingClientRect();
+          const isVisible = bounds.width >= 32 && bounds.height >= 32 &&
+            bounds.right <= inputBounds.right + 2 && bounds.left >= inputBounds.left;
+          let revealed = false;
+          let restored = false;
+          if (input.disabled) {
+            revealed = toggle.disabled && input.type === 'password';
+            restored = revealed;
+          } else {
+            toggle.click();
+            await new Promise((resolve) => setTimeout(resolve, 60));
+            revealed = input.type === 'text' &&
+              toggle.getAttribute('aria-pressed') === 'true' &&
+              toggle.getAttribute('aria-label')?.startsWith('Hide ') &&
+              input.value === originalValue;
+            toggle.click();
+            await new Promise((resolve) => setTimeout(resolve, 60));
+            restored = input.type === 'password' &&
+              toggle.getAttribute('aria-pressed') === 'false' &&
+              toggle.getAttribute('aria-label')?.startsWith('Show ') &&
+              input.value === originalValue;
+          }
+          results.push({ initiallyHidden: Boolean(initiallyHidden),
+            isVisible, revealed, restored, hasIcon: Boolean(toggle.querySelector('svg')) });
+        }
+        return results;
+      })()`, true);
+      if (checks.length !== scenario.verifyPasswordVisibility ||
+          checks.some((check) => !check.initiallyHidden || !check.isVisible ||
+            !check.revealed || !check.restored || !check.hasIcon)) {
+        throw new Error(`${scenario.name} password visibility failed: ${JSON.stringify(checks)}`);
+      }
+    }
+
     if (scenario.verifyPrizeImageLayout) {
       // The CI database may have no public prize rows. Render the same media
       // classes with tall and wide synthetic images in the real compiled page,
@@ -896,6 +950,50 @@ async function main() {
 
   const scenarios = [
     {
+      name: 'admin-login-password-desktop', baseUrl: adminBaseUrl, path: '/login',
+      width: 1440, height: 1000, mobile: false,
+      expectedTexts: ['Sign in to continue'], verifyPasswordVisibility: 1,
+    },
+    {
+      name: 'admin-login-password-mobile', baseUrl: adminBaseUrl, path: '/login',
+      width: 390, height: 844, mobile: true,
+      expectedTexts: ['Sign in to continue'], verifyPasswordVisibility: 1,
+    },
+    {
+      name: 'member-login-password-desktop', baseUrl: memberBaseUrl, path: '/login',
+      width: 1440, height: 1000, mobile: false,
+      expectedTexts: ['Welcome back'], verifyPasswordVisibility: 1,
+    },
+    {
+      name: 'member-login-password-mobile', baseUrl: memberBaseUrl, path: '/login',
+      width: 390, height: 844, mobile: true,
+      expectedTexts: ['Welcome back'], verifyPasswordVisibility: 1,
+    },
+    {
+      name: 'member-reset-password-mobile', baseUrl: memberBaseUrl,
+      path: '/reset-password?token=browser-uat-token',
+      width: 390, height: 844, mobile: true,
+      expectedTexts: ['Set a new password'], verifyPasswordVisibility: 2,
+    },
+    {
+      name: 'admin-change-password-desktop', baseUrl: adminBaseUrl, path: '/change-password',
+      cookieName: 'megagoldenclub_admin_access', token: adminToken,
+      width: 1440, height: 1000, mobile: false,
+      expectedTexts: ['Change your password'], verifyPasswordVisibility: 2,
+    },
+    {
+      name: 'member-change-password-mobile', baseUrl: memberBaseUrl, path: '/member/change-password',
+      cookieName: 'megagoldenclub_member_access', token: memberToken,
+      width: 390, height: 844, mobile: true,
+      expectedTexts: ['Choose a new password'], verifyPasswordVisibility: 2,
+    },
+    {
+      name: 'admin-staff-password-desktop', baseUrl: adminBaseUrl, path: '/portal/staff',
+      cookieName: 'megagoldenclub_admin_access', token: adminToken,
+      width: 1440, height: 1000, mobile: false,
+      expectedTexts: ['Initial Password'], verifyPasswordVisibility: 1,
+    },
+    {
       name: 'public-awards-desktop',
       requireRewardNav: true,
       baseUrl: memberBaseUrl, path: '/rewards', width: 1440, height: 1000,
@@ -1064,6 +1162,7 @@ async function main() {
     },
     {
       name: 'public-signup-referral-desktop',
+      verifyPasswordVisibility: 1,
       baseUrl: memberBaseUrl,
       path: '/signup?sponsor=MGC123456',
       width: 1440,
@@ -1074,6 +1173,7 @@ async function main() {
     },
     {
       name: 'public-signup-referral-mobile',
+      verifyPasswordVisibility: 1,
       baseUrl: memberBaseUrl,
       path: '/signup?sponsor=MGC123456',
       width: 390,

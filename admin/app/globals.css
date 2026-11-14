@@ -174,3 +174,15 @@ body {
 .mm-withdrawals-panel .mm-list-row strong{overflow-wrap:anywhere}
 .mm-withdrawals-panel .mm-table-wrap{max-width:100%;overflow-x:auto}
 @media(max-width:700px){.mm-withdrawals-panel .mm-card-head,.mm-withdrawals-panel .mm-hero-row{flex-wrap:wrap}.mm-withdrawals-panel .mm-card-body{padding:14px}.mm-withdrawals-panel .mm-table{min-width:640px}}
+
+
+/* Shared show/hide controls for all password fields, including compact Admin forms. */
+.mm-password-field { position:relative; display:block; width:100%; min-width:0; }
+.mm-password-field-input { padding-right:52px !important; }
+.mm-password-toggle { position:absolute; top:50%; right:6px; transform:translateY(-50%); display:grid; place-items:center; width:40px; height:40px; border:0; border-radius:9px; background:transparent; color:var(--mm-ink-500, #51627b); cursor:pointer; }
+.mm-password-toggle:hover, .mm-password-value-toggle:hover { background:rgba(11,94,199,.08); color:var(--mm-blue-700, #174f99); }
+.mm-password-toggle:focus-visible, .mm-password-value-toggle:focus-visible { outline:3px solid var(--mm-blue-700, #174f99); outline-offset:1px; }
+.mm-password-toggle:disabled { opacity:.45; cursor:not-allowed; }
+.mm-password-value { display:inline-flex; align-items:center; gap:6px; max-width:100%; overflow-wrap:anywhere; }
+.mm-password-value b { overflow-wrap:anywhere; }
+.mm-password-value-toggle { flex:none; display:grid; place-items:center; width:36px; height:36px; padding:0; border:0; border-radius:8px; background:transparent; color:var(--mm-ink-500, #51627b); cursor:pointer; }

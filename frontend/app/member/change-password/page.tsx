@@ -1,4 +1,5 @@
 'use client';
+import { PasswordInput } from '@/components/password-input';
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -37,8 +38,8 @@ export default function MemberChangePasswordPage() {
           <h1 className="mm-title">Choose a new password</h1>
           <p className="mm-subtitle" style={{ marginBottom: 26 }}>Your account requires a password change before the member dashboard can be used.</p>
           <form method="post" onSubmit={submit}>
-            <div className="mm-field"><label htmlFor="currentPassword">Current password</label><input className="mm-input" id="currentPassword" type="password" autoComplete="current-password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} required /></div>
-            <div className="mm-field"><label htmlFor="newPassword">New password</label><input className="mm-input" id="newPassword" type="password" autoComplete="new-password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} required /></div>
+            <div className="mm-field"><label htmlFor="currentPassword">Current password</label><PasswordInput label="Current password" className="mm-input" id="currentPassword" autoComplete="current-password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} required /></div>
+            <div className="mm-field"><label htmlFor="newPassword">New password</label><PasswordInput label="New password" className="mm-input" id="newPassword" autoComplete="new-password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} required /></div>
             {error ? <div className="mm-error" role="alert">{error}</div> : null}
             <button className="mm-button" disabled={busy} type="submit">{busy ? 'Updating…' : 'Update password'}</button>
           </form>

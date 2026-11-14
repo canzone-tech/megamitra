@@ -1,4 +1,5 @@
 'use client';
+import { PasswordInput } from '@/components/password-input';
 
 import { useState } from 'react';
 import { ApiClientError, apiJson } from '@/lib/client-api';
@@ -100,7 +101,7 @@ export function AdminEmailChangeForm() {
   return (
     <form method="post" onSubmit={submit}>
       <div className="mm-field"><label htmlFor="admin-new-email">New email</label><input className="mm-input" id="admin-new-email" type="email" autoComplete="email" value={newEmail} onChange={(event) => setNewEmail(event.target.value)} required /></div>
-      <div className="mm-field"><label htmlFor="admin-current-password">Current password</label><input className="mm-input" id="admin-current-password" type="password" autoComplete="current-password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} required /></div>
+      <div className="mm-field"><label htmlFor="admin-current-password">Current password</label><PasswordInput label="Current password" className="mm-input" id="admin-current-password" autoComplete="current-password" value={currentPassword} onChange={(event) => setCurrentPassword(event.target.value)} required /></div>
       <ResultMessage result={result} />
       <button className="mm-button" type="submit" disabled={busy}>{busy ? 'Sending…' : 'Verify new email'}</button>
     </form>

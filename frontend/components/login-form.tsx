@@ -1,4 +1,5 @@
 'use client';
+import { PasswordInput } from '@/components/password-input';
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
@@ -83,7 +84,7 @@ export function LoginForm() {
       </div>
       <div className="mm-field">
         <label htmlFor="password">Password</label>
-        <input className="mm-input" id="password" type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required />
+        <PasswordInput label="Password" className="mm-input" id="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required />
       </div>
       {(authConfig?.passwordResetEnabled || verificationRequired) ? (
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: 14, flexWrap: 'wrap', marginTop: -8, marginBottom: 18, fontSize: 13 }}>

@@ -219,6 +219,9 @@ bash "${ROOT_DIR}/scripts/verify-branding.sh"
 echo "==> Verifying premium homepage content, routes and accessibility"
 node "${ROOT_DIR}/scripts/test-homepage-contract.mjs"
 
+echo "==> Checking password visibility controls across Admin and Member"
+node "${ROOT_DIR}/scripts/test-password-visibility.mjs"
+
 echo "==> Verifying frontend privacy and native-form safety"
 node "${ROOT_DIR}/scripts/verify-frontend-safety.mjs"
 

@@ -1,4 +1,5 @@
 'use client';
+import { PasswordInput, PasswordValue } from '@/components/password-input';
 
 import { ActionFeedback } from './action-feedback';
 import Link from 'next/link';
@@ -508,11 +509,10 @@ export function SignupForm() {
       </div>
       <div className="mm-field">
         <label htmlFor="signupPassword">Password{passwordMode === 'MANUAL' ? ' *' : ''}</label>
-        <input
+        <PasswordInput label="Password"
           className="mm-input"
           id="signupPassword"
           name="password"
-          type="password"
           required={passwordMode === 'MANUAL'}
           disabled={passwordMode === 'AUTO'}
           minLength={config?.passwordMinLength}
@@ -546,7 +546,7 @@ export function SignupForm() {
           {result.sponsor ? <span style={{ display: 'block', marginTop: 4 }}>Sponsor: {result.sponsor.fullName} ({result.sponsor.username})</span> : null}
           {result.placement?.slot ? <span style={{ display: 'block', marginTop: 4 }}>Auto placement: Slot {result.placement.slot} • {result.placement.side}</span> : null}
           {result.enrollment ? <span style={{ display: 'block', marginTop: 4 }}>Installments paid through joining: {result.enrollment.paidInstallmentCount} • Catch-up: {result.enrollment.catchUpInstallmentCount}</span> : null}
-          {result.initialPassword ? <span style={{ display: 'block', marginTop: 7 }}>One-time generated password: <b>{result.initialPassword}</b>. Save it now.</span> : null}
+          {result.initialPassword ? <span style={{ display: 'block', marginTop: 7 }}>One-time generated password: <PasswordValue key={result.initialPassword} value={result.initialPassword} />. Save it now.</span> : null}
           <div style={{ marginTop: 13, padding: 12, borderRadius: 11, background: '#fff', border: '1px solid rgba(7,150,77,.26)', color: 'var(--mm-ink-900)' }}>
             <strong style={{ display: 'block' }}>Your Referral Code: {result.user.username}</strong>
             <span style={{ display: 'block', marginTop: 5, fontSize: 12, overflowWrap: 'anywhere' }}>
