@@ -991,7 +991,9 @@ async function main() {
       name: 'admin-staff-password-desktop', baseUrl: adminBaseUrl, path: '/portal/staff',
       cookieName: 'megagoldenclub_admin_access', token: adminToken,
       width: 1440, height: 1000, mobile: false,
-      expectedTexts: ['Initial Password'], verifyPasswordVisibility: 1,
+      // Field labels are CSS-uppercased in innerText; assert the form heading,
+      // then exercise the real password control below.
+      expectedTexts: ['Create Admin / Agent'], verifyPasswordVisibility: 1,
     },
     {
       name: 'public-awards-desktop',
